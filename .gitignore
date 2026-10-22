@@ -18,3 +18,4 @@ purchases.jsonl
 *.jsonl
 data/
 
+.pre_push_secret_test.js
