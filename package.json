@@ -2,7 +2,7 @@
   "name": "worth-the-trip",
   "version": "1.0.0",
   "description": "Worth The Trip — Japan travel guide marketplace with Stripe payments",
-  "main": "create-checkout-sessions.js",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "create-sessions": "node create-checkout-sessions.js",
