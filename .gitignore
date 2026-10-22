@@ -10,3 +10,11 @@ backup/
 live_idx.html
 pin-debug.html
 _served_*.js
+
+# Local user/session data (contains sensitive personal data)
+auth.jsonl
+sessions.jsonl
+purchases.jsonl
+*.jsonl
+data/
+
