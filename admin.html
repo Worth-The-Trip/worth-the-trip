@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Worth The Trip</title>
+  <link rel="stylesheet" href="/src/css/styles.css?v=36">
+  <link rel="icon" href="/public/Branding/WTT Logo 1.svg">
+  <style>
+    * { box-sizing: border-box; }
+    /* styles.css locks html/body scrolling for the full-screen map app.
+       This is a normal document page, so restore page scrolling. */
+    html, body { height: auto; overflow-y: auto; overflow-x: hidden; }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--app-bg, #0d0d0d);
+      color: var(--foreground);
+      min-height: 100vh;
+    }
+    a { color: var(--accent); }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin-bottom: 16px; }
+    .card h1 { margin: 0 0 4px; font-size: 22px; }
+    .card .sub { color: var(--muted-foreground); margin-bottom: 16px; }
+
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .tab {
+      flex: 1 1 160px; padding: 12px; text-align: center; border: 1px solid var(--border);
+      border-radius: 8px; cursor: pointer; font-weight: 600; background: var(--surface);
+      color: var(--foreground);
+    }
+    .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .tab[data-tab] { cursor: pointer; }
+    .tab[aria-selected="true"] { background: var(--accent); color: #fff; }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; color: var(--muted-foreground); margin-bottom: 6px; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--surface); color: var(--foreground); font-size: 15px; font-family: inherit;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; border: none; border-radius: 9px; cursor: pointer; font-weight: 600; text-decoration: none; font-size: 15px; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ghost { background: var(--surface); color: var(--foreground); }
+    .btn-danger { background: #b3261e; color: #fff; }
+    .btn-sm { padding: 8px 12px; font-size: 13px; }
+
+    .table-wrap { overflow-x: auto; }
+    .table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .table th, .table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .table th { color: var(--muted-foreground); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .table tr:hover { background: var(--surface); }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border); }
+
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: var(--surface); color: var(--muted-foreground); }
+    .pill.green { background: #1b5e20; color: #fff; }
+    .pill.yellow { background: #f9a825; color: #fff; }
+    .pill.orange { background: #e65100; color: #fff; }
+
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .edit-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .edit-form input, .edit-form select { width: auto; }
+    .empty { color: var(--muted-foreground); text-align: center; padding: 24px 0; }
+
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; padding: 12px 20px; border-radius: 8px; font-weight: 600; z-index: 999; opacity: 0; transition: opacity .25s; }
+    .toast.show { opacity: 1; }
+
+    .login-box { max-width: 420px; margin: 8vh auto; }
+    .login-box h1 { text-align: center; }
+  </style>
+</head>
+<body>
+
+  <header class="page-header">
+    <button class="back-btn" id="page-back-btn">← Back</button>
+  </header>
+
+  <div class="wrap">
+
+    <div id="login-view" class="card login-box">
+      <h1>Admin login</h1>
+      <form id="admin-login-form">
+        <div class="field">
+          <label>Password</label>
+          <input id="admin-password" type="password" required autocomplete="current-password">
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" type="submit">Log in</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="admin-view" style="display:none">
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div>
+            <h1>Admin dashboard</h1>
+            <p class="sub">Users, purchases, and creator applications — all from one place.</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="logout-btn">Log out</button>
+        </div>
+      </div>
+
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="users">Users</button>
+        <button class="tab" data-tab="purchases">Purchases</button>
+        <button class="tab" data-tab="guides">Guides</button>
+        <button class="tab" data-tab="creators">Creators</button>
+      </div>
+
+      <div id="panel-users"></div>
+      <div id="panel-purchases"></div>
+      <div id="panel-guides"></div>
+      <div id="panel-creators"></div>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+  (function () {
+    'use strict';
+    const $ = (s) => document.querySelector(s);
+    const TOAST_KEY = 'wtt_admin_token';
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    function toast(msg) {
+      const el = $('#toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('show'), 3200);
+    }
+
+    function api(path, options) {
+      const token = localStorage.getItem(TOAST_KEY) || '';
+      return fetch(path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      }).then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const e = new Error(body.error || 'Request failed');
+          e.status = r.status;
+          throw e;
+        }
+        return body;
+      });
+    }
+
+    function show(el, hide) {
+      const hideList = Array.isArray(hide) ? hide : (hide ? [hide] : []);
+      el.forEach((e) => { e.style.display = hideList.indexOf(e) !== -1 ? 'none' : 'block'; });
+    }
+
+    function loadToken() { return localStorage.getItem(TOAST_KEY); }
+
+    async function login(password) {
+      const res = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password }) });
+      localStorage.setItem(TOAST_KEY, res.token);
+      loadAll();
+    }
+
+    async function logout() {
+      await api('/api/admin/logout', { method: 'POST' });
+      localStorage.removeItem(TOAST_KEY);
+      location.reload();
+    }
+
+    async function loadAll() {
+      const u = await api('/api/users');
+      renderUsers(u.users);
+      const p = await api('/api/purchases');
+      renderPurchases(p.purchases);
+      const c = await api('/api/creators');
+      renderCreators(c.creators);
+      const g = await api('/api/admin/guides');
+      renderGuides(g.guides);
+      updateGuideTabBadge(g.guides);
+      show([$('#login-view'), $('#admin-view')], null);
+      $('#login-view').style.display = 'none';
+      $('#admin-view').style.display = 'block';
+      showTabs('users');
+    }
+
+    // ---- tabs ----
+    $('#tabs').addEventListener('click', (e) => {
+      const tab = e.target.closest('.tab');
+      if (!tab) return;
+      document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      showTabs(tab.dataset.tab);
+    });
+
+    function showTabs(name) {
+      ['users', 'purchases', 'guides', 'creators'].forEach((k) => {
+        $('#panel-' + k).style.display = (k === name) ? 'block' : 'none';
+      });
+    }
+
+    // ---- users ----
+    async function renderUsers(users) {
+      const el = $('#panel-users');
+      if (!users || !users.length) { el.innerHTML = '<p class="empty">No users.</p>'; return; }
+      let html = '<div class="table-wrap"><table class="table"><thead><tr>' +
+        '<th>Name</th><th>Email</th><th>Created</th><th>Purchases</th><th></th>' +
+        '</tr></thead><tbody>';
+      users.forEach((u) => {
+        html += '<tr>' +
+          `<td><strong>${u.name || '—'}</strong></td>` +
+          `<td>${u.email}</td>` +
+          `<td>${new Date(u.createdAt).toLocaleDateString()}</td>` +
+          `<td>${u.purchaseCount ?? 0}</td>` +
+          `<td style="white-space:nowrap"><button class="btn btn-sm btn-primary" data-edit-id="${u.id}">Edit</button></td>` +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+      el.innerHTML = html;
+
+      el.querySelectorAll('[data-edit-id]').forEach((b) => {
+        b.addEventListener('click', async () => {
+          const id = b.dataset.editId;
+          const list = await api('/api/users/' + id);
+          const u = list.user;
+          const newName = prompt('New name', u.name);
+          if (newName === null) return;
+          const newEmail = prompt('New email', u.email);
+          if (newEmail === null) return;
+          await api('/api/users/' + id, {
+            method: 'PATCH',
+            body: JSON.stringify({ name: newName, email: newEmail }),
+          });
+          loadAll();
+        });
+      });
+
+      el.querySelectorAll('.btn-danger').forEach((b) => {
+        b.addEventListener('click', async (e) => {
+          const id = e.target.dataset.deleteId;
+          if (!confirm('Delete this user?')) return;
+          await api('/api/users/' + id, { method: 'DELETE' });
+          loadAll();
+        });
+      });
+    }
+
+    // ---- purchases ----
+    function renderPurchases(purchases) {
+      const el = $('#panel-purchases');
+      if (!purchases || !purchases.length) { el.innerHTML = '<p class="empty">No purchases.</p>'; return; }
+      let html = '<div class="field"><label style="display:flex;gap:8px;flex-wrap:wrap">Email <input id="f-email" type="text" placeholder="filter by e-mail"></label>' +
+        '<label style="display:flex;gap:8px;flex-wrap:wrap">Guide <input id="f-guide" type="text" placeholder="filter by guide"></label></div>' +
+        '<div class="table-wrap"><table class="table"><thead><tr>' +
+        '<th>Guide</th><th>Buyer email</th><th>Amount</th><th>Currency</th><th>Date</th><th>Type</th>' +
+        '</tr></thead><tbody>';
+      purchases.forEach((p) => {
+        const type = p.type === 'subscription' ? 'Subscription' : 'Purchased';
+        const sign = p.currency === 'jpy' ? '¥' : (p.currency === 'usd' ? '$' : p.currency);
+        html += '<tr>' +
+          `<td><strong>${p.guideTitle || p.guideId || '—'}</strong></td>` +
+          `<td>${p.buyerEmail || '—'}</td>` +
+          `<td>${p.amount != null ? sign + Number(p.amount).toFixed(2) : '—'}</td>` +
+          `<td>${p.currency}</td>` +
+          `<td>${new Date(p.purchasedAt * 1000).toLocaleString()}</td>` +
+          `<td><span class="pill ${p.type === 'subscription' ? 'orange' : 'green'}">${type}</span></td>` +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+      el.innerHTML = html;
+    }
+
+    // ---- creators ----
+    function renderCreators(creators) {
+      const el = $('#panel-creators');
+      if (!creators || !creators.length) { el.innerHTML = '<p class="empty">No creator applications.</p>'; return; }
+      let html = '<div class="table-wrap"><table class="table"><thead><tr>' +
+        '<th>Name</th><th>Email</th><th>Area</th><th>Status</th><th>Guides</th><th>Applied</th><th></th>' +
+        '</tr></thead><tbody>';
+      creators.forEach((c) => {
+        const pill = c.status === 'accepted' ? '<span class="pill green">Accepted</span>' :
+                     c.status === 'rejected' ? '<span class="pill orange">Rejected</span>' :
+                     '<span class="pill yellow">Pending</span>';
+        html += '<tr>' +
+          `<td><strong>${c.name || '—'}</strong></td>` +
+          `<td>${c.email || '—'}</td>` +
+          `<td>${c.area || '—'}</td>` +
+          `<td>${pill}</td>` +
+          `<td>${c.guidesCount ?? 0}</td>` +
+          `<td>${c.appliedAt ? new Date(c.appliedAt).toLocaleDateString() : '—'}</td>` +
+          `<td style="white-space:nowrap">` +
+          `<button class="btn btn-sm ${c.status === 'accepted' ? 'btn-ghost' : 'btn-primary'}` + (c.status === 'accepted' ? '' : ' glass') + `" data-set="${c.id}" data-status="accepted">Approve</button> ` +
+          `<button class="btn btn-sm ${c.status === 'rejected' ? 'btn-ghost' : 'btn-danger'}" data-set="${c.id}" data-status="rejected">Reject</button>` +
+          `</td>` +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+      el.innerHTML = html;
+
+      el.querySelectorAll('[data-set]').forEach((b) => {
+        b.addEventListener('click', async () => {
+          const id = b.dataset.set;
+          const status = b.dataset.status;
+          await api('/api/creators/' + id, { method: 'PATCH', body: JSON.stringify({ status }) });
+          loadAll();
+        });
+      });
+    }
+
+    // ---- guides (creator submissions awaiting review) ----
+    let guidesCache = [];
+    let guideFilter = 'submitted';
+
+    function gStatusPill(status) {
+      const label = { draft: 'Draft', submitted: 'In review', published: 'Published', rejected: 'Rejected' }[status] || status;
+      const cls = { submitted: 'yellow', published: 'green', rejected: 'orange' }[status] || '';
+      return '<span class="pill ' + cls + '">' + esc(label) + '</span>';
+    }
+
+    function updateGuideTabBadge(guides) {
+      const n = (guides || []).filter((g) => g.status === 'submitted').length;
+      const tab = document.querySelector('[data-tab="guides"]');
+      if (tab) tab.textContent = n ? 'Guides (' + n + ')' : 'Guides';
+    }
+
+    function guideDetailHtml(g) {
+      const stops = (g.timeline || []);
+      let h = '<div style="padding:14px 4px">';
+      if (g.heroImage) h += '<img src="' + esc(g.heroImage) + '" alt="" style="max-width:260px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px" onerror="this.style.display=\'none\'">';
+      h += '<div><strong>' + esc(g.title || '') + '</strong> — ' + esc(g.tagline || '') + '</div>';
+      h += '<div class="sub" style="margin:8px 0">' +
+        esc([g.city, g.prefecture, g.duration, g.category].filter(Boolean).join(' · ')) +
+        ' · ¥' + Number(g.price || 0).toLocaleString() +
+        ((g.season || []).length ? ' · season: ' + esc(g.season.join(', ').toUpperCase()) : '') + '</div>';
+      h += '<div class="sub">Explore pin: ' + (g.coordinates ? esc(g.coordinates[0].toFixed(5) + ', ' + g.coordinates[1].toFixed(5)) : '<strong>missing</strong>') +
+        ' · zoom ' + esc(String(g.zoomLevel || '')) + '</div>';
+      h += '<div class="sub">Source video: ' + (g.video && g.video.url ? '<a href="' + esc(g.video.url) + '" target="_blank" rel="noopener">' + esc(g.video.url) + '</a>' : '<strong>missing</strong>') + '</div>';
+      if ((g.includes || []).length) {
+        h += '<div style="margin-top:10px"><strong>Includes</strong><ul style="margin:6px 0 0 18px">' +
+          g.includes.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></div>';
+      }
+      h += '<div style="margin-top:10px"><strong>Stops (' + stops.length + ')</strong>';
+      if (!stops.length) h += ' <span class="sub">none</span>';
+      h += stops.map((s, i) => '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">' +
+        '<div><strong>' + (i + 1) + '. ' + esc(s.title || '') + '</strong>' + (s.time ? ' <span class="sub">' + esc(s.time) + '</span>' : '') + '</div>' +
+        '<div class="sub">' + esc(s.desc || '') + '</div>' +
+        '<div class="sub">' + (s.mapPin ? 'pin ' + esc(s.mapPin[0].toFixed(5) + ', ' + s.mapPin[1].toFixed(5)) : '<strong>no pin</strong>') +
+        (s.travelTime ? ' · ' + esc(s.travelTime) + ' by ' + esc(s.travelMode || '') : '') + '</div>' +
+        (s.image ? '<img src="' + esc(s.image) + '" alt="" style="max-width:160px;border-radius:6px;margin-top:6px" onerror="this.style.display=\'none\'">' : '') +
+        '</div>').join('');
+      h += '</div>';
+      if (g.reviewNote) h += '<div class="sub" style="margin-top:10px">Last review note: ' + esc(g.reviewNote) + '</div>';
+      h += '</div>';
+      return h;
+    }
+
+    function renderGuides(guides) {
+      guidesCache = guides || [];
+      const el = $('#panel-guides');
+      const counts = {};
+      guidesCache.forEach((g) => { counts[g.status] = (counts[g.status] || 0) + 1; });
+      const filters = ['submitted', 'published', 'draft', 'rejected', 'all'];
+      const tabsHtml = filters.map((s) =>
+        '<button class="btn btn-sm ' + (guideFilter === s ? 'btn-primary' : 'btn-ghost') + '" data-gfilter="' + s + '">' +
+        (s === 'all' ? 'All' : gStatusPill(s)) + ' (' + (s === 'all' ? guidesCache.length : (counts[s] || 0)) + ')</button>').join(' ');
+
+      let html = '<div class="card"><div class="btn-row" style="margin-bottom:14px">' + tabsHtml + '</div>';
+      const list = guidesCache.filter((g) => guideFilter === 'all' || g.status === guideFilter);
+      if (!list.length) {
+        html += '<p class="empty">Nothing in this bucket.</p></div>';
+        el.innerHTML = html;
+        wireGuideFilters();
+        return;
+      }
+      html += '<div class="table-wrap"><table class="table"><thead><tr>' +
+        '<th>Guide</th><th>Creator</th><th>Status</th><th>Price</th><th>Stops</th><th>Updated</th><th></th>' +
+        '</tr></thead><tbody>';
+      list.forEach((g) => {
+        html += '<tr>' +
+          '<td><strong>' + esc(g.title || '(untitled)') + '</strong><br><span class="sub">' + esc(g.city || '') + '</span></td>' +
+          '<td>' + esc(g.creatorName || g.creatorHandle || '—') + '</td>' +
+          '<td>' + gStatusPill(g.status) + '</td>' +
+          '<td>¥' + Number(g.price || 0).toLocaleString() + '</td>' +
+          '<td>' + (g.timeline || []).length + '</td>' +
+          '<td>' + esc(String(g.updatedAt || '').slice(0, 10)) + '</td>' +
+          '<td style="white-space:nowrap">' +
+          '<button class="btn btn-sm btn-ghost" data-gview="' + esc(g.id) + '">View</button> ' +
+          '<a class="btn btn-sm btn-ghost" href="/creator?guide=' + esc(encodeURIComponent(g.id)) + '" target="_blank" rel="noopener">Edit</a> ' +
+          (g.status !== 'published' ? '<button class="btn btn-sm btn-primary" data-gpub="' + esc(g.id) + '">Publish</button> ' : '') +
+          (g.status !== 'rejected' ? '<button class="btn btn-sm btn-danger" data-grej="' + esc(g.id) + '">Reject</button>' : '') +
+          '</td></tr>' +
+          '<tr id="gdetail-' + esc(g.id) + '" style="display:none"><td colspan="7"></td></tr>';
+      });
+      html += '</tbody></table></div></div>';
+      el.innerHTML = html;
+      wireGuideFilters();
+      wireGuideActions();
+    }
+
+    function wireGuideFilters() {
+      document.querySelectorAll('#panel-guides [data-gfilter]').forEach((b) => {
+        b.addEventListener('click', () => { guideFilter = b.dataset.gfilter; renderGuides(guidesCache); });
+      });
+    }
+
+    function wireGuideActions() {
+      document.querySelectorAll('#panel-guides [data-gview]').forEach((b) => {
+        b.addEventListener('click', () => {
+          const id = b.dataset.gview;
+          const row = document.getElementById('gdetail-' + id);
+          if (!row) return;
+          const g = guidesCache.find((x) => x.id === id);
+          if (row.style.display === 'none') {
+            row.querySelector('td').innerHTML = guideDetailHtml(g || {});
+            row.style.display = '';
+            b.textContent = 'Hide';
+          } else {
+            row.style.display = 'none';
+            b.textContent = 'View';
+          }
+        });
+      });
+      document.querySelectorAll('#panel-guides [data-gpub]').forEach((b) => {
+        b.addEventListener('click', async () => {
+          const id = b.dataset.gpub;
+          if (!confirm('Publish this guide? It goes live on the Explore page immediately.')) return;
+          try {
+            await api('/api/admin/guides/' + id, { method: 'PATCH', body: JSON.stringify({ status: 'published' }) });
+            toast('Published');
+            loadAll();
+          } catch (e) {
+            toast(e.message + (e.problems ? ' — ' + e.problems.join(', ') : ''));
+          }
+        });
+      });
+      document.querySelectorAll('#panel-guides [data-grej]').forEach((b) => {
+        b.addEventListener('click', async () => {
+          const id = b.dataset.grej;
+          const note = prompt('What needs changing? (sent to the creator)');
+          if (note === null) return;
+          try {
+            await api('/api/admin/guides/' + id, { method: 'PATCH', body: JSON.stringify({ status: 'rejected', reviewNote: note }) });
+            toast('Sent back to the creator');
+            loadAll();
+          } catch (e) { toast(e.message); }
+        });
+      });
+    }
+
+    // ---- init ----
+    async function init() {
+      const token = loadToken();
+      if (!token) {
+        show([$('#login-view'), $('#admin-view')], [$('#admin-view')]);
+        return;
+      }
+      try {
+        await api('/api/users');
+        loadAll();
+      } catch (e) {
+        localStorage.removeItem(TOAST_KEY);
+        show([$('#login-view'), $('#admin-view')], [$('#admin-view')]);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    $('#admin-login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pw = $('#admin-password').value;
+      try { await login(pw); } catch (err) { toast(err.message); }
+    });
+
+    $('#logout-btn').addEventListener('click', async () => {
+      await logout();
+    });
+
+    $('#page-back-btn').addEventListener('click', () => { location.href = '/'; });
+  })();
+  </script>
+</body>
+</html>

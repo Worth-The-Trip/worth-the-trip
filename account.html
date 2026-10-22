@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your account — Worth The Trip</title>
+  <link rel="stylesheet" href="/src/css/styles.css?v=36">
+  <link rel="icon" href="/public/Branding/WTT Logo 1.svg">
+  <style>
+    :root { --app-bg: #0d0d0d; }
+    * { box-sizing: border-box; }
+    /* styles.css locks html/body scrolling for the full-screen map app.
+       This is a normal document page, so restore page scrolling. */
+    html, body { height: auto; overflow-y: auto; overflow-x: hidden; }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--app-bg);
+      color: var(--foreground);
+      min-height: 100vh;
+    }
+    a { color: var(--accent); }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      margin-bottom: 16px;
+    }
+    .card h1 { margin: 0 0 4px; font-size: 22px; }
+    .card .sub { color: var(--muted-foreground); margin-bottom: 18px; }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; color: var(--muted-foreground); margin-bottom: 6px; }
+    .field input, .field select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--foreground);
+      font-size: 15px;
+    }
+    .field input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
+
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px 18px; border: none; border-radius: 9px; cursor: pointer; font-weight: 600;
+      text-decoration: none; font-size: 15px;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ghost { background: var(--surface); color: var(--foreground); }
+    .btn-sm { padding: 8px 12px; font-size: 13px; }
+
+    .avatar-wrap { position: relative; }
+    .avatar {
+      width: 88px; height: 88px; border-radius: 50%;
+      object-fit: cover; border: 2px solid var(--border);
+    }
+    .avatar-btn { position: absolute; bottom: 0; right: 0; background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px; }
+    .avatar-label { font-size: 12px; color: var(--muted-foreground); margin-top: 6px; }
+
+    .section-title { font-size: 16px; font-weight: 700; margin: 22px 0 12px; }
+    .list { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .list th, .list td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .list th { color: var(--muted-foreground); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .list tr { cursor: pointer; }
+    .list tr:hover { background: var(--surface); }
+    .empty { color: var(--muted-foreground); text-align: center; padding: 24px 0; }
+
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: var(--surface); color: var(--muted-foreground); }
+    .pill.green { background: #1b5e20; color: #fff; }
+    .pill.yellow { background: #f9a825; color: #fff; }
+    .pill.orange { background: #e65100; color: #fff; }
+
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; padding: 12px 20px; border-radius: 8px; font-weight: 600; z-index: 999; opacity: 0; transition: opacity .25s; }
+    .toast.show { opacity: 1; }
+
+    .auth-step h2 { margin-bottom: 8px; }
+    .error { color: #b3261e; background: #b3261e10; border: 1px solid #b3261e30; padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
+
+    .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted-foreground); }
+  </style>
+</head>
+<body>
+
+  <header class="page-header">
+    <button class="back-btn" id="page-back-btn">← Back</button>
+  </header>
+
+  <div class="wrap">
+
+    <!-- ---- if not logged in ---- -->
+    <div id="auth-view">
+      <div class="card auth-step">
+        <h1>Your account</h1>
+        <p class="sub">Sign in or create an account to track your purchases and manage your profile.</p>
+
+        <div class="error" id="auth-error"></div>
+
+        <div class="section-title">Sign in</div>
+        <form id="signin-form">
+          <div class="field">
+            <label for="si-email">Email</label>
+            <input id="si-email" type="email" required autocomplete="email">
+          </div>
+          <div class="field">
+            <label for="si-password">Password</label>
+            <input id="si-password" type="password" required autocomplete="current-password">
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="submit">Sign in</button>
+          </div>
+        </form>
+
+        <div class="section-title">Create account</div>
+        <form id="signup-form">
+          <div class="field">
+            <label for="su-email">Email</label>
+            <input id="su-email" type="email" required autocomplete="email">
+          </div>
+          <div class="field">
+            <label for="su-password">Password (6+ chars)</label>
+            <input id="su-password" type="password" required minlength="6" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="su-name">Name</label>
+            <input id="su-name" type="text" required autocomplete="name">
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="submit">Create account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ---- app dashboard ---- -->
+    <div id="dashboard-view" style="display:none">
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <img class="avatar" id="avatar-preview" alt="avatar">
+            <div style="min-width:0;">
+              <h1 id="dash-name"></h1>
+              <p class="sub" id="dash-email"></p>
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="pick-avatar">Change photo</button>
+          <input type="file" id="avatar-input" accept="image/*" style="display:none">
+        </div>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-ghost btn-sm" id="edit-profile-btn">Edit profile</button>
+          <button class="btn btn-ghost btn-sm" id="change-pw-btn">Change password</button>
+          <button class="btn btn-ghost btn-sm" id="logout-btn">Sign out</button>
+        </div>
+      </div>
+
+      <div class="card" id="creator-card" style="display:none">
+        <div class="section-title">Creator studio</div>
+        <p class="sub">Build your guides, add locations and pins, and manage what is live.</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="/creator">Open the studio</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Your purchases</div>
+        <div id="purchases-list"><p class="empty">Loading purchases…</p></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">What's here</div>
+        <p class="sub">This dashboard is your account home. You can edit your profile photo, name and contact details, and view all the guides you've purchased. It is not tied to Stripe directly — it simply reflects what the site recorded when you paid.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+  (function () {
+    'use strict';
+    const $ = (s) => document.querySelector(s);
+    const AUTH_KEY = 'wtt_session';
+
+    function toast(msg) {
+      const el = $('#toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('show'), 3200);
+    }
+
+    function api(path, options) {
+      const token = localStorage.getItem(AUTH_KEY) || '';
+      return fetch(path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      }).then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const e = new Error(body.error || 'Request failed');
+          e.status = r.status;
+          throw e;
+        }
+        return body;
+      });
+    }
+
+    // ---- bootstrap ----
+    function isLoggedIn() { return !!localStorage.getItem(AUTH_KEY); }
+
+    function loadCurrentUser() {
+      return api('/api/me');
+    }
+
+    async function boot() {
+      try {
+        const u = await loadCurrentUser();
+        showDashboard(u);
+        loadPurchases().catch(() => {});
+        loadCreatorAccess();
+      } catch (e) {
+        showAuth();
+      }
+    }
+
+    // Approved creators get a shortcut to the studio on their account page.
+    function loadCreatorAccess() {
+      api('/api/creator/me')
+        .then((me) => {
+          if (me && me.isCreator) $('#creator-card').style.display = 'block';
+        })
+        .catch(() => { /* not signed in, or not a creator */ });
+    }
+
+    function showAuth() {
+      $('#auth-view').style.display = 'block';
+      $('#dashboard-view').style.display = 'none';
+      $('#signin-form').reset();
+      $('#signup-form').reset();
+      $('#auth-error').textContent = '';
+    }
+
+    function showDashboard(user) {
+      $('#auth-view').style.display = 'none';
+      $('#dashboard-view').style.display = 'block';
+      $('#avatar-preview').src = user.avatar || '/public/Branding/WTT profile.svg';
+      $('#dash-name').textContent = user.name || 'Hello there';
+      $('#dash-email').textContent = user.email;
+    }
+
+    // ---- sign in / sign up ----
+    $('#signin-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = $('#si-email').value.trim();
+      const password = $('#si-password').value;
+      $('#auth-error').textContent = '';
+      api('/api/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+        .then((res) => {
+          localStorage.setItem(AUTH_KEY, res.token);
+          return loadCurrentUser();
+        })
+        .then((u) => { showDashboard(u); loadCreatorAccess(); })
+        .catch((err) => { $('#auth-error').textContent = err.message; });
+    });
+
+    $('#signup-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = $('#su-email').value.trim();
+      const password = $('#su-password').value;
+      const name = $('#su-name').value.trim();
+      $('#auth-error').textContent = '';
+      api('/api/users', { method: 'POST', body: JSON.stringify({ email, password, name }) })
+        .then((res) => {
+          localStorage.setItem(AUTH_KEY, res.token);
+          return loadCurrentUser();
+        })
+        .then((u) => { showDashboard(u); loadCreatorAccess(); })
+        .catch((err) => { $('#auth-error').textContent = err.message; });
+    });
+
+    // ---- profile ----
+    $('#edit-profile-btn').addEventListener('click', async () => {
+      const user = await loadCurrentUser();
+      const name = prompt('Name', user.name || '');
+      if (name === null) return;
+      try {
+        const up = await api('/api/me', {
+          method: 'PATCH',
+          body: JSON.stringify({ name }),
+        });
+        showDashboard(up);
+        toast('Profile saved');
+      } catch (err) { toast(err.message); }
+    });
+
+    // change password
+    $('#change-pw-btn').addEventListener('click', async () => {
+      const oldPw = prompt('Current password');
+      if (oldPw === null) return;
+      const newPw = prompt('New password (6+ chars)');
+      if (newPw === null) return;
+      const confirm = prompt('Repeat new password');
+      if (confirm !== newPw) { toast('Passwords do not match'); return; }
+      try {
+        const up = await api('/api/me', {
+          method: 'PATCH',
+          body: JSON.stringify({ oldPassword: oldPw, password: newPw }),
+        });
+        showDashboard(up);
+        toast('Password changed');
+      } catch (err) { toast(err.message); }
+    });
+
+    // avatar upload (triggered by Change photo button)
+    $('#pick-avatar').addEventListener('click', () => { $('#avatar-input').click(); });
+    $('#avatar-input').addEventListener('change', async () => {
+      const file = $('#avatar-input').files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const up = await api('/api/me', {
+            method: 'PATCH',
+            body: JSON.stringify({ avatarDataUrl: reader.result }),
+          });
+          showDashboard(up);
+          toast('Photo updated');
+        } catch (err) { toast(err.message); }
+      };
+      reader.readAsDataURL(file);
+      $('#avatar-input').value = '';
+    });
+
+    // sign out
+    $('#logout-btn').addEventListener('click', async () => {
+      await api('/api/logout', { method: 'POST' });
+      localStorage.removeItem(AUTH_KEY);
+      showAuth();
+      toast('Signed out');
+    });
+
+    // ---- purchases ----
+    async function loadPurchases() {
+      const user = await loadCurrentUser();
+      const res = await api('/api/purchases/my');
+      const list = res.purchases || [];
+      const el = $('#purchases-list');
+      if (!list.length) {
+        el.innerHTML = '<p class="empty">No purchases yet.</p>';
+        return;
+      }
+      let html = '<table class="list"><thead><tr>' +
+        '<th>Guide</th><th>Price</th><th>Date</th><th>Status</th>' +
+        '</thead><tbody>';
+      list.forEach((p) => {
+        const type = p.type === 'subscription' ? 'Subscription' : 'Purchased';
+        const pill = p.type === 'subscription'
+          ? '<span class="pill orange">Subscription</span>'
+          : '<span class="pill green">Purchased</span>';
+        html += '<tr>' +
+          `<td><strong>${p.guideTitle || p.guideId || '—'}</strong></td>` +
+          `<td>${p.amount != null ? (p.currency === 'jpy' ? '¥' : '$' ) + Number(p.amount).toFixed(2) : '—'}</td>` +
+          `<td>${new Date(p.purchasedAt).toLocaleDateString()}</td>` +
+          `<td>${pill}</td>` +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    }
+
+    // ---- bind toggle ----
+    function bindToggle(btn, panelId) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.panel').forEach((p) => { p.classList.remove('open'); });
+        const panel = document.getElementById(panelId);
+        if (panel) panel.classList.toggle('open');
+      });
+    }
+
+    // ---- init ----
+    boot();
+
+    $('#page-back-btn').addEventListener('click', () => { location.href = '/'; });
+  })();
+  </script>
+</body>
+</html>

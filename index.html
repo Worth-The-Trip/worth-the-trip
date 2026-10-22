@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Worth The Trip — Curated Japan</title>
+  <meta name="description" content="Human-curated travel itineraries for Japan.">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="src/css/styles.css?v=35">
+  <link rel="icon" href="public/Branding/WTT Logo 1.svg">
+</head>
+<body>
+
+  <div id="app">
+
+    <header id="header">
+      <button id="menu-btn" class="icon-btn" aria-label="Menu">
+        <img src="public/Branding/WTT menu.svg" alt="Menu" class="header-menu-icon">
+      </button>
+      <div class="header-brand">
+        <img src="public/Branding/WTT Logo 1.svg" alt="Worth The Trip" class="brand-logo" id="brand-logo">
+        <span class="brand-text">WORTH THE TRIP</span>
+      </div>
+      <div class="header-actions">
+      <button id="theme-btn" class="icon-btn" aria-label="Toggle light mode">
+        <svg id="theme-icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg id="theme-icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </button>
+      <button id="profile-btn" class="icon-btn" aria-label="Profile">
+        <img src="public/Branding/WTT profile.svg" alt="Profile" class="header-profile-icon">
+      </button>
+      </div>
+    </header>
+
+    <main id="main">
+
+      <!-- Search + filter bar -->
+      <div id="search-bar">
+        <div class="search-pill">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+          <input type="text" id="search-input" placeholder="Where are you curious about?" autocomplete="off" data-i18n-ph="search.placeholder">
+          <button id="search-clear" class="search-clear" aria-label="Clear search" hidden>✕</button>
+        </div>
+        <div class="filter-row">
+          <button id="filter-btn" class="filter-btn" aria-label="Filters">
+            <img src="public/Branding/WTT filter.svg" alt="Filters" class="filter-btn-icon">
+          </button>
+          <div id="filter-chips" class="filter-chips">
+            <button class="chip active" data-filter="all" data-i18n="filter.all">All</button>
+            <button class="chip" data-filter="culture" data-i18n="filter.culture">Culture</button>
+            <button class="chip" data-filter="nature" data-i18n="filter.nature">Nature</button>
+            <button class="chip" data-filter="food" data-i18n="filter.food">Food</button>
+            <button class="chip" data-filter="hiking" data-i18n="filter.hiking">Hiking</button>
+            <button class="chip" data-filter="luxury" data-i18n="filter.luxury">Luxury</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map container -->
+      <div id="map-container">
+        <div id="map"></div>
+        <button id="compass-btn" class="compass-btn" aria-label="Reset to true north">
+          <svg id="compass-arrow" width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" opacity="0.4"/><path d="M12 3.5 L18.5 15.5 L12 13 L5.5 15.5 Z" fill="#D32F2F"/></svg>
+        </button>
+      </div>
+
+      <!-- Popular this week carousel -->
+      <div id="popular-sheet" class="bottom-sheet">
+        <div class="sheet-header">
+          <h2 class="sheet-title" data-i18n="popular.title">Popular This Week</h2>
+          <a href="#" class="sheet-link" id="see-all" data-i18n="popular.seeAll">See all</a>
+          <button id="popular-close" class="sheet-close" aria-label="Close panel">✕</button>
+        </div>
+        <div class="carousel" id="popular-carousel"></div>
+      </div>
+
+      <!-- Guide side panel (guided mode: map 70% + guide 30%) -->
+      <aside id="guide-panel" aria-hidden="true">
+        <div id="guide-panel-content"></div>
+      </aside>
+
+    </main>
+
+    <!-- Bottom navigation -->
+    <nav id="bottom-nav">
+      <button class="nav-item active" data-tab="explore">
+        <img src="public/Branding/WTT Pin.svg" alt="Explore" class="nav-icon">
+        <span data-i18n="nav.explore">Explore</span>
+      </button>
+      <button class="nav-item" data-tab="trips">
+        <img src="public/Branding/WTT trip.svg" alt="Trips" class="nav-icon">
+        <span data-i18n="nav.trips">Trips</span>
+      </button>
+      <button class="nav-item" data-tab="saved">
+        <img src="public/Branding/WTT heart.svg" alt="Saved" class="nav-icon">
+        <span data-i18n="nav.saved">Saved</span>
+      </button>
+      <button class="nav-item" data-tab="bookings">
+        <img src="public/Branding/WTT booking.svg" alt="Bookings" class="nav-icon">
+        <span data-i18n="nav.bookings">Bookings</span>
+      </button>
+      <button class="nav-item" data-tab="creators">
+        <img src="public/Branding/WTT play.svg" alt="Creators" class="nav-icon">
+        <span data-i18n="nav.creators">Creators</span>
+      </button>
+    </nav>
+
+    <!-- Modal -->
+    <div id="guide-modal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-sheet" id="modal-sheet">
+        <button id="modal-close" class="modal-close" aria-label="Close">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <div class="modal-hero" id="modal-hero">
+          <div class="modal-hero-overlay"></div>
+          <div class="modal-hero-badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            <span id="modal-location"></span>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="modal-meta">
+            <div class="modal-duration" id="modal-duration"></div>
+            <div class="modal-curated" id="modal-curated"></div>
+          </div>
+          <div class="modal-title-row">
+            <h2 class="modal-title" id="modal-title"></h2>
+            <button id="modal-save-btn" class="save-heart" aria-label="Save guide">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+            </button>
+          </div>
+          <div class="modal-price-row">
+            <div class="modal-price" id="modal-price"></div>
+            <button class="btn-primary" id="modal-unlock-btn">
+              <span class="btn-label">Unlock Guide</span>
+              <span class="btn-sub">Follow the full itinerary</span>
+            </button>
+            <button class="btn-orange-sub" id="modal-unlock-all">
+              <span class="btn-label"></span>
+              <span class="btn-sub"></span>
+            </button>
+          </div>
+          <button class="btn-primary" id="modal-start-btn" style="display:none">
+            <span class="btn-label" data-i18n="modal.start">▶ Start Guide</span>
+          </button>
+          <div class="section-label" id="includes-label" data-i18n="modal.includes">What's included</div>
+          <div class="includes-list" id="modal-includes"></div>
+          <div class="section-label" style="display:none" id="timeline-label" data-i18n="modal.timeline">Day-by-day itinerary</div>
+          <div class="timeline" id="modal-timeline" style="display:none">
+            <div id="modal-timeline-content"></div>
+          </div>
+          <div class="section-label" style="display:none" id="subdest-label">Sub-destinations</div>
+          <div class="sub-dest-grid" id="modal-sub-dest-grid" style="display:none"></div>
+          <div class="section-label" style="display:none" id="creator-label" data-i18n="modal.curatedBy">Curated by</div>
+          <div class="creator-card" id="modal-creator" style="display:none"></div>
+          <div class="section-label" style="display:none" id="youtube-label" data-i18n="modal.youtube">Watch the original trip</div>
+          <a class="youtube-ref" id="modal-youtube" style="display:none"></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile -->
+    <div id="profile-modal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-sheet" id="profile-sheet">
+        <button id="profile-close" class="modal-close" aria-label="Close">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <div class="modal-body">
+          <h2 class="modal-title" data-i18n="profile.title">Profile</h2>
+
+          <div id="profile-signin">
+            <div class="section-label" data-i18n="profile.signin">Sign in</div>
+            <label class="field-label" for="profile-email" data-i18n="profile.email">Email</label>
+            <input type="email" id="profile-email" class="field-input" placeholder="you@example.com" autocomplete="email">
+            <label class="field-label" for="profile-password" data-i18n="profile.password">Password</label>
+            <input type="password" id="profile-password" class="field-input" placeholder="••••••••" autocomplete="current-password">
+            <button class="btn-primary" id="profile-signin-btn">
+              <span class="btn-label" data-i18n="profile.signinBtn">Sign In</span>
+            </button>
+            <p class="auth-switch"><span data-i18n="profile.noAccount">No account?</span> <a href="/account" id="profile-show-signup" data-i18n="profile.signupLink">Sign up</a></p>
+          </div>
+
+          <div id="profile-signup" style="display:none">
+            <div class="section-label" data-i18n="profile.createTitle">Create account</div>
+            <label class="field-label" for="profile-signup-username" data-i18n="profile.username">Username</label>
+            <input type="text" id="profile-signup-username" class="field-input" placeholder="e.g. japan_explorer" autocomplete="username">
+            <label class="field-label" for="profile-signup-email" data-i18n="profile.email">Email</label>
+            <input type="email" id="profile-signup-email" class="field-input" placeholder="you@example.com" autocomplete="email">
+            <label class="field-label" for="profile-signup-password" data-i18n="profile.choosePw">Choose a password</label>
+            <input type="password" id="profile-signup-password" class="field-input" placeholder="Choose a password" autocomplete="new-password" data-i18n-ph="profile.choosePw">
+            <button class="btn-primary" id="profile-signup-btn">
+              <span class="btn-label" data-i18n="profile.createBtn">Create Account</span>
+            </button>
+            <p class="auth-switch"><span data-i18n="profile.haveAccount">Already have an account?</span> <a href="/account" id="profile-show-signin" data-i18n="profile.signinLink">Sign in</a></p>
+          </div>
+
+          <div id="profile-signedin" style="display:none">
+            <div class="profile-signedin-row">
+              <span id="profile-signedin-email"></span>
+              <button class="btn-ghost" id="profile-signout-btn" data-i18n="profile.signout">Sign out</button>
+            </div>
+          </div>
+
+          <div id="profile-details">
+          <div class="section-label" data-i18n="profile.details">Your details</div>
+          <div class="profile-avatar-row">
+            <img id="profile-avatar-preview" class="profile-avatar" alt="Profile picture">
+            <label class="btn-ghost profile-upload-btn" for="profile-avatar-input" data-i18n="profile.uploadPhoto">Upload photo</label>
+            <input type="file" id="profile-avatar-input" accept="image/*" hidden>
+          </div>
+          <label class="field-label" for="profile-username" data-i18n="profile.username">Username</label>
+          <input type="text" id="profile-username" class="field-input" placeholder="e.g. japan_explorer" autocomplete="username">
+          <label class="field-label" for="profile-phone" data-i18n="profile.phone">Phone number</label>
+          <input type="tel" id="profile-phone" class="field-input" placeholder="+81 90 1234 5678" autocomplete="tel">
+          <label class="field-label" for="profile-address" data-i18n="profile.address">Address</label>
+          <input type="text" id="profile-address" class="field-input" placeholder="City, Country" autocomplete="street-address">
+          <button class="btn-primary" id="profile-save-btn">
+            <span class="btn-label" data-i18n="profile.save">Save Profile</span>
+          </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Menu drawer -->
+    <div id="menu-overlay" class="menu-overlay" aria-hidden="true">
+      <div class="menu-drawer" id="menu-drawer">
+        <div class="menu-drawer-header">
+          <span class="menu-drawer-title" data-i18n="menu.title">Menu</span>
+          <button id="menu-close" class="sheet-close" aria-label="Close menu">✕</button>
+        </div>
+        <nav class="menu-list">
+          <button class="menu-item" data-page="explore" data-i18n="menu.explore">Explore</button>
+          <button class="menu-item" data-page="my-guides" data-i18n="menu.myTrips">My Trips</button>
+          <button class="menu-item" data-page="saved" data-i18n="menu.saved">Saved</button>
+          <button class="menu-item" data-page="translator" data-i18n="menu.translator">Translator</button>
+          <button class="menu-item" id="menu-creator-apply" data-page="creator" data-i18n="menu.creator">Become a Creator</button>
+          <button class="menu-item" id="menu-creator-studio" data-page="creator-studio" data-i18n="menu.creatorStudio" style="display:none">Creator Studio</button>
+          <button class="menu-item" data-page="help" data-i18n="menu.help">Help / Contact</button>
+          <button class="menu-item" data-page="settings" data-i18n="menu.settings">Settings</button>
+          <button class="menu-item" data-page="terms" data-i18n="menu.terms">Terms of Service</button>
+          <button class="menu-item" data-page="privacy" data-i18n="menu.privacy">Privacy Policy</button>
+          <button class="menu-item" data-page="refunds" data-i18n="menu.refunds">Refund Policy</button>
+          <button class="menu-item" data-page="about" data-i18n="menu.about">About Worth The Trip</button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Menu page -->
+    <div id="menu-page" class="modal-overlay" aria-hidden="true">
+      <div class="modal-sheet" id="menu-sheet">
+        <button id="menu-page-close" class="modal-close" aria-label="Close">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <div class="modal-body">
+          <h2 class="modal-title" id="menu-page-title"></h2>
+          <div id="menu-page-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trips browse page (full screen) -->
+    <div id="trips-page" class="trips-page" aria-hidden="true">
+      <div class="trips-topbar">
+        <h2 class="trips-title" data-i18n="trips.title">Trips</h2>
+        <button id="trips-close" class="sheet-close" aria-label="Close trips">✕</button>
+      </div>
+      <div class="trips-layout">
+        <aside class="trips-sidebar">
+          <div class="trips-filter-head">
+            <div class="trips-section-label" style="margin:0" data-i18n="trips.filters">Filters</div>
+            <button id="trips-filters-toggle" class="trips-filters-toggle" aria-label="Expand filters">▼</button>
+            <button id="trips-clear-filters" class="trips-clear" aria-label="Clear filters" data-i18n="trips.clear">Clear</button>
+          </div>
+          <div id="trips-filters"></div>
+        </aside>
+        <div class="trips-main">
+          <div class="trips-search-row">
+            <div class="trips-search-wrap">
+              <input type="text" id="trips-search" class="trips-search-input" data-i18n-ph="trips.searchPh" placeholder="Search trips…" autocomplete="off">
+              <button id="trips-search-clear" class="search-clear search-clear-inside" aria-label="Clear search" hidden>✕</button>
+            </div>
+          </div>
+          <div id="trips-mine-section" style="display:none">
+            <div class="trips-section-title" data-i18n="trips.myTrips">My Trips</div>
+            <div id="trips-mine"></div>
+          </div>
+          <div id="trips-all"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bookings page (full screen) -->
+    <div id="bookings-page" class="trips-page" aria-hidden="true">
+      <div class="trips-topbar">
+        <h2 class="trips-title" data-i18n="bookings.title">Bookings</h2>
+        <button id="bookings-close" class="sheet-close" aria-label="Close bookings">✕</button>
+      </div>
+      <div class="bookings-list" id="bookings-list"></div>
+    </div>
+
+    <!-- Creators page (full screen) -->
+    <div id="creators-page" class="trips-page" aria-hidden="true">
+      <div class="trips-topbar">
+        <h2 class="trips-title" data-i18n="creators.title">Creators</h2>
+        <button id="creators-close" class="sheet-close" aria-label="Close creators">✕</button>
+      </div>
+      <div class="creators-search-row">
+        <input type="text" id="creators-search" class="field-input" data-i18n-ph="creators.searchPh" placeholder="Search creators by name…" autocomplete="off">
+      </div>
+      <div class="creators-chips" id="creators-platform-chips"></div>
+      <div class="creators-list" id="creators-list"></div>
+    </div>
+
+  </div>
+
+    <!-- Welcome / first-guide-free modal -->
+    <div id="welcome-modal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-sheet welcome-sheet">
+        <img src="public/Branding/WTT Logo 1.svg" alt="Worth The Trip" class="welcome-logo">
+        <h2 class="modal-title" data-i18n="welcome.title">Thank you for downloading Worth The Trip</h2>
+        <p class="page-text" data-i18n="welcome.body">To get you started, your first guide is on us. Pick any guide and unlock it for free.</p>
+        <button class="btn-primary" id="welcome-cta"><span class="btn-label" data-i18n="welcome.cta">Unlock my first guide free</span></button>
+        <button class="btn-ghost" id="welcome-later"><span data-i18n="welcome.later">Maybe later</span></button>
+      </div>
+    </div>
+
+  <div id="toast" class="toast"></div>
+
+  <div id="nav-banner" class="nav-banner" style="display:none">
+    <div class="nav-banner-text">
+      <div class="nav-next" id="nav-next"></div>
+      <div class="nav-dist" id="nav-dist"></div>
+    </div>
+    <a class="nav-gmaps" id="nav-gmaps" href="#" target="_blank" rel="noopener" data-i18n="nav.navigate">Navigate</a>
+    <button class="nav-mode" id="nav-mode" aria-label="Travel mode">🚶</button>
+    <button class="nav-end" id="nav-end" aria-label="End navigation" data-i18n="nav.end">End</button>
+  </div>
+
+  <aside id="nav-panel" class="nav-panel" aria-hidden="true">
+    <div id="nav-panel-body"></div>
+  </aside>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="src/js/data/guides.js?v=3"></script>
+  <script src="src/js/data/creators.js?v=1"></script>
+  <script src="src/js/data/bookings.js?v=2"></script>
+  <script src="src/js/data/strings.js?v=7"></script>
+  <script src="src/js/data/creator-guides.js?v=1"></script>
+  <script src="src/js/app.js?v=40"></script>
+</body>
+</html>

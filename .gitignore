@@ -1,0 +1,12 @@
+node_modules/
+.env
+stripe-config.json
+*.db-shm
+*.db-wal
+*.tmp
+nul
+build/
+backup/
+live_idx.html
+pin-debug.html
+_served_*.js
