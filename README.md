@@ -83,3 +83,22 @@ Paste the URLs into `src/js/app.js` under `CONFIG.stripePaymentLinks`.
 - `CONFIG.stripePaymentLinks` in `src/js/app.js` — the Stripe Checkout URLs
 - `server.js` — webhook endpoint for recording purchases
 - `create-checkout-sessions.js` — generates the URLs
+
+## Deployment (SiteGround managed Node.js)
+
+The live site runs as a SiteGround managed Node.js project. SiteGround checks
+out this repo into `.nodeapp/<id>/app_source` and runs `node server.js` there,
+fronted by its reverse proxy.
+
+- `package.json` → `main` must be `server.js`. SiteGround starts the app via
+  that field; pointing it at a one-shot script makes every request return 502.
+- Environment variables live in the SiteGround project settings, never in git:
+  `PORT` (`8080`), `HOST` (`0.0.0.0`), `ADMIN_PASSWORD`, `STRIPE_SECRET_KEY`,
+  `STRIPE_WEBHOOK_SECRET`.
+- **Runtime data must live outside the deploy dir.** SiteGround recreates
+  `.nodeapp/<id>/app_source` on every deploy, so anything written inside it is
+  wiped by the next `git push`. `server.js` therefore keeps accounts, sessions,
+  purchases and uploads in a persistent location and logs `Data dir: <path>` at
+  startup. Override it with the `WTT_DATA_DIR` env var if you move it. Locally
+  (no `.nodeapp` in the path) data stays in this repo directory, so existing
+  dev data is untouched.
