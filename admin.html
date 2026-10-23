@@ -71,6 +71,11 @@
 
     .login-box { max-width: 420px; margin: 8vh auto; }
     .login-box h1 { text-align: center; }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.62); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+    .modal { width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+    .modal h2 { margin: 0 0 14px; font-size: 19px; }
+    .modal .hint { color: var(--muted-foreground); font-size: 13px; font-weight: 400; }
   </style>
 </head>
 <body>
@@ -118,6 +123,39 @@
       <div id="panel-creators"></div>
     </div>
 
+  </div>
+
+  <div class="modal-overlay" id="user-modal" style="display:none">
+    <div class="modal card">
+      <h2 id="user-modal-title">Edit user</h2>
+      <form id="user-edit-form">
+        <input type="hidden" id="um-id">
+        <div class="field">
+          <label for="um-name">Name</label>
+          <input id="um-name" required>
+        </div>
+        <div class="field">
+          <label for="um-email">Email</label>
+          <input id="um-email" type="email" required>
+        </div>
+        <div class="field">
+          <label for="um-phone">Phone</label>
+          <input id="um-phone">
+        </div>
+        <div class="field">
+          <label for="um-address">Address</label>
+          <input id="um-address">
+        </div>
+        <div class="field">
+          <label for="um-password">New password <span class="hint">— leave blank to keep the current one</span></label>
+          <input id="um-password" type="password" autocomplete="new-password">
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" type="submit">Save changes</button>
+          <button class="btn btn-ghost" type="button" id="um-cancel">Cancel</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -207,50 +245,104 @@
     }
 
     // ---- users ----
-    async function renderUsers(users) {
+    function renderUsers(users) {
       const el = $('#panel-users');
       if (!users || !users.length) { el.innerHTML = '<p class="empty">No users.</p>'; return; }
       let html = '<div class="table-wrap"><table class="table"><thead><tr>' +
-        '<th>Name</th><th>Email</th><th>Created</th><th>Purchases</th><th></th>' +
+        '<th>Name</th><th>Email</th><th>Phone</th><th>Created</th><th>Purchases</th><th>Status</th><th></th>' +
         '</tr></thead><tbody>';
       users.forEach((u) => {
+        const banned = !!u.banned;
         html += '<tr>' +
-          `<td><strong>${u.name || '—'}</strong></td>` +
-          `<td>${u.email}</td>` +
-          `<td>${new Date(u.createdAt).toLocaleDateString()}</td>` +
+          `<td><strong>${esc(u.name || '—')}</strong></td>` +
+          `<td>${esc(u.email)}</td>` +
+          `<td>${esc(u.phone || '—')}</td>` +
+          `<td>${esc(new Date(u.createdAt).toLocaleDateString())}</td>` +
           `<td>${u.purchaseCount ?? 0}</td>` +
-          `<td style="white-space:nowrap"><button class="btn btn-sm btn-primary" data-edit-id="${u.id}">Edit</button></td>` +
+          `<td>${banned ? '<span class="pill orange">Banned</span>' : '<span class="pill green">Active</span>'}</td>` +
+          '<td style="white-space:nowrap">' +
+            `<button class="btn btn-sm btn-primary" data-edit-id="${esc(u.id)}">Edit</button> ` +
+            `<button class="btn btn-sm ${banned ? 'btn-ghost' : 'btn-danger'}" data-ban-id="${esc(u.id)}" data-banned="${banned ? 0 : 1}">${banned ? 'Unban' : 'Ban'}</button> ` +
+            `<button class="btn btn-sm btn-danger" data-del-id="${esc(u.id)}">Delete</button>` +
+          '</td>' +
           '</tr>';
       });
       html += '</tbody></table></div>';
       el.innerHTML = html;
 
       el.querySelectorAll('[data-edit-id]').forEach((b) => {
+        b.addEventListener('click', () => openUserModal(b.dataset.editId));
+      });
+
+      el.querySelectorAll('[data-ban-id]').forEach((b) => {
         b.addEventListener('click', async () => {
-          const id = b.dataset.editId;
-          const list = await api('/api/users/' + id);
-          const u = list.user;
-          const newName = prompt('New name', u.name);
-          if (newName === null) return;
-          const newEmail = prompt('New email', u.email);
-          if (newEmail === null) return;
-          await api('/api/users/' + id, {
-            method: 'PATCH',
-            body: JSON.stringify({ name: newName, email: newEmail }),
-          });
-          loadAll();
+          const id = b.dataset.banId;
+          const ban = b.dataset.banned === '1';
+          const msg = ban
+            ? 'Ban this user? They will be logged out immediately and will not be able to sign in.'
+            : 'Lift the ban on this user? They will be able to sign in again.';
+          if (!confirm(msg)) return;
+          try {
+            await api('/api/users/' + id, { method: 'PATCH', body: JSON.stringify({ banned: ban }) });
+            toast(ban ? 'User banned' : 'Ban lifted');
+            loadAll();
+          } catch (e) { toast(e.message); }
         });
       });
 
-      el.querySelectorAll('.btn-danger').forEach((b) => {
-        b.addEventListener('click', async (e) => {
-          const id = e.target.dataset.deleteId;
-          if (!confirm('Delete this user?')) return;
-          await api('/api/users/' + id, { method: 'DELETE' });
-          loadAll();
+      el.querySelectorAll('[data-del-id]').forEach((b) => {
+        b.addEventListener('click', async () => {
+          const id = b.dataset.delId;
+          if (!confirm('Delete this user? Their account, sessions and purchase history will be removed. This cannot be undone.')) return;
+          try {
+            await api('/api/users/' + id, { method: 'DELETE' });
+            toast('User deleted');
+            loadAll();
+          } catch (e) { toast(e.message); }
         });
       });
     }
+
+    // ---- user edit modal ----
+    async function openUserModal(id) {
+      let u;
+      try {
+        const r = await api('/api/users/' + id);
+        u = r.user;
+      } catch (e) { toast(e.message); return; }
+      $('#um-id').value = u.id;
+      $('#um-name').value = u.name || '';
+      $('#um-email').value = u.email || '';
+      $('#um-phone').value = u.phone || '';
+      $('#um-address').value = u.address || '';
+      $('#um-password').value = '';
+      $('#user-modal-title').textContent = 'Edit ' + (u.name || u.email);
+      $('#user-modal').style.display = 'flex';
+    }
+
+    function closeUserModal() { $('#user-modal').style.display = 'none'; }
+
+    $('#user-edit-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = $('#um-id').value;
+      const body = {
+        name: $('#um-name').value.trim(),
+        email: $('#um-email').value.trim(),
+        phone: $('#um-phone').value.trim(),
+        address: $('#um-address').value.trim(),
+      };
+      const pw = $('#um-password').value;
+      if (pw) body.password = pw;
+      try {
+        await api('/api/users/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+        closeUserModal();
+        toast('User updated');
+        loadAll();
+      } catch (err) { toast(err.message); }
+    });
+
+    $('#um-cancel').addEventListener('click', closeUserModal);
+    $('#user-modal').addEventListener('click', (e) => { if (e.target.id === 'user-modal') closeUserModal(); });
 
     // ---- purchases ----
     function renderPurchases(purchases) {

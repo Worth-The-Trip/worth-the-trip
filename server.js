@@ -316,7 +316,7 @@ app.post('/api/users', (req, res) => {
     if (findUser(email)) return jsonError(res, 409, 'An account with this email already exists');
     const user = {
       id: genId(), email: email.toLowerCase().trim(), name: (name || email.split('@')[0]).trim(),
-      passwordHash: hashPassword(password), phone: '', address: '', avatar: null,
+      passwordHash: hashPassword(password), phone: '', address: '', avatar: null, banned: false,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     const users = readUsers();
@@ -340,6 +340,7 @@ app.post('/api/login', (req, res) => {
     if (!user || !verifyPassword(password, user.passwordHash)) {
       return jsonError(res, 401, 'Email or password is incorrect');
     }
+    if (user.banned) return jsonError(res, 403, 'This account has been banned.');
     const token = genToken();
     const session = { token, userId: user.id, kind: 'user', expiresAt: Date.now() + SESSION_TTL_MS };
     const sessions = readSessions();
@@ -368,6 +369,7 @@ function requireUser(req, res, next) {
   if (!s || s.kind !== 'user') return jsonError(res, 401, 'Not logged in');
   req.user = findUserById(s.userId);
   if (!req.user) return jsonError(res, 401, 'User no longer exists');
+  if (req.user.banned) return jsonError(res, 403, 'This account has been banned.');
   next();
 }
 function jsonError(res, status, msg) { res.status(status).json({ error: msg }); }
@@ -425,6 +427,7 @@ app.get('/api/users', requireAdmin, (req, res) => {
   const purchases = readPurchases();
   const list = users.map((u) => ({
     id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar,
+    banned: !!u.banned,
     createdAt: u.createdAt, purchaseCount: purchases.filter((p) => p.buyerEmail === u.email).length,
   }));
   res.json({ users: list, total: list.length });
@@ -434,7 +437,7 @@ app.get('/api/users/:id', requireAdmin, (req, res) => {
   const u = findUserById(req.params.id);
   if (!u) return jsonError(res, 404, 'User not found');
   const purchases = readPurchases().filter((p) => p.buyerEmail === u.email).sort((a, b) => (b.purchasedAt || 0) - (a.purchasedAt || 0));
-  res.json({ user: { id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar, createdAt: u.createdAt }, purchases });
+  res.json({ user: { id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar, banned: !!u.banned, createdAt: u.createdAt }, purchases });
 });
 
 app.patch('/api/users/:id', requireAdmin, (req, res) => {
@@ -450,9 +453,14 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
   }
   if (body.phone !== undefined) u.phone = body.phone.trim();
   if (body.address !== undefined) u.address = body.address.trim();
-  if (body.password && body.oldPassword) {
-    if (!verifyPassword(body.oldPassword, u.passwordHash)) return jsonError(res, 401, 'Current password is incorrect');
+  if (body.password) {
+    // Admin route: a password sent here is a reset, so no old password is needed.
     u.passwordHash = hashPassword(body.password);
+  }
+  if (body.banned !== undefined) {
+    u.banned = !!body.banned;
+    // Ban takes effect immediately: drop the user's live sessions.
+    if (u.banned) writeLines(SESSIONS_FILE, readSessions().filter((s) => s.userId !== u.id));
   }
   if (body.avatarDataUrl) {
     const mime = saveAvatar(u.id, body.avatarDataUrl);
@@ -621,7 +629,7 @@ function sessionInfo(req) {
   if (s.kind === 'admin') return { kind: 'admin' };
   if (s.kind === 'user') {
     const u = findUserById(s.userId);
-    if (!u) return { kind: null };
+    if (!u || u.banned) return { kind: null };
     return { kind: 'user', user: u, creator: findCreatorRecord(u.email) };
   }
   return { kind: null };
