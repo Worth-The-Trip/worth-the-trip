@@ -12,6 +12,9 @@
  * Run:  node server.js       (PORT defaults to 8080)
  * Env:  PORT, ADMIN_PASSWORD, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, .env file
  *
+ * Deployed on SiteGround's managed Node.js project, which runs this file from
+ *   .nodeapp/<id>/app_source and fronts it with a reverse proxy.
+ *
  * NOTE — Stripe webhook registration must point at
  *   http://localhost:8080/webhooks/stripe   (not :3000)
  */
