@@ -17,5 +17,6 @@ sessions.jsonl
 purchases.jsonl
 *.jsonl
 data/
+uploads/
 
 .pre_push_secret_test.js

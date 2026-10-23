@@ -29,8 +29,38 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '127.0.0.1';
 const DATA_DIR = __dirname;
+
+// SiteGround runs the app from .nodeapp/<id>/app_source and recreates that
+// folder on every deploy, so anything written inside it is wiped on the next
+// `git push`. Keep runtime data (accounts, sessions, purchases, uploads)
+// outside it. Locally there is no .nodeapp, so data stays in the repo dir and
+// existing dev data is untouched. Override the location with WTT_DATA_DIR.
+const ON_SITEGROUND = DATA_DIR.split(path.sep).indexOf('.nodeapp') !== -1;
+function pickRuntimeDir() {
+  const candidates = [];
+  if (process.env.WTT_DATA_DIR) candidates.push(path.resolve(process.env.WTT_DATA_DIR));
+  if (ON_SITEGROUND) {
+    if (process.env.HOME) candidates.push(path.join(process.env.HOME, 'wtt-data'));
+    candidates.push(path.resolve(DATA_DIR, '..', '..', '..', 'wtt-data'));
+  }
+  candidates.push(DATA_DIR);
+  for (const dir of candidates) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const probe = path.join(dir, '.wtt-write-test');
+      fs.writeFileSync(probe, 'ok');
+      fs.unlinkSync(probe);
+      return dir;
+    } catch (e) { /* not writable, try the next candidate */ }
+  }
+  return DATA_DIR;
+}
+const RUNTIME_DIR = pickRuntimeDir();
+
 const PUBLIC_DIR = path.join(DATA_DIR, 'public');
-const AVATAR_DIR = path.join(PUBLIC_DIR, 'avatars');
+const UPLOAD_DIR = path.join(RUNTIME_DIR, 'uploads');
+const AVATAR_DIR = path.join(UPLOAD_DIR, 'avatars');
+const GUIDES_IMG_DIR = path.join(UPLOAD_DIR, 'Guide Images');
 
 // ------------------------------------------------------------------ env
 function loadEnv() {
@@ -59,10 +89,10 @@ const CATEGORIES = ['culture', 'food', 'nature', 'hiking', 'luxury'];
 const TRAVEL_MODES = ['walk', 'train', 'bus', 'taxi', 'car', 'ferry', 'bike'];
 const VIDEO_PLATFORMS = ['youtube', 'instagram', 'tiktok', 'twitch', 'other'];
 
-const AUTH_FILE = path.join(DATA_DIR, 'auth.jsonl');
-const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.jsonl');
-const PURCHASES_FILE = path.join(DATA_DIR, 'purchases.jsonl');
-const CREATORS_FILE = path.join(DATA_DIR, 'creators.json');
+const AUTH_FILE = path.join(RUNTIME_DIR, 'auth.jsonl');
+const SESSIONS_FILE = path.join(RUNTIME_DIR, 'sessions.jsonl');
+const PURCHASES_FILE = path.join(RUNTIME_DIR, 'purchases.jsonl');
+const CREATORS_FILE = path.join(RUNTIME_DIR, 'creators.json');
 const GUIDES_FILE = path.join(DATA_DIR, 'src', 'js', 'data', 'guides.js');
 
 const vm = require('vm');
@@ -86,9 +116,16 @@ function writeArray(file, arr) {
   fs.renameSync(tmp, file);
 }
 function ensureDataFiles() {
+  fs.mkdirSync(RUNTIME_DIR, { recursive: true });
   fs.mkdirSync(AVATAR_DIR, { recursive: true });
+  fs.mkdirSync(GUIDES_IMG_DIR, { recursive: true });
   if (!fs.existsSync(GUIDES_FILE)) fs.writeFileSync(GUIDES_FILE, 'const WTT_GUIDES = [];');
-  if (!fs.existsSync(CREATORS_FILE)) fs.writeFileSync(CREATORS_FILE, '[]');
+  // Seed runtime creator records from the committed copy on first run so the
+  // demo creator survives; afterwards applications persist in RUNTIME_DIR.
+  if (!fs.existsSync(CREATORS_FILE)) {
+    try { fs.copyFileSync(path.join(DATA_DIR, 'creators.json'), CREATORS_FILE); }
+    catch (e) { fs.writeFileSync(CREATORS_FILE, '[]'); }
+  }
 }
 ensureDataFiles();
 
@@ -556,7 +593,7 @@ function saveGuideImage(guideId, dataUrl) {
   const ext = mime === 'png' ? 'png' : (mime === 'webp' ? 'webp' : 'jpg');
   const buf = Buffer.from(m[3], 'base64');
   if (buf.length > MAX_IMAGE_BYTES) return { error: 'Image is larger than 5 MB' };
-  const dir = path.join(PUBLIC_DIR, 'Guide Images', guideId);
+  const dir = path.join(GUIDES_IMG_DIR, guideId);
   fs.mkdirSync(dir, { recursive: true });
   const name = Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex') + '.' + ext;
   fs.writeFileSync(path.join(dir, name), buf);
@@ -1058,6 +1095,11 @@ app.get('/admin', (req, res) => res.sendFile('admin.html', { root: DATA_DIR }));
 app.get('/creator', (req, res) => res.sendFile('creator.html', { root: DATA_DIR }));
 
 // ------------------------------------------------------------------ start
+// User uploads live in the persistent runtime dir; committed images stay in
+// DATA_DIR. Mount the runtime copies first so new uploads win, then fall
+// through to the committed tree.
+app.use('/avatars', express.static(AVATAR_DIR));
+app.use('/public/Guide Images', express.static(GUIDES_IMG_DIR));
 app.use(express.static(DATA_DIR));
 
 app.listen(PORT, HOST, () => {
@@ -1066,6 +1108,10 @@ app.listen(PORT, HOST, () => {
   console.log('Webhook:    http://' + HOST + ':' + PORT + '/webhooks/stripe');
   console.log('Admin:      http://' + HOST + ':' + PORT + '/admin (password: ' + ADMIN_PASSWORD + ')');
   console.log('Account:    http://' + HOST + ':' + PORT + '/account');
+  console.log('Data dir:   ' + RUNTIME_DIR);
+  if (ON_SITEGROUND && RUNTIME_DIR === DATA_DIR) {
+    console.log('⚠️  No writable persistent data dir found — signups and purchases will be LOST on the next deploy.');
+  }
   if (STRIPE_SECRET_KEY === '__STRIPE_NO_KEY__') {
     console.log('⚠️  STRIPE_SECRET_KEY is not set — Stripe checkout/webhook will NOT work until env is configured.');
   }
