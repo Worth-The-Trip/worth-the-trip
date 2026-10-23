@@ -1048,9 +1048,11 @@ app.patch('/api/admin/guides/:id', requireAdmin, async (req, res) => {
   } catch (e) { jsonError(res, 500, e.message); }
 });
 
-app.get('/account', (req, res) => res.sendFile(path.join(DATA_DIR, 'account.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(DATA_DIR, 'admin.html')));
-app.get('/creator', (req, res) => res.sendFile(path.join(DATA_DIR, 'creator.html')));
+// Pass a relative path + root (same as express.static). An absolute path makes
+// `send` treat SiteGround's hidden ".nodeapp" dir as a dotfile and 404.
+app.get('/account', (req, res) => res.sendFile('account.html', { root: DATA_DIR }));
+app.get('/admin', (req, res) => res.sendFile('admin.html', { root: DATA_DIR }));
+app.get('/creator', (req, res) => res.sendFile('creator.html', { root: DATA_DIR }));
 
 // ------------------------------------------------------------------ start
 app.use(express.static(DATA_DIR));
