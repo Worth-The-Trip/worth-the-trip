@@ -99,7 +99,10 @@ const SESSIONS_FILE = path.join(RUNTIME_DIR, 'sessions.jsonl');
 const PURCHASES_FILE = path.join(RUNTIME_DIR, 'purchases.jsonl');
 const FREE_CLAIMS_FILE = path.join(RUNTIME_DIR, 'freeguides.jsonl');
 const CREATORS_FILE = path.join(RUNTIME_DIR, 'creators.json');
-const GUIDES_FILE = path.join(DATA_DIR, 'src', 'js', 'data', 'guides.js');
+const GUIDES_SRC = path.join(DATA_DIR, 'src', 'js', 'data', 'guides.js');
+// Creator-authored guides are runtime data: SiteGround recreates the app dir on
+// every deploy, so writing them next to the source would destroy them.
+const GUIDES_FILE = path.join(RUNTIME_DIR, 'guides.json');
 
 const vm = require('vm');
 const STRIPE = require('stripe')(STRIPE_SECRET_KEY);
@@ -125,7 +128,7 @@ function ensureDataFiles() {
   fs.mkdirSync(RUNTIME_DIR, { recursive: true });
   fs.mkdirSync(AVATAR_DIR, { recursive: true });
   fs.mkdirSync(GUIDES_IMG_DIR, { recursive: true });
-  if (!fs.existsSync(GUIDES_FILE)) fs.writeFileSync(GUIDES_FILE, 'const WTT_GUIDES = [];');
+  if (!fs.existsSync(GUIDES_FILE)) fs.writeFileSync(GUIDES_FILE, '[]');
   // Seed runtime creator records from the committed copy on first run so the
   // demo creator survives; afterwards applications persist in RUNTIME_DIR.
   if (!fs.existsSync(CREATORS_FILE)) {
@@ -170,10 +173,17 @@ function findFreeClaim(email) {
   return readFreeClaims().find((c) => String(c.email || '').toLowerCase() === e) || null;
 }
 function readCreators() { return loadArray(CREATORS_FILE); }
+function parseGuidesJs(file) {
+  const src = fs.readFileSync(file, 'utf8');
+  return JSON.parse(src.replace(/^const WTT_GUIDES = /, '').replace(/;\s*$/, ''));
+}
 function readGuides() {
-  const src = fs.readFileSync(GUIDES_FILE, 'utf8');
-  const arr = JSON.parse(src.replace(/^const WTT_GUIDES = /, '').replace(/;\s*$/, ''));
-  return arr.map(canonicalizeGuide);
+  // WTT's own guides come from the repo so a deploy always updates them; guides
+  // authored in the studio live in the persistent runtime dir and survive deploys.
+  const base = parseGuidesJs(GUIDES_SRC);
+  const baseIds = new Set(base.map((g) => g.id));
+  const extra = loadArray(GUIDES_FILE).filter((g) => !baseIds.has(g.id));
+  return base.concat(extra).map(canonicalizeGuide);
 }
 function canonicalizeGuide(g) {
   const ja = g.ja || {};
@@ -205,7 +215,14 @@ function hashJa(ja) {
   for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
   return (h >>> 0).toString(16);
 }
-function writeGuides(arr) { fs.writeFileSync(GUIDES_FILE, 'const WTT_GUIDES = ' + JSON.stringify(arr, null, 2) + ';'); }
+function writeGuides(arr) {
+  // Only creator-authored guides are runtime data — writing the whole list would
+  // pin stale copies of WTT's own guides and block repo updates from landing.
+  const baseIds = new Set(parseGuidesJs(GUIDES_SRC).map((g) => g.id));
+  const creatorGuides = arr.filter((g) => !baseIds.has(g.id));
+  fs.mkdirSync(RUNTIME_DIR, { recursive: true });
+  fs.writeFileSync(GUIDES_FILE, JSON.stringify(creatorGuides, null, 2));
+}
 function findGuide(id) { return readGuides().find((g) => g.id === id); }
 function findCreatorRecord(email) {
   const e = String(email || '').toLowerCase();
