@@ -84,6 +84,9 @@
 
     .auth-step h2 { margin-bottom: 8px; }
     .error { color: #b3261e; background: #b3261e10; border: 1px solid #b3261e30; padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
+    /* The auth-error div is always in the markup, so hide it until it has text —
+       otherwise its red background/border renders as an empty red bar. */
+    .error:empty { display: none; }
 
     .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted-foreground); }
   </style>
