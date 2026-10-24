@@ -416,7 +416,7 @@
         return '<label class="month"><input type="checkbox" name="season" value="' + m + '"' + (on ? ' checked' : '') + '><span>' + m.toUpperCase() + '</span></label>';
       }).join('') + '</div></div>' +
       '<div class="field"><label>' + esc(t('cover')) + '</label>' +
-      '<div id="cover-preview">' + (g.heroImage ? '<img class="thumb" src="' + esc(g.heroImage) + '" alt="">' : '<div class="thumb-empty">' + esc(t('cover')) + '</div>') + '</div>' +
+      '<div id="cover-preview">' + (g.heroImage ? '<img src="' + esc(g.heroImage) + '" alt="">' : '<div class="thumb-empty">' + esc(t('cover')) + '</div>') + '</div>' +
       '<div class="btn-row" style="margin-top:10px"><button class="btn btn-ghost btn-sm" id="pick-cover">' + esc(g.heroImage ? t('replacing') : t('chooseImage')) + '</button>' +
       '<input type="file" id="cover-input" accept="image/*" style="display:none"></div>' +
       '<p class="hint">' + esc(t('coverHint')) + '</p></div>' +
@@ -725,7 +725,7 @@
       toast(lang === 'ja' ? 'アップロード中…' : 'Uploading…');
       uploadImage(f, 1600).then(function (path) {
         state.guide.heroImage = path;
-        $('#cover-preview').innerHTML = '<img class="thumb" src="' + esc(path) + '" alt="">';
+        $('#cover-preview').innerHTML = '<img src="' + esc(path) + '" alt="">';
         $('#pick-cover').textContent = t('replacing');
         markDirty();
         toast(t('saved'));
@@ -951,6 +951,16 @@
 
   // ---------------------------------------------------------------- init
   document.addEventListener('DOMContentLoaded', function () {
+    // Image load errors don't bubble — capture them. A cover that fails to load
+    // would otherwise collapse to a 1px border instead of showing a placeholder.
+    document.addEventListener('error', function (e) {
+      var el = e.target;
+      if (!el || el.tagName !== 'IMG') return;
+      var box = el.closest && el.closest('#cover-preview');
+      if (!box) return;
+      el.outerHTML = '<div class="thumb-empty">' + esc(t('cover')) + '</div>';
+    }, true);
+
     $('#page-back-btn').addEventListener('click', function () { location.href = '/'; });
     $('#theme-btn').addEventListener('click', function () {
       saveSettings({ theme: theme() === 'light' ? 'dark' : 'light' });
