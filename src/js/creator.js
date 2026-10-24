@@ -301,11 +301,16 @@
         : '<div class="card"><p class="empty">' + esc(t('noGuides')) + '</p></div>');
     showView('list');
 
+    // No browser prompt() — create the draft and open the studio editor, where
+    // the creator titles the guide in the Basics section.
     $('#new-guide').addEventListener('click', function () {
-      var title = prompt(t('newGuidePrompt'));
-      if (!title) return;
-      api('/api/creator/guides', { method: 'POST', body: JSON.stringify({ title: title }) })
-        .then(function (res) { state.guide = res.guide; renderEditor(); })
+      api('/api/creator/guides', { method: 'POST', body: JSON.stringify({}) })
+        .then(function (res) {
+          state.guide = res.guide;
+          renderEditor();
+          var f = $('#f-title');
+          if (f) { f.focus(); f.select(); }
+        })
         .catch(function (e) { toast(e.message, true); });
     });
     $('#signout').addEventListener('click', function () {
