@@ -28,7 +28,7 @@
       signin: 'Sign in', signup: 'Create account', email: 'Email', password: 'Password', password6: 'Password (6+ chars)', name: 'Name',
       applyTitle: 'Apply to become a creator', applySub: 'Tell us where you post. WTT reviews every application by hand.',
       applyAccountNote: 'An account is created for you as part of applying — no separate sign-up needed.',
-      handle: 'Social handle (e.g. @yourname)', area: 'Where you cover', bio: 'Short bio', youtube: 'YouTube link', instagram: 'Instagram link',
+      handle: 'Social handle (e.g. @yourname)', optional: 'optional', area: 'Where you cover', bio: 'Short bio', youtube: 'YouTube link', instagram: 'Instagram link',
       apply: 'Send application', applying: 'Application sent',
       pendingTitle: 'Application under review', pendingSub: 'Thanks — WTT will review your application and unlock the studio once approved.',
       rejectedTitle: 'Application not approved', rejectedSub: 'You can update your details and apply again.', reapply: 'Apply again',
@@ -75,7 +75,7 @@
       signin: 'サインイン', signup: 'アカウント作成', email: 'メール', password: 'パスワード', password6: 'パスワード（6文字以上）', name: '名前',
       applyTitle: 'クリエイター申請', applySub: '投稿しているSNSを教えてください。WTTが一件ずつ確認します。',
       applyAccountNote: '申請と同時にアカウントが作成されます。別途登録は不要です。',
-      handle: 'SNSハンドル（例：@yourname）', area: '担当エリア', bio: '自己紹介', youtube: 'YouTubeリンク', instagram: 'Instagramリンク',
+      handle: 'SNSハンドル（例：@yourname）', optional: '任意', area: '担当エリア', bio: '自己紹介', youtube: 'YouTubeリンク', instagram: 'Instagramリンク',
       apply: '申請を送る', applying: '申請済み',
       pendingTitle: '申請を確認中', pendingSub: 'ありがとうございます。承認されるとスタジオが使えるようになります。',
       rejectedTitle: '申請は承認されませんでした', rejectedSub: '内容を更新して再申請できます。', reapply: '再申請する',
@@ -248,10 +248,14 @@
       ? '<div class="field"><label>' + esc(t('email')) + '</label><input id="ap-email" type="email" required autocomplete="email"></div>' +
         '<div class="field"><label>' + esc(t('password6')) + '</label><input id="ap-password" type="password" required minlength="6" autocomplete="new-password"></div>'
       : '';
+    var fallbackName = a.name || (state.me.user && state.me.user.name) || '';
+    // A social handle is optional — pre-fill a sensible one so an empty field
+    // can never silently block the application.
+    var fallbackHandle = '@' + fallbackName.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24);
     return '<form id="apply-form">' + accountFields +
       '<div class="row2">' +
-      '<div class="field"><label>' + esc(t('name')) + '</label><input id="ap-name" required value="' + esc(a.name || (state.me.user && state.me.user.name) || '') + '"></div>' +
-      '<div class="field"><label>' + esc(t('handle')) + '</label><input id="ap-handle" required value="' + esc(a.handle || '') + '"></div>' +
+      '<div class="field"><label>' + esc(t('name')) + '</label><input id="ap-name" required value="' + esc(fallbackName) + '"></div>' +
+      '<div class="field"><label>' + esc(t('handle')) + ' <span class="hint">— ' + esc(t('optional')) + '</span></label><input id="ap-handle" maxlength="80" value="' + esc(a.handle || fallbackHandle) + '" placeholder="@yourname"></div>' +
       '</div>' +
       '<div class="field"><label>' + esc(t('area')) + '</label><input id="ap-area" value="' + esc(a.area || '') + '"></div>' +
       '<div class="field"><label>' + esc(t('bio')) + '</label><textarea id="ap-bio">' + esc(a.bio || '') + '</textarea></div>' +

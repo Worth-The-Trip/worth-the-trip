@@ -828,8 +828,11 @@ app.post('/api/creator/apply', requireUser, (req, res) => {
   try {
     const b = req.body || {};
     const name = clip(b.name, 120).trim();
-    const handle = clip(b.handle, 80).trim();
-    if (!name || !handle) return jsonError(res, 400, 'Your name and social handle are required');
+    if (!name) return jsonError(res, 400, 'Your name is required');
+    // A social handle is optional — derive one from the name when it is blank,
+    // so a creator without social media is not blocked from applying.
+    const handle = clip(b.handle, 80).trim() ||
+      ('@' + name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24));
     const creators = readCreators();
     const idx = creators.findIndex((c) => String(c.email || '').toLowerCase() === req.user.email);
     const existing = idx >= 0 ? creators[idx] : null;
