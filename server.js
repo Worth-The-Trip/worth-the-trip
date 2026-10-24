@@ -881,7 +881,7 @@ app.post('/api/creator/guides', requireCreator, (req, res) => {
     };
     guides.push(guide);
     writeGuides(guides);
-    res.status(201).json({ guide: guide });
+    res.status(201).json({ guide: guide, problems: guideProblems(guide) });
   } catch (e) { jsonError(res, 500, e.message); }
 });
 

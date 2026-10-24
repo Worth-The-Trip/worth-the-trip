@@ -307,6 +307,9 @@
       api('/api/creator/guides', { method: 'POST', body: JSON.stringify({}) })
         .then(function (res) {
           state.guide = res.guide;
+          // A brand-new draft has no saved problems yet — without these the
+          // banner would wrongly claim it is ready to submit.
+          state.problems = res.problems || [];
           renderEditor();
           var f = $('#f-title');
           if (f) { f.focus(); f.select(); }
