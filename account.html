@@ -271,6 +271,16 @@
       $('#dash-email').textContent = user.email;
     }
 
+    // Just signed in — show the dashboard and populate it. boot() does the same
+    // on page load; both paths must fetch purchases, or the panel stays stuck on
+    // "Loading purchases…" until the user navigates away and back.
+    function enterDashboard(user) {
+      clearAuthForms();
+      showDashboard(user);
+      loadPurchases().catch(() => {});
+      loadCreatorAccess();
+    }
+
     // ---- sign in / sign up ----
     $('#signin-form').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -282,7 +292,7 @@
           localStorage.setItem(AUTH_KEY, res.token);
           return loadCurrentUser();
         })
-        .then((u) => { clearAuthForms(); showDashboard(u); loadCreatorAccess(); })
+        .then(enterDashboard)
         .catch((err) => { $('#auth-error').textContent = err.message; });
     });
 
@@ -297,7 +307,7 @@
           localStorage.setItem(AUTH_KEY, res.token);
           return loadCurrentUser();
         })
-        .then((u) => { clearAuthForms(); showDashboard(u); loadCreatorAccess(); })
+        .then(enterDashboard)
         .catch((err) => { $('#auth-error').textContent = err.message; });
     });
 
@@ -385,13 +395,19 @@
           '<th>Guide</th><th>Price</th><th>Date</th><th>Status</th>' +
           '</thead><tbody>';
         list.forEach((p) => {
-          const type = p.type === 'subscription' ? 'Subscription' : 'Purchased';
-          const pill = p.type === 'subscription'
-            ? '<span class="pill orange">Subscription</span>'
-            : '<span class="pill green">Purchased</span>';
+          // The free first guide is a claim, not a payment — tag it accordingly.
+          const isFree = p.type === 'free';
+          const pill = isFree
+            ? '<span class="pill yellow">Free unlock</span>'
+            : p.type === 'subscription'
+              ? '<span class="pill orange">Subscription</span>'
+              : '<span class="pill green">Purchased</span>';
+          const amount = isFree
+            ? 'Free'
+            : (p.amount != null ? (p.currency === 'jpy' ? '¥' : '$' ) + Number(p.amount).toFixed(2) : '—');
           html += '<tr>' +
             `<td><strong>${p.guideTitle || p.guideId || '—'}</strong></td>` +
-            `<td>${p.amount != null ? (p.currency === 'jpy' ? '¥' : '$' ) + Number(p.amount).toFixed(2) : '—'}</td>` +
+            `<td>${amount}</td>` +
             `<td>${fmtTs(p.purchasedAt)}</td>` +
             `<td>${pill}</td>` +
             '</tr>';

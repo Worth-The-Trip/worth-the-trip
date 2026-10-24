@@ -535,6 +535,22 @@ app.get('/api/purchases/my', requireUser, (req, res) => {
     .filter((p) => String(p.buyerEmail || '').toLowerCase() === email)
     .sort((a, b) => (b.purchasedAt || 0) - (a.purchasedAt || 0));
   if (since) list = list.filter((p) => (p.purchasedAt || 0) >= Date.parse(since));
+
+  // The free first guide is a claim, not a payment — but it belongs on the
+  // customer's own list, tagged "Free unlock".
+  const claim = findFreeClaim(email);
+  if (claim) {
+    const g = findGuide(claim.guideId);
+    list.unshift({
+      guideId: claim.guideId,
+      guideTitle: g ? g.title : claim.guideId,
+      buyerEmail: claim.email,
+      amount: 0,
+      currency: null,
+      purchasedAt: Date.parse(claim.claimedAt),
+      type: 'free',
+    });
+  }
   res.json({ purchases: list, total: list.length });
 });
 
