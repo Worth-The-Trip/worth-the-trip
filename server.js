@@ -553,12 +553,15 @@ app.post('/api/admin/purchases/sync', requireAdmin, async (req, res) => {
       const amount = (s.amount_total != null)
         ? s.amount_total
         : (li && li.amount_total != null ? li.amount_total : null);
+      // Prefer the guide's real title over Stripe's raw product name
+      // ("tokyo city explorer — Worth The Trip").
+      const g = guideId ? findGuide(guideId) : null;
       purchases.push({
         id: s.id,
         sessionId: s.id,
         type: s.mode === 'subscription' ? 'subscription' : 'payment',
         guideId: guideId,
-        guideTitle: (s.metadata && s.metadata.guideTitle) || (rawName || null),
+        guideTitle: (s.metadata && s.metadata.guideTitle) || (g ? g.title : (rawName || null)),
         buyerEmail: (s.customer_details && s.customer_details.email) || null,
         stripeCustomerId: (s.customer && s.customer.id) || s.customer || null,
         amount: amount,
