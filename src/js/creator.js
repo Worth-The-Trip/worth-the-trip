@@ -27,6 +27,7 @@
       signinTitle: 'Creator studio', signinSub: 'Sign in to build and manage your guides.',
       signin: 'Sign in', signup: 'Create account', email: 'Email', password: 'Password', password6: 'Password (6+ chars)', name: 'Name',
       applyTitle: 'Apply to become a creator', applySub: 'Tell us where you post. WTT reviews every application by hand.',
+      applyAccountNote: 'An account is created for you as part of applying — no separate sign-up needed.',
       handle: 'Social handle (e.g. @yourname)', area: 'Where you cover', bio: 'Short bio', youtube: 'YouTube link', instagram: 'Instagram link',
       apply: 'Send application', applying: 'Application sent',
       pendingTitle: 'Application under review', pendingSub: 'Thanks — WTT will review your application and unlock the studio once approved.',
@@ -73,6 +74,7 @@
       signinTitle: 'クリエイタースタジオ', signinSub: 'サインインしてガイドを作成・管理します。',
       signin: 'サインイン', signup: 'アカウント作成', email: 'メール', password: 'パスワード', password6: 'パスワード（6文字以上）', name: '名前',
       applyTitle: 'クリエイター申請', applySub: '投稿しているSNSを教えてください。WTTが一件ずつ確認します。',
+      applyAccountNote: '申請と同時にアカウントが作成されます。別途登録は不要です。',
       handle: 'SNSハンドル（例：@yourname）', area: '担当エリア', bio: '自己紹介', youtube: 'YouTubeリンク', instagram: 'Instagramリンク',
       apply: '申請を送る', applying: '申請済み',
       pendingTitle: '申請を確認中', pendingSub: 'ありがとうございます。承認されるとスタジオが使えるようになります。',
@@ -209,18 +211,17 @@
     var app = m.application;
     var html = '';
     if (!m.signedIn) {
+      // Applying is how you join — the form creates the account as part of the
+      // application, so there is no "apply without an account" path.
       html += '<div class="card">' +
-        '<h1>' + esc(t('signinTitle')) + '</h1><p class="sub">' + esc(t('signinSub')) + '</p>' +
+        '<h1>' + esc(t('applyTitle')) + '</h1><p class="sub">' + esc(t('applySub')) + '</p>' +
         '<div class="error" id="gate-error"></div>' +
-        '<div class="section-title">' + esc(t('signin')) + '</div>' +
+        applyForm(true) +
+        '<div class="section-title" style="margin-top:22px">' + esc(t('signin')) + '</div>' +
         '<form id="signin-form"><div class="field"><label>' + esc(t('email')) + '</label><input id="si-email" type="email" required autocomplete="email"></div>' +
         '<div class="field"><label>' + esc(t('password')) + '</label><input id="si-password" type="password" required autocomplete="current-password"></div>' +
         '<div class="btn-row"><button class="btn btn-primary" type="submit">' + esc(t('signin')) + '</button></div></form>' +
-        '<div class="section-title" style="margin-top:22px">' + esc(t('signup')) + '</div>' +
-        '<form id="signup-form"><div class="field"><label>' + esc(t('email')) + '</label><input id="su-email" type="email" required autocomplete="email"></div>' +
-        '<div class="field"><label>' + esc(t('password6')) + '</label><input id="su-password" type="password" required minlength="6" autocomplete="new-password"></div>' +
-        '<div class="field"><label>' + esc(t('name')) + '</label><input id="su-name" type="text" required autocomplete="name"></div>' +
-        '<div class="btn-row"><button class="btn btn-primary" type="submit">' + esc(t('signup')) + '</button></div></form></div>';
+        '<p class="hint" style="margin-top:14px">' + esc(t('applyAccountNote')) + '</p></div>';
     } else if (!app || app.status === 'pending') {
       var pending = !!app;
       html += '<div class="card"><h1>' + esc(pending ? t('pendingTitle') : t('applyTitle')) + '</h1>' +
@@ -238,11 +239,18 @@
     wireGate();
   }
 
-  function applyForm() {
+  function applyForm(withAccount) {
     var a = (state.me.application || {});
-    return '<form id="apply-form">' +
+    // When signed out the form also collects the account details, so applying
+    // creates the account in the same step — there is no way to apply without
+    // being a registered user.
+    var accountFields = withAccount
+      ? '<div class="field"><label>' + esc(t('email')) + '</label><input id="ap-email" type="email" required autocomplete="email"></div>' +
+        '<div class="field"><label>' + esc(t('password6')) + '</label><input id="ap-password" type="password" required minlength="6" autocomplete="new-password"></div>'
+      : '';
+    return '<form id="apply-form">' + accountFields +
       '<div class="row2">' +
-      '<div class="field"><label>' + esc(t('name')) + '</label><input id="ap-name" required value="' + esc(a.name || state.me.user.name || '') + '"></div>' +
+      '<div class="field"><label>' + esc(t('name')) + '</label><input id="ap-name" required value="' + esc(a.name || (state.me.user && state.me.user.name) || '') + '"></div>' +
       '<div class="field"><label>' + esc(t('handle')) + '</label><input id="ap-handle" required value="' + esc(a.handle || '') + '"></div>' +
       '</div>' +
       '<div class="field"><label>' + esc(t('area')) + '</label><input id="ap-area" value="' + esc(a.area || '') + '"></div>' +
@@ -272,12 +280,25 @@
     var af = $('#apply-form');
     if (af) af.addEventListener('submit', function (e) {
       e.preventDefault();
-      api('/api/creator/apply', {
-        method: 'POST', body: JSON.stringify({
-          name: $('#ap-name').value, handle: $('#ap-handle').value, area: $('#ap-area').value,
-          bio: $('#ap-bio').value, youtubeUrl: $('#ap-youtube').value, instagramUrl: $('#ap-instagram').value
-        })
-      }).then(loadMe).then(route).catch(function (err) { $('#gate-error').textContent = err.message; });
+      var payload = {
+        name: $('#ap-name').value, handle: $('#ap-handle').value, area: $('#ap-area').value,
+        bio: $('#ap-bio').value, youtubeUrl: $('#ap-youtube').value, instagramUrl: $('#ap-instagram').value
+      };
+      // No account yet? Create one from the same form, then apply as that user.
+      var email = $('#ap-email');
+      var step = (email && email.value)
+        ? api('/api/users', {
+            method: 'POST',
+            body: JSON.stringify({ email: email.value.trim(), password: $('#ap-password').value, name: payload.name })
+          }).then(function (res) {
+            try { localStorage.setItem(AUTH_KEY, res.token); } catch (x) {}
+            return loadMe();
+          })
+        : Promise.resolve();
+      step
+        .then(function () { return api('/api/creator/apply', { method: 'POST', body: JSON.stringify(payload) }); })
+        .then(loadMe).then(route)
+        .catch(function (err) { $('#gate-error').textContent = err.message; });
     });
   }
 

@@ -229,6 +229,7 @@
       renderFreeGuides(f.claims);
       const c = await api('/api/creators');
       renderCreators(c.creators);
+      updateCreatorTabBadge(c.creators);
       const g = await api('/api/admin/guides');
       renderGuides(g.guides);
       updateGuideTabBadge(g.guides);
@@ -499,6 +500,13 @@
       const n = (guides || []).filter((g) => g.status === 'submitted').length;
       const tab = document.querySelector('[data-tab="guides"]');
       if (tab) tab.textContent = n ? 'Guides (' + n + ')' : 'Guides';
+    }
+
+    // Pending creator applications are easy to miss — count them on the tab.
+    function updateCreatorTabBadge(creators) {
+      const n = (creators || []).filter((c) => c.status === 'pending').length;
+      const tab = document.querySelector('[data-tab="creators"]');
+      if (tab) tab.textContent = n ? 'Creators (' + n + ')' : 'Creators';
     }
 
     function guideDetailHtml(g) {
