@@ -211,7 +211,10 @@ function isLatLng(v) {
     Number.isFinite(Number(v[0])) && Number.isFinite(Number(v[1])) &&
     Math.abs(Number(v[0])) <= 90 && Math.abs(Number(v[1])) <= 180;
 }
-function findUser(email) { return readUsers().find((u) => u.email === email); }
+function findUser(email) {
+  const e = String(email || '').toLowerCase();
+  return readUsers().find((u) => String(u.email || '').toLowerCase() === e);
+}
 function findUserById(id) { return readUsers().find((u) => u.id === id); }
 function getSession(token) { return readSessions().find((s) => s.token === token); }
 
@@ -278,7 +281,8 @@ app.post('/webhooks/stripe', (req, res) => {
       return res.json({ received: true, ignored: event.type });
     }
     const session = event.data.object;
-    const buyerEmail = session.customer_details && session.customer_details.email;
+    const buyerEmail = session.customer_details && session.customer_details.email
+      ? String(session.customer_details.email).toLowerCase() : null;
     const stripeCustomerId = (session.customer && session.customer.id) || null;
     const guideId = session.metadata && session.metadata.guideId;
     const guideTitle = session.metadata && session.metadata.guideTitle;
@@ -441,7 +445,7 @@ app.get('/api/users', requireAdmin, (req, res) => {
   const list = users.map((u) => ({
     id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar,
     banned: !!u.banned,
-    createdAt: u.createdAt, purchaseCount: purchases.filter((p) => p.buyerEmail === u.email).length,
+    createdAt: u.createdAt, purchaseCount: purchases.filter((p) => String(p.buyerEmail || '').toLowerCase() === String(u.email || '').toLowerCase()).length,
   }));
   res.json({ users: list, total: list.length });
 });
@@ -506,9 +510,10 @@ app.delete('/api/users/:id', requireAdmin, (req, res) => {
 
 // ---- Customer: own purchases ----
 app.get('/api/purchases/my', requireUser, (req, res) => {
-  const email = req.user.email;
+  const email = String(req.user.email || '').toLowerCase();
   const since = req.query.since;
-  const list = readPurchases().filter((p) => p.buyerEmail === email)
+  const list = readPurchases()
+    .filter((p) => String(p.buyerEmail || '').toLowerCase() === email)
     .sort((a, b) => (b.purchasedAt || 0) - (a.purchasedAt || 0));
   if (since) list = list.filter((p) => (p.purchasedAt || 0) >= Date.parse(since));
   res.json({ purchases: list, total: list.length });
@@ -562,7 +567,8 @@ app.post('/api/admin/purchases/sync', requireAdmin, async (req, res) => {
         type: s.mode === 'subscription' ? 'subscription' : 'payment',
         guideId: guideId,
         guideTitle: (s.metadata && s.metadata.guideTitle) || (g ? g.title : (rawName || null)),
-        buyerEmail: (s.customer_details && s.customer_details.email) || null,
+        buyerEmail: (s.customer_details && s.customer_details.email)
+          ? String(s.customer_details.email).toLowerCase() : null,
         stripeCustomerId: (s.customer && s.customer.id) || s.customer || null,
         amount: amount,
         currency: s.currency || 'jpy',
