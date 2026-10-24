@@ -237,10 +237,19 @@ function clearSessionCookie(res) {
 // per-session body — the account page then shows a stale avatar and an empty
 // purchases list, and one user's data can be served to another. no-store
 // forces every API call through to Node.
+// HTML page paths (extensionless routes plus their .html aliases). These must
+// never be cached: the proxy keys on the URL and serves stale shells.
+const HTML_PAGES = new Set(['/', '/account', '/admin', '/creator']);
+
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/')) {
+  const p = req.path;
+  if (p.startsWith('/api/')) {
     res.set('Cache-Control', 'no-store');
     res.set('Vary', 'Cookie');
+  } else if (HTML_PAGES.has(p) || p.endsWith('.html')) {
+    // Never let the proxy or the browser pin an old page shell — a stale
+    // account.html keeps calling uncacheable API URLs and hangs on load.
+    res.set('Cache-Control', 'no-store');
   }
   next();
 });
@@ -1173,9 +1182,9 @@ app.patch('/api/admin/guides/:id', requireAdmin, async (req, res) => {
 
 // Pass a relative path + root (same as express.static). An absolute path makes
 // `send` treat SiteGround's hidden ".nodeapp" dir as a dotfile and 404.
-app.get('/account', (req, res) => res.sendFile('account.html', { root: DATA_DIR }));
-app.get('/admin', (req, res) => res.sendFile('admin.html', { root: DATA_DIR }));
-app.get('/creator', (req, res) => res.sendFile('creator.html', { root: DATA_DIR }));
+app.get('/account', (req, res) => res.sendFile('account.html', { root: DATA_DIR, cacheControl: false }));
+app.get('/admin', (req, res) => res.sendFile('admin.html', { root: DATA_DIR, cacheControl: false }));
+app.get('/creator', (req, res) => res.sendFile('creator.html', { root: DATA_DIR, cacheControl: false }));
 
 // ------------------------------------------------------------------ start
 // User uploads live in the persistent runtime dir; committed images stay in

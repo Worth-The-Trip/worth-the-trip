@@ -1356,6 +1356,32 @@
     try { return new Set(JSON.parse(localStorage.getItem('wtt_unlocked') || '[]')); } catch (e) { return new Set(); }
   }
 
+  // Guides bought on the account are recorded on the server; merge them into
+  // the local unlock set so a purchase follows the user across devices.
+  async function syncPurchasedUnlocks() {
+    let list = [];
+    try {
+      const r = await fetch('/api/purchases/my?_ts=' + Date.now(), { credentials: 'include' });
+      if (r.ok) {
+        const body = await r.json();
+        list = (body && body.purchases) || [];
+      }
+    } catch (e) { return; /* not signed in */ }
+
+    let changed = false;
+    list.forEach(function (p) {
+      if (p && p.guideId && guideById(p.guideId) && !state.unlockedGuides.has(p.guideId)) {
+        state.unlockedGuides.add(p.guideId);
+        changed = true;
+      }
+    });
+    if (!changed) return;
+
+    persistUnlocked();
+    try { renderTripsPage(); } catch (e) { /* trips page not rendered yet */ }
+    try { refreshMapMarkers(); } catch (e) { /* map not ready yet */ }
+  }
+
   function showWelcome() {
     const m = $('#welcome-modal');
     if (!m) return;
@@ -2918,9 +2944,14 @@
           (window.WTT_CREATOR_IDS || []).forEach(function (id) { if (id) state.visibleCreators.add(id); });
         } catch (e) { /* ignore */ }
         init();
-      }, init);
+        syncPurchasedUnlocks();
+      }, function () {
+        init();
+        syncPurchasedUnlocks();
+      });
     } else {
       init();
+      syncPurchasedUnlocks();
     }
   }
   if (document.readyState === 'loading') {

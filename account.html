@@ -377,31 +377,37 @@
     }
 
     async function loadPurchases() {
-      const user = await loadCurrentUser();
-      const res = await api('/api/purchases/my');
-      const list = res.purchases || [];
       const el = $('#purchases-list');
-      if (!list.length) {
-        el.innerHTML = '<p class="empty">No purchases yet.</p>';
-        return;
+      try {
+        const user = await loadCurrentUser();
+        const res = await api('/api/purchases/my');
+        const list = res.purchases || [];
+        if (!list.length) {
+          el.innerHTML = '<p class="empty">No purchases yet.</p>';
+          return;
+        }
+        let html = '<table class="list"><thead><tr>' +
+          '<th>Guide</th><th>Price</th><th>Date</th><th>Status</th>' +
+          '</thead><tbody>';
+        list.forEach((p) => {
+          const type = p.type === 'subscription' ? 'Subscription' : 'Purchased';
+          const pill = p.type === 'subscription'
+            ? '<span class="pill orange">Subscription</span>'
+            : '<span class="pill green">Purchased</span>';
+          html += '<tr>' +
+            `<td><strong>${p.guideTitle || p.guideId || '—'}</strong></td>` +
+            `<td>${p.amount != null ? (p.currency === 'jpy' ? '¥' : '$' ) + Number(p.amount).toFixed(2) : '—'}</td>` +
+            `<td>${fmtTs(p.purchasedAt)}</td>` +
+            `<td>${pill}</td>` +
+            '</tr>';
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      } catch (e) {
+        // Never leave the panel stuck on "Loading purchases…".
+        el.innerHTML = '<p class="empty">Could not load your purchases. Refresh the page — ' +
+          'if you have bought guides, make sure you are signed in.</p>';
       }
-      let html = '<table class="list"><thead><tr>' +
-        '<th>Guide</th><th>Price</th><th>Date</th><th>Status</th>' +
-        '</thead><tbody>';
-      list.forEach((p) => {
-        const type = p.type === 'subscription' ? 'Subscription' : 'Purchased';
-        const pill = p.type === 'subscription'
-          ? '<span class="pill orange">Subscription</span>'
-          : '<span class="pill green">Purchased</span>';
-        html += '<tr>' +
-          `<td><strong>${p.guideTitle || p.guideId || '—'}</strong></td>` +
-          `<td>${p.amount != null ? (p.currency === 'jpy' ? '¥' : '$' ) + Number(p.amount).toFixed(2) : '—'}</td>` +
-          `<td>${fmtTs(p.purchasedAt)}</td>` +
-          `<td>${pill}</td>` +
-          '</tr>';
-      });
-      html += '</tbody></table>';
-      el.innerHTML = html;
     }
 
     // ---- bind toggle ----
