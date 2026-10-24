@@ -780,7 +780,7 @@ function saveGuideImage(guideId, dataUrl) {
   fs.mkdirSync(dir, { recursive: true });
   const name = Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex') + '.' + ext;
   fs.writeFileSync(path.join(dir, name), buf);
-  return { path: '/public/Guide Images/' + guideId + '/' + name };
+  return { path: '/guide-images/' + guideId + '/' + name };
 }
 
 // ---- Creator: access gate ----
@@ -1302,7 +1302,14 @@ app.get('/creator', (req, res) => res.sendFile('creator.html', { root: DATA_DIR,
 // DATA_DIR. Mount the runtime copies first so new uploads win, then fall
 // through to the committed tree.
 app.use('/avatars', express.static(AVATAR_DIR));
-app.use('/public/Guide Images', express.static(GUIDES_IMG_DIR));
+// Space-free mount: the old '/public/Guide Images' path can never match, because
+// browsers request it percent-encoded (/public/Guide%20Images/...) and Express
+// matches the mount against the raw path. Uploads are served from here; the
+// committed images under public/Guide Images still work via the DATA_DIR mount.
+app.use('/guide-images', express.static(GUIDES_IMG_DIR));
+// Legacy safety net: covers uploaded before the mount fix were addressed under
+// the spacey path. Missing here, they fall through to the committed tree.
+app.use('/public/Guide%20Images', express.static(GUIDES_IMG_DIR));
 app.use(express.static(DATA_DIR));
 
 app.listen(PORT, HOST, () => {
