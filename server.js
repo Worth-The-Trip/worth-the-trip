@@ -1244,6 +1244,16 @@ app.patch('/api/admin/guides/:id', requireAdmin, async (req, res) => {
   } catch (e) { jsonError(res, 500, e.message); }
 });
 
+// Admins can remove a guide outright. Unlike the creator's own delete route
+// there is no published-guide guard and no notice is sent to the creator.
+app.delete('/api/admin/guides/:id', requireAdmin, (req, res) => {
+  const guides = readGuides();
+  const g = guides.find((x) => x.id === req.params.id);
+  if (!g) return jsonError(res, 404, 'Guide not found');
+  writeGuides(guides.filter((x) => x.id !== g.id));
+  res.json({ ok: true });
+});
+
 // Pass a relative path + root (same as express.static). An absolute path makes
 // `send` treat SiteGround's hidden ".nodeapp" dir as a dotfile and 404.
 app.get('/account', (req, res) => res.sendFile('account.html', { root: DATA_DIR, cacheControl: false }));

@@ -235,7 +235,9 @@
       show([$('#login-view'), $('#admin-view')], null);
       $('#login-view').style.display = 'none';
       $('#admin-view').style.display = 'block';
-      showTabs('users');
+      // Stay on whatever tab the admin was on — every action re-runs loadAll(),
+      // so resetting to Users here made the panel jump away mid-task.
+      showTabs(currentTab);
     }
 
     // ---- tabs ----
@@ -248,6 +250,7 @@
     });
 
     function showTabs(name) {
+      currentTab = name;
       // Derive from the tab buttons so a new tab can't be forgotten here.
       document.querySelectorAll('#tabs .tab').forEach((t) => {
         const panel = document.getElementById('panel-' + t.dataset.tab);
@@ -482,6 +485,9 @@
     // ---- guides (creator submissions awaiting review) ----
     let guidesCache = [];
     let guideFilter = 'submitted';
+    // Which admin tab is showing. loadAll() re-runs after every action and must
+    // restore this rather than snapping back to Users.
+    let currentTab = 'users';
 
     function gStatusPill(status) {
       const label = { draft: 'Draft', submitted: 'In review', published: 'Published', rejected: 'Rejected' }[status] || status;
@@ -559,7 +565,8 @@
           '<button class="btn btn-sm btn-ghost" data-gview="' + esc(g.id) + '">View</button> ' +
           '<a class="btn btn-sm btn-ghost" href="/creator?guide=' + esc(encodeURIComponent(g.id)) + '" target="_blank" rel="noopener">Edit</a> ' +
           (g.status !== 'published' ? '<button class="btn btn-sm btn-primary" data-gpub="' + esc(g.id) + '">Publish</button> ' : '') +
-          (g.status !== 'rejected' ? '<button class="btn btn-sm btn-danger" data-grej="' + esc(g.id) + '">Reject</button>' : '') +
+          (g.status !== 'rejected' ? '<button class="btn btn-sm btn-danger" data-grej="' + esc(g.id) + '">Reject</button> ' : '') +
+          '<button class="btn btn-sm btn-danger" data-gdel="' + esc(g.id) + '">Delete</button>' +
           '</td></tr>' +
           '<tr id="gdetail-' + esc(g.id) + '" style="display:none"><td colspan="7"></td></tr>';
       });
@@ -613,6 +620,20 @@
           try {
             await api('/api/admin/guides/' + id, { method: 'PATCH', body: JSON.stringify({ status: 'rejected', reviewNote: note }) });
             toast('Sent back to the creator');
+            loadAll();
+          } catch (e) { toast(e.message); }
+        });
+      });
+      // Deleting removes the guide for good and does NOT notify the creator.
+      document.querySelectorAll('#panel-guides [data-gdel]').forEach((b) => {
+        b.addEventListener('click', async () => {
+          const id = b.dataset.gdel;
+          const g = guidesCache.find((x) => x.id === id);
+          const label = (g && (g.title || g.id)) || 'this guide';
+          if (!confirm('Delete "' + label + '" permanently?\n\nIt disappears from the site immediately and cannot be undone. The creator is not notified.')) return;
+          try {
+            await api('/api/admin/guides/' + id, { method: 'DELETE' });
+            toast('Guide deleted');
             loadAll();
           } catch (e) { toast(e.message); }
         });
