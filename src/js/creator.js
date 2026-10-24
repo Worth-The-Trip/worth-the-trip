@@ -11,7 +11,12 @@
   var SETTINGS_KEY = 'wtt_settings';
   var DARK_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json?key=cb1_2yub_1_2c7e35648b4432f09a02221';
   var LIGHT_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json?key=cb1_2yub_1_2c7e35648b4432f09a02221';
-  var CATEGORIES = ['culture', 'food', 'nature', 'hiking', 'luxury'];
+  var CATEGORIES = [
+    'culture', 'food', 'nature', 'hiking', 'luxury',
+    'temples', 'nightlife', 'shopping', 'onsen', 'family',
+    'romance', 'photography', 'art', 'festivals', 'wellness',
+    'adventure', 'budget', 'daytrips', 'seasonal', 'local',
+  ];
   var MODES = ['walk', 'train', 'bus', 'taxi', 'car', 'ferry', 'bike'];
   var MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 

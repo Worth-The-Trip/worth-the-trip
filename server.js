@@ -85,7 +85,12 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const PRICE_MIN = 100;   // ¥ — creator guide price floor
 const PRICE_MAX = 2000;  // ¥ — creator guide price ceiling (enforced server-side)
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const CATEGORIES = ['culture', 'food', 'nature', 'hiking', 'luxury'];
+const CATEGORIES = [
+  'culture', 'food', 'nature', 'hiking', 'luxury',
+  'temples', 'nightlife', 'shopping', 'onsen', 'family',
+  'romance', 'photography', 'art', 'festivals', 'wellness',
+  'adventure', 'budget', 'daytrips', 'seasonal', 'local',
+];
 const TRAVEL_MODES = ['walk', 'train', 'bus', 'taxi', 'car', 'ferry', 'bike'];
 const VIDEO_PLATFORMS = ['youtube', 'instagram', 'tiktok', 'twitch', 'other'];
 
@@ -1236,6 +1241,13 @@ app.patch('/api/admin/guides/:id', requireAdmin, async (req, res) => {
       }
     }
     if (b.reviewNote !== undefined) g.reviewNote = clip(b.reviewNote, 600);
+    // Same field set the studio sends, so the admin panel and the studio agree.
+    if (b.category !== undefined && CATEGORIES.includes(b.category)) g.category = b.category;
+    if (b.title !== undefined && clip(b.title, 120).trim()) g.title = clip(b.title, 120).trim();
+    if (b.city !== undefined) g.city = clip(b.city, 80).trim();
+    if (b.prefecture !== undefined) g.prefecture = clip(b.prefecture, 80).trim();
+    if (b.duration !== undefined) g.duration = clip(b.duration, 80).trim();
+    if (b.tagline !== undefined) g.tagline = clip(b.tagline, 200).trim();
     g.reviewedAt = new Date().toISOString();
     g.updatedAt = g.reviewedAt;
     guides[i] = g;

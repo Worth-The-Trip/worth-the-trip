@@ -192,10 +192,25 @@
 
   const CATEGORY_LABELS_JA = {
     culture: '文化・歴史',
-    food: 'グルメ',
-    nature: '自然',
+    food: 'グルメ・食',
+    nature: '自然・絶景',
     hiking: 'ハイキング・アウトドア',
     luxury: 'ラグジュアリー',
+    temples: '寺院・神社',
+    nightlife: 'ナイトライフ・バー',
+    shopping: 'ショッピング',
+    onsen: '温泉',
+    family: 'ファミリー・子ども',
+    romance: 'ロマンス・新婚旅行',
+    photography: '写真・絶景スポット',
+    art: 'アート・美術館',
+    festivals: '祭り・イベント',
+    wellness: 'ウェルネス・リラックス',
+    adventure: 'アドベンチャー・スポーツ',
+    budget: 'バックパッカー・低予算',
+    daytrips: '日帰り旅行',
+    seasonal: '季節・桜',
+    local: 'ローカル・穴場',
   };
 
   const CITY_JA = {
@@ -2375,11 +2390,31 @@
   const CATEGORY_LABELS = {
     culture: 'Culture & History',
     food: 'Food & Drink',
-    nature: 'Nature',
+    nature: 'Nature & Scenery',
     hiking: 'Hiking & Outdoors',
-    luxury: 'Luxury',
+    luxury: 'Luxury & Splurge',
+    temples: 'Temples & Shrines',
+    nightlife: 'Nightlife & Bars',
+    shopping: 'Shopping',
+    onsen: 'Onsen & Hot Springs',
+    family: 'Family & Kids',
+    romance: 'Romance & Honeymoon',
+    photography: 'Photography & Views',
+    art: 'Art & Museums',
+    festivals: 'Festivals & Events',
+    wellness: 'Wellness & Relaxation',
+    adventure: 'Adventure & Sports',
+    budget: 'Budget & Backpacker',
+    daytrips: 'Day Trips',
+    seasonal: 'Seasonal & Cherry Blossom',
+    local: 'Local Life & Hidden Gems',
   };
-  const CATEGORY_ORDER = ['culture', 'food', 'nature', 'hiking', 'luxury'];
+  const CATEGORY_ORDER = [
+    'culture', 'food', 'nature', 'hiking', 'luxury',
+    'temples', 'nightlife', 'shopping', 'onsen', 'family',
+    'romance', 'photography', 'art', 'festivals', 'wellness',
+    'adventure', 'budget', 'daytrips', 'seasonal', 'local',
+  ];
 
   function cityOf(g) {
     return (g.location.split('·')[1] || g.location).trim();
