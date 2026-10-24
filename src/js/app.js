@@ -118,6 +118,7 @@
     profilePhone: $('#profile-phone'),
     profileAddress: $('#profile-address'),
     profileSaveBtn: $('#profile-save-btn'),
+    headerProfileIcon: document.querySelector('.header-profile-icon'),
   };
 
   // -------- Helpers --------
@@ -1297,6 +1298,38 @@
     } catch (e) { /* storage full / unavailable */ }
   }
 
+  const DEFAULT_AVATAR = 'public/Branding/WTT profile.svg';
+
+  // Push the current avatar to every place it is shown — the header profile
+  // button (visible on all tabs) and the profile modal preview.
+  function applyAvatar(url) {
+    const src = url || DEFAULT_AVATAR;
+    if (els.headerProfileIcon) {
+      els.headerProfileIcon.onerror = function () { this.onerror = null; this.src = DEFAULT_AVATAR; };
+      els.headerProfileIcon.src = src;
+    }
+    if (els.profileAvatarPreview) els.profileAvatarPreview.src = src;
+  }
+
+  // The avatar lives on the server once saved, so pull it on load — otherwise
+  // the header would only show a photo uploaded in this same browser.
+  async function syncAvatar() {
+    let url = '';
+    try {
+      const r = await fetch('/api/me?_ts=' + Date.now(), { credentials: 'include' });
+      if (r.ok) {
+        const me = await r.json();
+        url = (me && me.avatar) || '';
+        if (url) {
+          const p = loadProfile();
+          if (p.avatar !== url) { p.avatar = url; saveProfileData(p); }
+        }
+      }
+    } catch (e) { /* not signed in */ }
+    if (!url) url = loadProfile().avatar || '';
+    applyAvatar(url);
+  }
+
   function renderProfile() {
     const p = loadProfile();
     els.profileEmail.value = p.email || '';
@@ -1304,7 +1337,7 @@
     els.profileUsername.value = p.username || '';
     els.profilePhone.value = p.phone || '';
     els.profileAddress.value = p.address || '';
-    els.profileAvatarPreview.src = p.avatar || 'public/Branding/WTT profile.svg';
+    applyAvatar(p.avatar);
     const signedIn = !!p.email;
     els.profileSignin.style.display = signedIn ? 'none' : 'block';
     els.profileSignup.style.display = 'none';
@@ -1808,6 +1841,8 @@
           const res = await up.json();
           if (!up.ok) throw new Error(res.error || 'Could not save');
           localStorage.removeItem(PROFILE_KEY);
+          // The server stores the photo; show it in the header straight away.
+          applyAvatar(res.avatar);
           showToast(t('toast.profileSaved'), 'success');
         } catch (err) {
           showToast(err.message, 'success');
@@ -2945,13 +2980,16 @@
         } catch (e) { /* ignore */ }
         init();
         syncPurchasedUnlocks();
+        syncAvatar();
       }, function () {
         init();
         syncPurchasedUnlocks();
+        syncAvatar();
       });
     } else {
       init();
       syncPurchasedUnlocks();
+      syncAvatar();
     }
   }
   if (document.readyState === 'loading') {
