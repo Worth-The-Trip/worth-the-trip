@@ -107,6 +107,14 @@
         }
         WTT_GUIDES.push(normalize(raw));
       });
+      // Only live guides belong on the map. The studio writes every guide it
+      // saves into the served guides.js, so that file can contain drafts and
+      // rejected submissions — and a half-finished one (no location, no title)
+      // used to throw and blank the whole Trips page.
+      for (var i = WTT_GUIDES.length - 1; i >= 0; i--) {
+        var st = WTT_GUIDES[i] && WTT_GUIDES[i].status;
+        if (st && st !== 'published') WTT_GUIDES.splice(i, 1);
+      }
       // app.js defaults visibleCreators to ['wtt']; tell it which creators are live.
       window.WTT_CREATOR_IDS = creatorIds;
       return list.length;

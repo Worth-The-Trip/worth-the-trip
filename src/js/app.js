@@ -2417,7 +2417,10 @@
   ];
 
   function cityOf(g) {
-    return (g.location.split('·')[1] || g.location).trim();
+    // A guide without a location must not break the page — fall back to its
+    // city, then to a neutral label.
+    const loc = (g && g.location) || '';
+    return (loc.split('·')[1] || loc || (g && g.city) || '').trim();
   }
 
   function renderTripsPageSidebar() {
