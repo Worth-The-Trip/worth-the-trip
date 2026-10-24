@@ -574,7 +574,12 @@ app.post('/api/admin/purchases/sync', requireAdmin, async (req, res) => {
     writeLines(PURCHASES_FILE, purchases);
     res.json({ ok: true, added, skipped, total: purchases.length });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    // Never echo an API key back to the browser — Stripe's own messages
+    // include the (masked) key, and a raw key could appear too.
+    let msg = String((e && e.message) || e);
+    msg = msg.replace(/[sr]k_(?:live|test)_[A-Za-z0-9_.*-]+/g, '[redacted]');
+    if (STRIPE_SECRET_KEY) msg = msg.split(STRIPE_SECRET_KEY).join('[redacted]');
+    res.status(500).json({ error: msg });
   }
 });
 

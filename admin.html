@@ -354,7 +354,7 @@
       const el = $('#panel-purchases');
       let html = '<div class="btn-row" style="margin-bottom:14px;align-items:center">' +
         '<button class="btn btn-primary btn-sm" id="sync-stripe-btn" type="button">Sync from Stripe</button>' +
-        '<span class="sub" id="sync-stripe-msg">Record completed payments Stripe holds that the site never captured (e.g. taken before the webhook existed).</span>' +
+        '<span class="sub" id="sync-stripe-msg">Record completed payments Stripe holds that the site never captured (e.g. taken before the webhook existed). Needs a current STRIPE_SECRET_KEY.</span>' +
         '</div>';
       if (!purchases || !purchases.length) {
         html += '<p class="empty">No purchases.</p>';
