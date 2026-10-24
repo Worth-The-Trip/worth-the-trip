@@ -1421,6 +1421,8 @@
 
   // The first free guide is claimed once per email and recorded on the server,
   // so the offer never reappears on another device or after clearing storage.
+  // The server is the source of truth: if it says this email has NOT claimed,
+  // any stale local flag is cleared so the offer becomes available again.
   async function syncFreeGuideClaim() {
     let claim = null;
     try {
@@ -1428,15 +1430,21 @@
       if (r.ok) claim = await r.json();
     } catch (e) { return; /* not signed in */ }
 
-    if (!claim || !claim.claimed) return;
+    if (!claim) return;   // could not determine — leave local state alone
 
-    if (!state.freeUnlocked) {
-      state.freeUnlocked = true;
-      persistFreeUnlocked();
-    }
-    if (claim.guideId && guideById(claim.guideId) && !state.unlockedGuides.has(claim.guideId)) {
-      state.unlockedGuides.add(claim.guideId);
-      persistUnlocked();
+    if (claim.claimed) {
+      if (!state.freeUnlocked) {
+        state.freeUnlocked = true;
+        persistFreeUnlocked();
+      }
+      if (claim.guideId && guideById(claim.guideId) && !state.unlockedGuides.has(claim.guideId)) {
+        state.unlockedGuides.add(claim.guideId);
+        persistUnlocked();
+      }
+    } else if (state.freeUnlocked) {
+      // Server says the free guide is still unused — re-offer it.
+      state.freeUnlocked = false;
+      try { localStorage.removeItem('wtt_free_unlocked'); } catch (e) {}
     }
     try { renderTripsPage(); } catch (e) { /* trips page not rendered yet */ }
   }
@@ -1959,7 +1967,11 @@
       try { welcomed = localStorage.getItem(WELCOMED_KEY) === '1'; } catch (e) {}
       // If the account already claimed its free guide on the server, the offer
       // is spent — don't show the popup again on this device either.
-      if (freeClaimReady) { try { await freeClaimReady; } catch (e) {} }
+      if (freeClaimReady) {
+        try {
+          await Promise.race([freeClaimReady, new Promise((r) => setTimeout(r, 1500))]);
+        } catch (e) {}
+      }
       if (!welcomed && !state.freeUnlocked) showWelcome();
     }, 600);
 
