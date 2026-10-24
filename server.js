@@ -177,9 +177,14 @@ function readGuides() {
 }
 function canonicalizeGuide(g) {
   const ja = g.ja || {};
-  const video = g.youtubeRef ? { platform: 'youtube', url: g.youtubeRef.url, handle: g.youtubeRef.handle } : {};
+  // Studio guides store `video`; older/committed ones use `youtubeRef`. Prefer
+  // whichever is present, or guideProblems would report the video link as
+  // missing on every studio guide.
+  const video = (g.video && g.video.url)
+    ? { platform: g.video.platform || 'youtube', url: g.video.url, handle: g.video.handle || '' }
+    : (g.youtubeRef ? { platform: 'youtube', url: g.youtubeRef.url, handle: g.youtubeRef.handle } : {});
   return {
-    id: g.id, creatorId: g.creatorId, status: 'published', title: g.title,
+    id: g.id, creatorId: g.creatorId, status: g.status || 'published', title: g.title,
     tagline: g.tagline, city: g.city, prefecture: g.prefecture, category: g.category,
     duration: g.duration, price: g.price, priceTier: g.priceTier, stay: g.stay,
     season: g.season || ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'],
@@ -191,7 +196,7 @@ function canonicalizeGuide(g) {
     submittedAt: g.submittedAt || new Date().toISOString(),
     publishedAt: g.publishedAt || new Date().toISOString(),
     reviewedAt: g.reviewedAt || new Date().toISOString(),
-    reviewNote: null, location: g.location
+    reviewNote: g.reviewNote || null, location: g.location
   };
 }
 function hashJa(ja) {
