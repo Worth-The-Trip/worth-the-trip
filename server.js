@@ -92,6 +92,7 @@ const VIDEO_PLATFORMS = ['youtube', 'instagram', 'tiktok', 'twitch', 'other'];
 const AUTH_FILE = path.join(RUNTIME_DIR, 'auth.jsonl');
 const SESSIONS_FILE = path.join(RUNTIME_DIR, 'sessions.jsonl');
 const PURCHASES_FILE = path.join(RUNTIME_DIR, 'purchases.jsonl');
+const FREE_CLAIMS_FILE = path.join(RUNTIME_DIR, 'freeguides.jsonl');
 const CREATORS_FILE = path.join(RUNTIME_DIR, 'creators.json');
 const GUIDES_FILE = path.join(DATA_DIR, 'src', 'js', 'data', 'guides.js');
 
@@ -153,6 +154,15 @@ function readSessions() {
 }
 function readPurchases() {
   return loadLines(PURCHASES_FILE).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+}
+function readFreeClaims() {
+  return loadLines(FREE_CLAIMS_FILE).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+}
+// The first free guide is tracked per email, case-insensitive — Stripe and the
+// browser both hand us mixed-case addresses.
+function findFreeClaim(email) {
+  const e = String(email || '').toLowerCase();
+  return readFreeClaims().find((c) => String(c.email || '').toLowerCase() === e) || null;
 }
 function readCreators() { return loadArray(CREATORS_FILE); }
 function readGuides() {
@@ -402,7 +412,7 @@ function jsonError(res, status, msg) { res.status(status).json({ error: msg }); 
 
 app.get('/api/me', requireUser, (req, res) => {
   const u = req.user;
-  res.json({ id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar, createdAt: u.createdAt, updatedAt: u.updatedAt });
+  res.json({ id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar, createdAt: u.createdAt, updatedAt: u.updatedAt, freeGuideClaimed: !!findFreeClaim(u.email) });
 });
 
 app.patch('/api/me', requireUser, (req, res) => {
@@ -526,6 +536,44 @@ app.get('/api/purchases/my', requireUser, (req, res) => {
     .sort((a, b) => (b.purchasedAt || 0) - (a.purchasedAt || 0));
   if (since) list = list.filter((p) => (p.purchasedAt || 0) >= Date.parse(since));
   res.json({ purchases: list, total: list.length });
+});
+
+// ---- Customer: first free guide claim (once per email, recorded server-side) ----
+// The claim used to live only in the browser's localStorage, so it was invisible
+// to the server, reset on another device, and could be re-claimed by clearing
+// storage. It is now a record keyed on the account email.
+app.get('/api/free-guides/status', requireUser, (req, res) => {
+  const email = String(req.user.email || '').toLowerCase();
+  const claim = findFreeClaim(email);
+  res.json(claim
+    ? { claimed: true, guideId: claim.guideId, claimedAt: claim.claimedAt }
+    : { claimed: false });
+});
+
+app.post('/api/free-guides/claim', requireUser, (req, res) => {
+  const email = String(req.user.email || '').toLowerCase();
+  const guideId = String((req.body || {}).guideId || '').trim();
+  if (!guideId) return jsonError(res, 400, 'guideId is required');
+
+  const existing = findFreeClaim(email);
+  if (existing) {
+    return res.json({ ok: true, alreadyClaimed: true, guideId: existing.guideId, claimedAt: existing.claimedAt });
+  }
+
+  const claims = readFreeClaims();
+  const claimedAt = new Date().toISOString();
+  claims.push({ email, guideId, userId: req.user.id, claimedAt });
+  writeLines(FREE_CLAIMS_FILE, claims);
+  res.json({ ok: true, alreadyClaimed: false, guideId, claimedAt });
+});
+
+// ---- Admin: who has claimed the first free guide ----
+app.get('/api/free-guides', requireAdmin, (req, res) => {
+  const email = (req.query.email || '').trim().toLowerCase();
+  let list = readFreeClaims();
+  if (email) list = list.filter((c) => String(c.email || '').toLowerCase() === email);
+  list.sort((a, b) => String(b.claimedAt).localeCompare(String(a.claimedAt)));
+  res.json({ claims: list, total: list.length });
 });
 
 // ---- Admin: purchases ----

@@ -1415,6 +1415,32 @@
     try { refreshMapMarkers(); } catch (e) { /* map not ready yet */ }
   }
 
+  // Resolves once the server's free-guide claim for this account is known, so
+  // the welcome popup can be suppressed when the free guide is already used.
+  let freeClaimReady = null;
+
+  // The first free guide is claimed once per email and recorded on the server,
+  // so the offer never reappears on another device or after clearing storage.
+  async function syncFreeGuideClaim() {
+    let claim = null;
+    try {
+      const r = await fetch('/api/free-guides/status?_ts=' + Date.now(), { credentials: 'include' });
+      if (r.ok) claim = await r.json();
+    } catch (e) { return; /* not signed in */ }
+
+    if (!claim || !claim.claimed) return;
+
+    if (!state.freeUnlocked) {
+      state.freeUnlocked = true;
+      persistFreeUnlocked();
+    }
+    if (claim.guideId && guideById(claim.guideId) && !state.unlockedGuides.has(claim.guideId)) {
+      state.unlockedGuides.add(claim.guideId);
+      persistUnlocked();
+    }
+    try { renderTripsPage(); } catch (e) { /* trips page not rendered yet */ }
+  }
+
   function showWelcome() {
     const m = $('#welcome-modal');
     if (!m) return;
@@ -1450,6 +1476,14 @@
       persistFreeUnlocked();
       state.freeUnlocked = true;
       showToast(t('toast.unlockedFreeGuide'), 'success');
+      // Record the claim on the server so the offer never comes back —
+      // the server allows only one free guide per email.
+      fetch('/api/free-guides/claim', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guideId })
+      }).catch(() => { /* offline: localStorage still suppresses the offer */ });
       return true;
     }
 
@@ -1919,11 +1953,14 @@
     startPassiveTracking();
 
     // -------- Initial toast + one-time welcome --------
-    setTimeout(() => {
+    setTimeout(async () => {
       showToast(t('toast.welcome'), 'success');
       let welcomed = false;
       try { welcomed = localStorage.getItem(WELCOMED_KEY) === '1'; } catch (e) {}
-      if (!welcomed) showWelcome();
+      // If the account already claimed its free guide on the server, the offer
+      // is spent — don't show the popup again on this device either.
+      if (freeClaimReady) { try { await freeClaimReady; } catch (e) {} }
+      if (!welcomed && !state.freeUnlocked) showWelcome();
     }, 600);
 
     $('#welcome-cta').addEventListener('click', () => {
@@ -2980,15 +3017,18 @@
         } catch (e) { /* ignore */ }
         init();
         syncPurchasedUnlocks();
+        freeClaimReady = syncFreeGuideClaim();
         syncAvatar();
       }, function () {
         init();
         syncPurchasedUnlocks();
+        freeClaimReady = syncFreeGuideClaim();
         syncAvatar();
       });
     } else {
       init();
       syncPurchasedUnlocks();
+      freeClaimReady = syncFreeGuideClaim();
       syncAvatar();
     }
   }

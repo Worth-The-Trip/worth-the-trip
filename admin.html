@@ -113,12 +113,14 @@
       <div class="tabs" id="tabs">
         <button class="tab active" data-tab="users">Users</button>
         <button class="tab" data-tab="purchases">Purchases</button>
+        <button class="tab" data-tab="freeguides">Free guides</button>
         <button class="tab" data-tab="guides">Guides</button>
         <button class="tab" data-tab="creators">Creators</button>
       </div>
 
       <div id="panel-users"></div>
       <div id="panel-purchases"></div>
+      <div id="panel-freeguides"></div>
       <div id="panel-guides"></div>
       <div id="panel-creators"></div>
     </div>
@@ -223,6 +225,8 @@
       renderUsers(u.users);
       const p = await api('/api/purchases');
       renderPurchases(p.purchases);
+      const f = await api('/api/free-guides');
+      renderFreeGuides(f.claims);
       const c = await api('/api/creators');
       renderCreators(c.creators);
       const g = await api('/api/admin/guides');
@@ -244,8 +248,10 @@
     });
 
     function showTabs(name) {
-      ['users', 'purchases', 'guides', 'creators'].forEach((k) => {
-        $('#panel-' + k).style.display = (k === name) ? 'block' : 'none';
+      // Derive from the tab buttons so a new tab can't be forgotten here.
+      document.querySelectorAll('#tabs .tab').forEach((t) => {
+        const panel = document.getElementById('panel-' + t.dataset.tab);
+        if (panel) panel.style.display = (t.dataset.tab === name) ? 'block' : 'none';
       });
     }
 
@@ -400,6 +406,39 @@
         } finally {
           btn.disabled = false;
         }
+      });
+    }
+
+    // ---- first free guide claims ----
+    function renderFreeGuides(claims) {
+      const el = $('#panel-freeguides');
+      const list = claims || [];
+      let html = '<p class="sub">The first guide a customer unlocks is free, limited to <strong>one per email</strong>. ' +
+        'The claim is recorded on the server, so the offer never reappears for that account on any device.</p>' +
+        '<p class="sub"><strong>' + list.length + '</strong> free guide' + (list.length === 1 ? '' : 's') + ' claimed.</p>';
+      if (!list.length) { el.innerHTML = html + '<p class="empty">No free guides claimed yet.</p>'; return; }
+
+      html += '<div class="field"><label style="display:flex;gap:8px;flex-wrap:wrap">Email ' +
+        '<input id="fg-email" type="text" placeholder="filter by e-mail"></label></div>' +
+        '<div class="table-wrap"><table class="table"><thead><tr>' +
+        '<th>Email</th><th>Guide</th><th>Claimed</th>' +
+        '</tr></thead><tbody>';
+      list.forEach((c) => {
+        html += '<tr>' +
+          `<td><strong>${esc(c.email || '—')}</strong></td>` +
+          `<td>${esc(c.guideId || '—')}</td>` +
+          `<td>${c.claimedAt ? new Date(c.claimedAt).toLocaleString() : '—'}</td>` +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+      el.innerHTML = html;
+
+      const box = $('#fg-email');
+      if (box) box.addEventListener('input', () => {
+        const q = box.value.trim().toLowerCase();
+        el.querySelectorAll('tbody tr').forEach((tr) => {
+          tr.style.display = (!q || tr.textContent.toLowerCase().includes(q)) ? '' : 'none';
+        });
       });
     }
 
