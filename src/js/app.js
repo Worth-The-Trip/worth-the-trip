@@ -1884,7 +1884,9 @@
       if (studio) studio.style.display = isCreator ? '' : 'none';
       if (applyBtn) applyBtn.style.display = isCreator ? 'none' : '';
     };
-    fetch('/api/creator/me')
+    // _ts busts the proxy cache: it keys on the URL alone, so a plain
+    // /api/creator/me would keep serving a stale body.
+    fetch('/api/creator/me?_ts=' + Date.now())
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(apply)
       .catch(function () { apply(null); });

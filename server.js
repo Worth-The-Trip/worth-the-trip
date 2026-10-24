@@ -229,6 +229,19 @@ function clearSessionCookie(res) {
 }
 
 // ------------------------------------------------------------------ middleware
+// Never let the CDN/proxy cache API responses. SiteGround's proxy keys its
+// cache on the URL alone, so a plain `GET /api/me` keeps serving an old
+// per-session body — the account page then shows a stale avatar and an empty
+// purchases list, and one user's data can be served to another. no-store
+// forces every API call through to Node.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    res.set('Cache-Control', 'no-store');
+    res.set('Vary', 'Cookie');
+  }
+  next();
+});
+
 const DATA_NAMES = new Set([
   'auth.jsonl', 'sessions.jsonl', 'purchases.jsonl', 'creators.json', 'guides.jsonl',
   'auth.jsonl.tmp', 'sessions.jsonl.tmp', 'purchases.jsonl.tmp', 'creators.json.tmp', 'guides.jsonl.tmp',

@@ -203,6 +203,12 @@
 
     function api(path, options) {
       const token = localStorage.getItem(AUTH_KEY) || '';
+      options = options || {};
+      // Bust any cached copy of a GET — the proxy caches on the URL alone,
+      // so a plain /api/me would keep serving a stale body.
+      if ((options.method || 'GET').toUpperCase() === 'GET') {
+        path += (path.indexOf('?') === -1 ? '?' : '&') + '_ts=' + Date.now();
+      }
       return fetch(path, {
         ...options,
         headers: {

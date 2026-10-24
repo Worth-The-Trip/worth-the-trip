@@ -145,6 +145,11 @@
   }
 
   function api(path, options) {
+    options = options || {};
+    // Bust any cached copy of a GET — the proxy caches on the URL alone.
+    if ((options.method || 'GET').toUpperCase() === 'GET') {
+      path += (path.indexOf('?') === -1 ? '?' : '&') + '_ts=' + Date.now();
+    }
     return fetch(path, Object.assign({}, options, {
       headers: Object.assign({ 'Content-Type': 'application/json' }, (options && options.headers) || {}),
       credentials: 'include'
