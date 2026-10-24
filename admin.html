@@ -352,8 +352,17 @@
     // ---- purchases ----
     function renderPurchases(purchases) {
       const el = $('#panel-purchases');
-      if (!purchases || !purchases.length) { el.innerHTML = '<p class="empty">No purchases.</p>'; return; }
-      let html = '<div class="field"><label style="display:flex;gap:8px;flex-wrap:wrap">Email <input id="f-email" type="text" placeholder="filter by e-mail"></label>' +
+      let html = '<div class="btn-row" style="margin-bottom:14px;align-items:center">' +
+        '<button class="btn btn-primary btn-sm" id="sync-stripe-btn" type="button">Sync from Stripe</button>' +
+        '<span class="sub" id="sync-stripe-msg">Record completed payments Stripe holds that the site never captured (e.g. taken before the webhook existed).</span>' +
+        '</div>';
+      if (!purchases || !purchases.length) {
+        html += '<p class="empty">No purchases.</p>';
+        el.innerHTML = html;
+        wireStripeSync();
+        return;
+      }
+      html += '<div class="field"><label style="display:flex;gap:8px;flex-wrap:wrap">Email <input id="f-email" type="text" placeholder="filter by e-mail"></label>' +
         '<label style="display:flex;gap:8px;flex-wrap:wrap">Guide <input id="f-guide" type="text" placeholder="filter by guide"></label></div>' +
         '<div class="table-wrap"><table class="table"><thead><tr>' +
         '<th>Guide</th><th>Buyer email</th><th>Amount</th><th>Currency</th><th>Date</th><th>Type</th>' +
@@ -372,6 +381,26 @@
       });
       html += '</tbody></table></div>';
       el.innerHTML = html;
+      wireStripeSync();
+    }
+
+    function wireStripeSync() {
+      const btn = $('#sync-stripe-btn');
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        const msg = $('#sync-stripe-msg');
+        btn.disabled = true;
+        if (msg) msg.textContent = 'Contacting Stripe…';
+        try {
+          const r = await api('/api/admin/purchases/sync', { method: 'POST', body: '{}' });
+          if (msg) msg.textContent = 'Added ' + r.added + ', skipped ' + r.skipped + ' — ' + r.total + ' recorded.';
+          loadAll();
+        } catch (e) {
+          if (msg) msg.textContent = 'Sync failed: ' + e.message;
+        } finally {
+          btn.disabled = false;
+        }
+      });
     }
 
     // ---- creators ----

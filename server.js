@@ -527,6 +527,54 @@ app.get('/api/purchases', requireAdmin, (req, res) => {
   res.json({ purchases: list, total: list.length });
 });
 
+// ---- Admin: pull completed Checkout sessions from Stripe and record any the
+// site never captured (e.g. payments taken before the webhook existed).
+// Idempotent — a session already recorded is skipped.
+app.post('/api/admin/purchases/sync', requireAdmin, async (req, res) => {
+  try {
+    let result;
+    try {
+      result = await STRIPE.checkout.sessions.list({ limit: 100, expand: ['data.line_items'] });
+    } catch (e) {
+      result = await STRIPE.checkout.sessions.list({ limit: 100 });
+    }
+    const purchases = readPurchases();
+    const seen = new Set(purchases.map((p) => p.sessionId || p.id));
+    let added = 0;
+    let skipped = 0;
+    for (const s of (result && result.data) || []) {
+      const paid = s.status === 'complete' || s.payment_status === 'paid';
+      if (!paid || seen.has(s.id)) { skipped++; continue; }
+      const li = s.line_items && s.line_items.data && s.line_items.data[0];
+      // Product names are "<guide id with spaces> — Worth The Trip".
+      const rawName = String((li && (li.description || (li.price && li.price.nickname))) || '');
+      const guideId = (s.metadata && s.metadata.guideId) ||
+        (rawName ? slugify(rawName.split('—')[0]) : null);
+      const amount = (s.amount_total != null)
+        ? s.amount_total
+        : (li && li.amount_total != null ? li.amount_total : null);
+      purchases.push({
+        id: s.id,
+        sessionId: s.id,
+        type: s.mode === 'subscription' ? 'subscription' : 'payment',
+        guideId: guideId,
+        guideTitle: (s.metadata && s.metadata.guideTitle) || (rawName || null),
+        buyerEmail: (s.customer_details && s.customer_details.email) || null,
+        stripeCustomerId: (s.customer && s.customer.id) || s.customer || null,
+        amount: amount,
+        currency: s.currency || 'jpy',
+        purchasedAt: s.created || Math.floor(Date.now() / 1000),
+      });
+      seen.add(s.id);
+      added++;
+    }
+    writeLines(PURCHASES_FILE, purchases);
+    res.json({ ok: true, added, skipped, total: purchases.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ---- Admin: creators ----
 app.get('/api/creators', requireAdmin, (req, res) => {
   const creators = readCreators().map((c) => ({

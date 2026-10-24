@@ -361,6 +361,13 @@
     });
 
     // ---- purchases ----
+    // Stripe timestamps are in seconds; older records may be milliseconds.
+    function fmtTs(ts) {
+      const n = Number(ts);
+      if (!n) return '—';
+      return new Date(n > 1e12 ? n : n * 1000).toLocaleDateString();
+    }
+
     async function loadPurchases() {
       const user = await loadCurrentUser();
       const res = await api('/api/purchases/my');
@@ -381,7 +388,7 @@
         html += '<tr>' +
           `<td><strong>${p.guideTitle || p.guideId || '—'}</strong></td>` +
           `<td>${p.amount != null ? (p.currency === 'jpy' ? '¥' : '$' ) + Number(p.amount).toFixed(2) : '—'}</td>` +
-          `<td>${new Date(p.purchasedAt).toLocaleDateString()}</td>` +
+          `<td>${fmtTs(p.purchasedAt)}</td>` +
           `<td>${pill}</td>` +
           '</tr>';
       });
