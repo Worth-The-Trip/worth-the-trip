@@ -34,13 +34,17 @@
 
   /* Tokens used by the account/admin views (shadcn-style). Must be defined so
      var(--foreground), var(--accent) etc. resolve to real values instead of
-     the CSS initial value (black / transparent), which breaks dark-mode legibility. */
+     the CSS initial value (black / transparent), which breaks dark-mode legibility.
+     NOTE: --surface is NOT redefined here. `--surface: var(--surface)` is a
+     self-reference, which makes the property invalid at computed-value time —
+     every `background: var(--surface)` then falls back to transparent and the
+     panels turn see-through. --surface is already set above (and overridden by
+     the light theme). */
   --foreground: var(--warm-white);
   --accent: var(--vermilion);
   --muted-foreground: var(--text-muted);
   --border: var(--glass-border);
   --card: var(--surface-raised);
-  --surface: var(--surface);
 
   /* Spacing */
   --space-xs: 4px;
