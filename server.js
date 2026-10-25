@@ -1846,6 +1846,76 @@ app.use('/guide-images', express.static(GUIDES_IMG_DIR));
 app.use('/public/Guide%20Images', express.static(GUIDES_IMG_DIR));
 app.use(express.static(DATA_DIR));
 
+// SQLite probe. Gated behind WTT_PROBE=1 so it is not a permanent endpoint —
+// it exists to answer "does the built-in node:sqlite actually work on this
+// host?" before committing to a data-layer rewrite.
+app.get('/api/probe/sqlite', (req, res) => {
+  if (process.env.WTT_PROBE !== '1') return res.status(404).end();
+  const out = {
+    node: process.version,
+    platform: process.platform,
+    arch: process.arch,
+    runtimeDir: RUNTIME_DIR,
+    checks: {},
+  };
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    out.checks.module = 'available';
+    const dbPath = path.join(RUNTIME_DIR, 'probe.sqlite');
+    const db = new DatabaseSync(dbPath);
+    out.checks.opened = true;
+    out.dbPath = dbPath;
+
+    db.exec('DROP TABLE IF EXISTS probe');
+    db.exec('CREATE TABLE probe (id INTEGER PRIMARY KEY, v TEXT)');
+    db.prepare('INSERT INTO probe (v) VALUES (?)').run('hello');
+    const row = db.prepare('SELECT v FROM probe WHERE id = ?').get(1);
+    out.checks.roundTrip = !!(row && row.v === 'hello');
+
+    // A rolled-back transaction must leave nothing behind.
+    db.exec('BEGIN');
+    db.prepare('INSERT INTO probe (v) VALUES (?)').run('rolled-back');
+    db.exec('ROLLBACK');
+    out.checks.rollback = db.prepare('SELECT COUNT(*) AS n FROM probe').get().n === 1;
+
+    // Two handles on one file — the closest we can get in-process to the
+    // multi-writer case a host could present.
+    const second = new DatabaseSync(dbPath);
+    second.prepare('INSERT INTO probe (v) VALUES (?)').run('from-second-handle');
+    out.checks.secondHandle = db.prepare('SELECT COUNT(*) AS n FROM probe').get().n === 2;
+    second.close();
+
+    // WAL is what lets readers and a writer coexist; not every host
+    // filesystem supports its shared-memory requirement.
+    try {
+      db.exec('PRAGMA journal_mode=WAL');
+      out.checks.wal = 'ok';
+    } catch (e) {
+      out.checks.wal = 'unsupported: ' + String(e && e.message).slice(0, 80);
+    }
+    out.checks.journalMode = db.prepare('PRAGMA journal_mode').get();
+
+    // Bulk write throughput, as a rough sense of whether this host's disk can
+    // take the workload.
+    const t0 = Date.now();
+    db.exec('BEGIN');
+    const ins = db.prepare('INSERT INTO probe (v) VALUES (?)');
+    for (let i = 0; i < 2000; i++) ins.run('row-' + i);
+    db.exec('COMMIT');
+    out.checks.bulkInsertMs = Date.now() - t0;
+    out.checks.rowCount = db.prepare('SELECT COUNT(*) AS n FROM probe').get().n;
+
+    db.exec('DROP TABLE probe');
+    try { fs.unlinkSync(dbPath); } catch (e) { /* already gone */ }
+    db.close();
+    out.checks.cleanedUp = true;
+    res.json(out);
+  } catch (e) {
+    out.checks.error = String((e && e.message) || e).slice(0, 300);
+    res.status(500).json(out);
+  }
+});
+
 app.listen(PORT, HOST, () => {
   console.log('WTT app server running at http://' + HOST + ':' + PORT);
   console.log('API:        http://' + HOST + ':' + PORT + '/api/*');
