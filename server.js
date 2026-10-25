@@ -128,6 +128,25 @@ function writeArray(file, arr) {
   fs.writeFileSync(tmp, JSON.stringify(arr, null, 2));
   fs.renameSync(tmp, file);
 }
+
+// ------------------------------------------------------------------ writes
+// All state lives in flat files and Node serves every request from one thread,
+// so a read-modify-write is only atomic if nothing yields between the read and
+// the write. Handlers that await first (Stripe, the map resolver, Japanese
+// translation) can interleave — and one of the things they write is a purchase,
+// so a lost update is money, not just data.
+//
+// `mutate` runs a read-modify-write cycle inside a serialised critical section,
+// so exactly one is ever in flight. Wrap any handler that reads a data file and
+// then writes it back.
+let writeChain = Promise.resolve();
+function mutate(fn) {
+  const run = writeChain.then(fn, fn);
+  // Keep the chain usable even if a cycle throws.
+  writeChain = run.then(() => {}, () => {});
+  return run;
+}
+
 function ensureDataFiles() {
   fs.mkdirSync(RUNTIME_DIR, { recursive: true });
   fs.mkdirSync(AVATAR_DIR, { recursive: true });
@@ -255,28 +274,43 @@ async function fetchTwitchFollowers(handle) {
 async function refreshFollowerCounts(force) {
   const creators = readCreators().filter((c) => c.status === 'accepted');
   if (!creators.length) return;
-  const cache = readFollowerCache();
-  let changed = false;
-  for (const c of creators) {
-    const entry = cache[c.id] || {};
-    if (!force && followerCacheFresh(entry)) continue;
-    const next = Object.assign({}, entry);
+
+  // Decide what is stale BEFORE any slow platform call, then collect the new
+  // figures, then commit — so the read-modify-write never spans an await.
+  const before = readFollowerCache();
+  const stale = force ? creators : creators.filter((c) => !followerCacheFresh(before[c.id] || {}));
+  if (!stale.length) return;
+
+  const now = new Date().toISOString();
+  const updates = {};
+  for (const c of stale) {
+    const next = { updatedAt: now };
     const yt = youtubeHandle(c.youtubeUrl);
     if (yt) {
       const r = await fetchYouTubeSubs(yt);
-      if (typeof r.count === 'number') { next.youtube = r.count; next.youtubeAt = new Date().toISOString(); changed = true; }
+      if (typeof r.count === 'number') { next.youtube = r.count; next.youtubeAt = now; }
       else if (r.error && r.error !== 'no key') console.error('YouTube lookup failed for', c.id + ':', r.error);
     }
     const tw = twitchHandle(c.twitchUrl);
     if (tw) {
       const r = await fetchTwitchFollowers(tw);
-      if (typeof r.count === 'number') { next.twitch = r.count; next.twitchAt = new Date().toISOString(); changed = true; }
+      if (typeof r.count === 'number') { next.twitch = r.count; next.twitchAt = now; }
       else if (r.error && r.error !== 'no key') console.error('Twitch lookup failed for', c.id + ':', r.error);
     }
-    next.updatedAt = new Date().toISOString();
-    cache[c.id] = next;
+    updates[c.id] = next;
   }
-  if (changed) writeFollowerCache(cache);
+
+  mutate(() => {
+    const cache = readFollowerCache();
+    for (const id of Object.keys(updates)) {
+      const merged = Object.assign({}, cache[id] || {}, updates[id]);
+      // Keep the previous figure when the platform returned nothing this time.
+      if (updates[id].youtube === undefined) delete merged.youtube;
+      if (updates[id].twitch === undefined) delete merged.twitch;
+      cache[id] = merged;
+    }
+    writeFollowerCache(cache);
+  });
 }
 
 // 128000 -> "128K", 486000 -> "486K", 8920000 -> "8.9M"
@@ -411,7 +445,25 @@ function findUser(email) {
   return readUsers().find((u) => String(u.email || '').toLowerCase() === e);
 }
 function findUserById(id) { return readUsers().find((u) => u.id === id); }
-function getSession(token) { return readSessions().find((s) => s.token === token); }
+function getSession(token) {
+  const s = readSessions().find((x) => x.token === token);
+  if (!s) return null;
+  // An expired session must stop working even before anything prunes it —
+  // otherwise the 30-day TTL is decorative and the file grows forever.
+  if (s.expiresAt && Date.now() > s.expiresAt) return null;
+  return s;
+}
+
+// Drop sessions past their expiry. Called on login (the hot path) and on an
+// interval so sessions.jsonl cannot grow without bound — every authenticated
+// request scans that file, so its size is a per-request cost.
+function pruneSessions() {
+  const list = readSessions();
+  if (!list.length) return list;
+  const live = list.filter((s) => !s.expiresAt || Date.now() <= s.expiresAt);
+  if (live.length !== list.length) writeLines(SESSIONS_FILE, live);
+  return live;
+}
 
 // ------------------------------------------------------------------ cookies
 const COOKIE = 'wtt_session';
@@ -459,6 +511,44 @@ app.use((req, res, next) => {
   next();
 });
 
+// ------------------------------------------------------------- rate limiting
+// Login, signup and admin login are the only unauthenticated write paths, and
+// they are where credential stuffing lands. SiteGround's proxy fronts the app
+// and `trust proxy` is not set, so req.ip is the proxy's own address — shared by
+// every visitor — and limiting on it would lock out all users at once. Key on
+// the forwarded client IP instead.
+const AUTH_LIMIT = 10;                 // attempts…
+const AUTH_WINDOW_MS = 60 * 1000;      // …per minute
+const authAttempts = new Map();
+
+function clientIp(req) {
+  const fwd = req.headers['x-forwarded-for'];
+  if (fwd) return String(fwd).split(',')[0].trim();
+  return req.ip || 'unknown';
+}
+
+function rateLimitAuth(req, res, next) {
+  const key = clientIp(req) + '|' + req.path;
+  const now = Date.now();
+  let e = authAttempts.get(key);
+  if (!e || e.resetAt <= now) {
+    e = { count: 0, resetAt: now + AUTH_WINDOW_MS };
+    authAttempts.set(key, e);
+  }
+  e.count++;
+  if (e.count > AUTH_LIMIT) {
+    res.set('Retry-After', String(Math.max(1, Math.ceil((e.resetAt - now) / 1000))));
+    return jsonError(res, 429, 'Too many attempts. Please try again shortly.');
+  }
+  next();
+}
+
+// Keep the map from growing without bound.
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, e] of authAttempts) if (e.resetAt <= now) authAttempts.delete(k);
+}, 5 * 60 * 1000).unref();
+
 // Parse incoming request bodies (JSON) for all routes. The verify hook captures
 // the raw buffer so the Stripe webhook can verify its signature.
 const captureRaw = (req, res, buf) => { req.rawBody = buf; };
@@ -472,6 +562,7 @@ app.use((req, res, next) => {
 
 // Stripe webhook
 app.post('/webhooks/stripe', (req, res) => {
+  mutate(() => {
   try {
     const sig = req.headers['stripe-signature'];
     let event;
@@ -523,12 +614,14 @@ app.post('/webhooks/stripe', (req, res) => {
     console.error('Webhook error:', e);
     res.status(500).json({ error: e.message });
   }
+  });
 });
 
 // ---- API routes ----
 
 // Signup
-app.post('/api/users', (req, res) => {
+app.post('/api/users', rateLimitAuth, (req, res) => {
+  mutate(() => {
   try {
     const { email, password, name } = req.body || {};
     if (!email || !password) return jsonError(res, 400, 'Email and password are required');
@@ -545,16 +638,21 @@ app.post('/api/users', (req, res) => {
     writeLines(AUTH_FILE, users);
     const token = genToken();
     const session = { token, userId: user.id, kind: 'user', expiresAt: Date.now() + SESSION_TTL_MS };
-    const sessions = readSessions();
+    // Drop sessions past their expiry while we hold the write lock, so
+    // sessions.jsonl cannot grow without bound (every authenticated request
+    // scans it).
+    const sessions = pruneSessions();
     sessions.push(session);
     writeLines(SESSIONS_FILE, sessions);
     res.setHeader('Set-Cookie', [`wtt_session=${token}; HttpOnly; Path=/; SameSite=lax; Max-Age=${SESSION_TTL_MS / 1000}`]);
     res.status(201).json({ ok: true, token, user: { id: user.id, email: user.email, name: user.name } });
   } catch (e) { jsonError(res, 500, e.message); }
+  });
 });
 
 // Login
-app.post('/api/login', (req, res) => {
+app.post('/api/login', rateLimitAuth, (req, res) => {
+  mutate(() => {
   try {
     const { email, password } = req.body || {};
     const user = findUser(email);
@@ -564,16 +662,21 @@ app.post('/api/login', (req, res) => {
     if (user.banned) return jsonError(res, 403, 'This account has been banned.');
     const token = genToken();
     const session = { token, userId: user.id, kind: 'user', expiresAt: Date.now() + SESSION_TTL_MS };
-    const sessions = readSessions();
+    // Drop sessions past their expiry while we hold the write lock, so
+    // sessions.jsonl cannot grow without bound (every authenticated request
+    // scans it).
+    const sessions = pruneSessions();
     sessions.push(session);
     writeLines(SESSIONS_FILE, sessions);
     res.setHeader('Set-Cookie', [`wtt_session=${token}; HttpOnly; Path=/; SameSite=lax; Max-Age=${SESSION_TTL_MS / 1000}`]);
     res.json({ ok: true, token, user: { id: user.id, email: user.email, name: user.name } });
   } catch (e) { jsonError(res, 500, e.message); }
+  });
 });
 
 // Logout
 app.post('/api/logout', (req, res) => {
+  mutate(() => {
   const token = readCookie(req);
   if (token) {
     const sessions = readSessions().filter((s) => s.token !== token);
@@ -581,6 +684,7 @@ app.post('/api/logout', (req, res) => {
   }
   res.setHeader('Set-Cookie', [`wtt_session=; HttpOnly; Path=/; SameSite=lax; Max-Age=0`]);
   res.json({ ok: true });
+  });
 });
 
 // Me (current logged-in user)
@@ -608,6 +712,7 @@ app.get('/api/me', requireUser, (req, res) => {
 });
 
 app.patch('/api/me', requireUser, (req, res) => {
+  mutate(() => {
   try {
     const u = req.user;
     const body = req.body || {};
@@ -663,6 +768,7 @@ app.patch('/api/me', requireUser, (req, res) => {
       updatedAt: u.updatedAt
     });
   } catch (e) { jsonError(res, 500, redactKeys(e.message)); }
+  });
 });
 
 // Mirror an account's public profile onto its creator record so the Creators
@@ -719,6 +825,7 @@ app.get('/api/users/:id', requireAdmin, (req, res) => {
 });
 
 app.patch('/api/users/:id', requireAdmin, (req, res) => {
+  mutate(() => {
   const u = findUserById(req.params.id);
   if (!u) return jsonError(res, 404, 'User not found');
   const body = req.body || {};
@@ -754,19 +861,22 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
   if (i >= 0) users[i] = u;
   writeLines(AUTH_FILE, users);
   res.json({ ok: true, avatar: u.avatar });
+  });
 });
 
 app.delete('/api/users/:id', requireAdmin, (req, res) => {
-  const u = findUserById(req.params.id);
-  if (!u) return jsonError(res, 404, 'User not found');
-  const sessions = readSessions().filter((s) => !(s.userId === u.id && s.kind === 'user'));
-  writeLines(SESSIONS_FILE, sessions);
-  const purchases = readPurchases().filter((p) => p.buyerEmail !== u.email);
-  writeLines(PURCHASES_FILE, purchases);
-  try { fs.unlinkSync(path.join(AVATAR_DIR, u.id + '.png')); } catch (e) {}
-  const users = readUsers().filter((x) => x.id !== u.id);
-  writeLines(AUTH_FILE, users);
-  res.json({ ok: true });
+  mutate(() => {
+    const u = findUserById(req.params.id);
+    if (!u) return jsonError(res, 404, 'User not found');
+    const sessions = readSessions().filter((s) => !(s.userId === u.id && s.kind === 'user'));
+    writeLines(SESSIONS_FILE, sessions);
+    const purchases = readPurchases().filter((p) => p.buyerEmail !== u.email);
+    writeLines(PURCHASES_FILE, purchases);
+    try { fs.unlinkSync(path.join(AVATAR_DIR, u.id + '.png')); } catch (e) {}
+    const users = readUsers().filter((x) => x.id !== u.id);
+    writeLines(AUTH_FILE, users);
+    res.json({ ok: true });
+  });
 });
 
 // ---- Customer: own purchases ----
@@ -809,6 +919,7 @@ app.get('/api/free-guides/status', requireUser, (req, res) => {
 });
 
 app.post('/api/free-guides/claim', requireUser, (req, res) => {
+  mutate(() => {
   const email = String(req.user.email || '').toLowerCase();
   const guideId = String((req.body || {}).guideId || '').trim();
   if (!guideId) return jsonError(res, 400, 'guideId is required');
@@ -823,6 +934,7 @@ app.post('/api/free-guides/claim', requireUser, (req, res) => {
   claims.push({ email, guideId, userId: req.user.id, claimedAt });
   writeLines(FREE_CLAIMS_FILE, claims);
   res.json({ ok: true, alreadyClaimed: false, guideId, claimedAt });
+  });
 });
 
 // ---- Admin: who has claimed the first free guide ----
@@ -858,41 +970,43 @@ app.post('/api/admin/purchases/sync', requireAdmin, async (req, res) => {
     } catch (e) {
       result = await STRIPE.checkout.sessions.list({ limit: 100 });
     }
-    const purchases = readPurchases();
-    const seen = new Set(purchases.map((p) => p.sessionId || p.id));
-    let added = 0;
-    let skipped = 0;
-    for (const s of (result && result.data) || []) {
-      const paid = s.status === 'complete' || s.payment_status === 'paid';
-      if (!paid || seen.has(s.id)) { skipped++; continue; }
-      const li = s.line_items && s.line_items.data && s.line_items.data[0];
-      // Product names are "<guide id with spaces> — Worth The Trip".
-      const rawName = String((li && (li.description || (li.price && li.price.nickname))) || '');
-      const guideId = (s.metadata && s.metadata.guideId) ||
-        (rawName ? slugify(rawName.split('—')[0]) : null);
-      const amount = (s.amount_total != null)
-        ? s.amount_total
-        : (li && li.amount_total != null ? li.amount_total : null);
-      // Prefer the guide's real title over Stripe's raw product name
-      // ("tokyo city explorer — Worth The Trip").
-      const g = guideId ? findGuide(guideId) : null;
-      purchases.push({
-        id: s.id,
-        sessionId: s.id,
-        type: s.mode === 'subscription' ? 'subscription' : 'payment',
-        guideId: guideId,
-        guideTitle: (s.metadata && s.metadata.guideTitle) || (g ? g.title : (rawName || null)),
-        buyerEmail: (s.customer_details && s.customer_details.email)
-          ? String(s.customer_details.email).toLowerCase() : null,
-        stripeCustomerId: (s.customer && s.customer.id) || s.customer || null,
-        amount: amount,
-        currency: s.currency || 'jpy',
-        purchasedAt: s.created || Math.floor(Date.now() / 1000),
-      });
-      seen.add(s.id);
-      added++;
-    }
-    writeLines(PURCHASES_FILE, purchases);
+  mutate(() => {
+      const purchases = readPurchases();
+      const seen = new Set(purchases.map((p) => p.sessionId || p.id));
+      let added = 0;
+      let skipped = 0;
+      for (const s of (result && result.data) || []) {
+        const paid = s.status === 'complete' || s.payment_status === 'paid';
+        if (!paid || seen.has(s.id)) { skipped++; continue; }
+        const li = s.line_items && s.line_items.data && s.line_items.data[0];
+        // Product names are "<guide id with spaces> — Worth The Trip".
+        const rawName = String((li && (li.description || (li.price && li.price.nickname))) || '');
+        const guideId = (s.metadata && s.metadata.guideId) ||
+          (rawName ? slugify(rawName.split('—')[0]) : null);
+        const amount = (s.amount_total != null)
+          ? s.amount_total
+          : (li && li.amount_total != null ? li.amount_total : null);
+        // Prefer the guide's real title over Stripe's raw product name
+        // ("tokyo city explorer — Worth The Trip").
+        const g = guideId ? findGuide(guideId) : null;
+        purchases.push({
+          id: s.id,
+          sessionId: s.id,
+          type: s.mode === 'subscription' ? 'subscription' : 'payment',
+          guideId: guideId,
+          guideTitle: (s.metadata && s.metadata.guideTitle) || (g ? g.title : (rawName || null)),
+          buyerEmail: (s.customer_details && s.customer_details.email)
+            ? String(s.customer_details.email).toLowerCase() : null,
+          stripeCustomerId: (s.customer && s.customer.id) || s.customer || null,
+          amount: amount,
+          currency: s.currency || 'jpy',
+          purchasedAt: s.created || Math.floor(Date.now() / 1000),
+        });
+        seen.add(s.id);
+        added++;
+      }
+      writeLines(PURCHASES_FILE, purchases);
+  });
     res.json({ ok: true, added, skipped, total: purchases.length });
   } catch (e) {
     // Never echo an API key back to the browser — Stripe's own messages
@@ -979,6 +1093,7 @@ app.get('/api/creators', requireAdmin, (req, res) => {
 });
 
 app.patch('/api/creators/:id', requireAdmin, (req, res) => {
+  mutate(() => {
   const creators = readCreators();
   const c = creators.find((x) => x.id === req.params.id);
   if (!c) return jsonError(res, 404, 'Creator not found');
@@ -988,10 +1103,12 @@ app.patch('/api/creators/:id', requireAdmin, (req, res) => {
   if (idx >= 0) creators[idx] = c;
   writeArray(CREATORS_FILE, creators);
   res.json({ ok: true, status: c.status });
+  });
 });
 
 // ---- Admin: login ----
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', rateLimitAuth, (req, res) => {
+  mutate(() => {
   const { password } = req.body || {};
   if (password !== ADMIN_PASSWORD) return jsonError(res, 401, 'Incorrect admin password');
   const token = genToken();
@@ -1001,9 +1118,11 @@ app.post('/api/admin/login', (req, res) => {
   writeLines(SESSIONS_FILE, sessions);
   res.setHeader('Set-Cookie', [`wtt_session=${token}; HttpOnly; Path=/; SameSite=lax; Max-Age=${SESSION_TTL_MS / 1000}`]);
   res.json({ ok: true, token });
+  });
 });
 
 app.post('/api/admin/logout', (req, res) => {
+  mutate(() => {
   const token = readCookie(req);
   if (token) {
     const sessions = readSessions().filter((s) => s.token !== token);
@@ -1011,6 +1130,7 @@ app.post('/api/admin/logout', (req, res) => {
   }
   res.setHeader('Set-Cookie', [`wtt_session=; HttpOnly; Path=/; SameSite=lax; Max-Age=0`]);
   res.json({ ok: true });
+  });
 });
 
 app.get('/api/health', (req, res) => {
@@ -1126,6 +1246,7 @@ app.get('/api/creator/me', (req, res) => {
 
 // Apply to become a creator (admin approves in /admin)
 app.post('/api/creator/apply', requireUser, (req, res) => {
+  mutate(() => {
   try {
     const b = req.body || {};
     const name = clip(b.name, 120).trim();
@@ -1156,6 +1277,7 @@ app.post('/api/creator/apply', requireUser, (req, res) => {
     writeArray(CREATORS_FILE, creators);
     res.json({ ok: true, status: 'pending' });
   } catch (e) { jsonError(res, 500, e.message); }
+  });
 });
 
 // My guides
@@ -1167,6 +1289,7 @@ app.get('/api/creator/guides', requireCreator, (req, res) => {
 
 // New draft
 app.post('/api/creator/guides', requireCreator, (req, res) => {
+  mutate(() => {
   try {
     const guides = readGuides();
     const base = slugify((req.body || {}).title || 'guide');
@@ -1192,6 +1315,7 @@ app.post('/api/creator/guides', requireCreator, (req, res) => {
     writeGuides(guides);
     res.status(201).json({ guide: guide, problems: guideProblems(guide) });
   } catch (e) { jsonError(res, 500, e.message); }
+  });
 });
 
 // Read one (owning creator, or any admin)
@@ -1204,6 +1328,7 @@ app.get('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
 
 // Update (owning creator, or any admin — admins can even edit published guides)
 app.patch('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
+  mutate(() => {
   try {
     const guides = readGuides();
     const i = guides.findIndex((g) => g.id === req.params.id);
@@ -1277,20 +1402,24 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
     writeGuides(guides);
     res.json({ guide: g, problems: guideProblems(g) });
   } catch (e) { jsonError(res, 500, e.message); }
+  });
 });
 
 app.delete('/api/creator/guides/:id', requireCreator, (req, res) => {
-  const guides = readGuides();
-  const g = guides.find((x) => x.id === req.params.id);
-  if (!g) return jsonError(res, 404, 'Guide not found');
-  if (g.creatorId !== req.user.id) return jsonError(res, 403, 'Not your guide');
-  if (g.status === 'published') return jsonError(res, 409, 'Published guides cannot be deleted');
-  writeGuides(guides.filter((x) => x.id !== g.id));
-  res.json({ ok: true });
+  mutate(() => {
+    const guides = readGuides();
+    const g = guides.find((x) => x.id === req.params.id);
+    if (!g) return jsonError(res, 404, 'Guide not found');
+    if (g.creatorId !== req.user.id) return jsonError(res, 403, 'Not your guide');
+    if (g.status === 'published') return jsonError(res, 409, 'Published guides cannot be deleted');
+    writeGuides(guides.filter((x) => x.id !== g.id));
+    res.json({ ok: true });
+  });
 });
 
 // Submit for review
 app.post('/api/creator/guides/:id/submit', requireCreator, (req, res) => {
+  mutate(() => {
   const guides = readGuides();
   const i = guides.findIndex((g) => g.id === req.params.id);
   if (i < 0) return jsonError(res, 404, 'Guide not found');
@@ -1307,10 +1436,12 @@ app.post('/api/creator/guides/:id/submit', requireCreator, (req, res) => {
   guides[i] = g;
   writeGuides(guides);
   res.json({ ok: true, guide: g });
+  });
 });
 
 // Image upload — base64 in, public path out
 app.post('/api/creator/images', requireGuideEditor, (req, res) => {
+  mutate(() => {
   try {
     const b = req.body || {};
     const guideId = String(b.guideId || '').replace(/[^a-z0-9-]/gi, '');
@@ -1322,6 +1453,7 @@ app.post('/api/creator/images', requireGuideEditor, (req, res) => {
     if (saved.error) return jsonError(res, 413, saved.error);
     res.json({ ok: true, path: saved.path });
   } catch (e) { jsonError(res, 500, e.message); }
+  });
 });
 
 // ---- Creator: pull lat/lng out of any Google Maps link (incl. short share links) ----
@@ -1618,48 +1750,79 @@ app.get('/api/admin/guides', requireAdmin, (req, res) => {
 });
 
 app.patch('/api/admin/guides/:id', requireAdmin, async (req, res) => {
-  try {
-    const guides = readGuides();
-    const i = guides.findIndex((g) => g.id === req.params.id);
-    if (i < 0) return jsonError(res, 404, 'Guide not found');
-    const g = guides[i];
-    const b = req.body || {};
-    if (b.status && ['published', 'rejected', 'submitted', 'draft'].includes(b.status)) {
-      if (b.status === 'published') {
-        const problems = guideProblems(g);
-        if (problems.length) return res.status(400).json({ error: 'Cannot publish — still incomplete', problems: problems });
-        g.publishedAt = new Date().toISOString();
-        g.status = 'published';
-        // Creators write English only — produce the Japanese version here.
-        await translateGuideToJa(g);
-      } else {
+  const b = req.body || {};
+  const STATUSES = ['published', 'rejected', 'submitted', 'draft'];
+
+  // Translate BEFORE taking the lock — it can take a moment and must not stall
+  // every other write. The translation is computed from the guide as it will be
+  // after this request's field changes, so it matches what gets committed.
+  let translated = null;
+  if (b.status === 'published') {
+    const preview = readGuides().find((x) => x.id === req.params.id);
+    if (!preview) return jsonError(res, 404, 'Guide not found');
+    const draft = Object.assign({}, preview);
+    if (b.reviewNote !== undefined) draft.reviewNote = clip(b.reviewNote, 600);
+    if (b.category !== undefined && CATEGORIES.includes(b.category)) draft.category = b.category;
+    if (b.title !== undefined && clip(b.title, 120).trim()) draft.title = clip(b.title, 120).trim();
+    if (b.city !== undefined) draft.city = clip(b.city, 80).trim();
+    if (b.prefecture !== undefined) draft.prefecture = clip(b.prefecture, 80).trim();
+    if (b.duration !== undefined) draft.duration = clip(b.duration, 80).trim();
+    if (b.tagline !== undefined) draft.tagline = clip(b.tagline, 200).trim();
+    draft.status = 'published';
+    const problems = guideProblems(draft);
+    if (problems.length) return res.status(400).json({ error: 'Cannot publish — still incomplete', problems: problems });
+    await translateGuideToJa(draft);   // mutates draft.ja / draft.jaSourceHash
+    translated = draft;
+  }
+
+  mutate(() => {
+    try {
+      const guides = readGuides();
+      const i = guides.findIndex((g) => g.id === req.params.id);
+      if (i < 0) return jsonError(res, 404, 'Guide not found');
+      // Apply the requested delta to the CURRENT guide inside the lock, so a
+      // concurrent edit is merged rather than overwritten.
+      const g = guides[i];
+      if (b.status && STATUSES.includes(b.status)) {
+        if (b.status === 'published') {
+          const problems = guideProblems(g);
+          if (problems.length) return res.status(400).json({ error: 'Cannot publish — still incomplete', problems: problems });
+          g.publishedAt = new Date().toISOString();
+        }
         g.status = b.status;
       }
-    }
-    if (b.reviewNote !== undefined) g.reviewNote = clip(b.reviewNote, 600);
-    // Same field set the studio sends, so the admin panel and the studio agree.
-    if (b.category !== undefined && CATEGORIES.includes(b.category)) g.category = b.category;
-    if (b.title !== undefined && clip(b.title, 120).trim()) g.title = clip(b.title, 120).trim();
-    if (b.city !== undefined) g.city = clip(b.city, 80).trim();
-    if (b.prefecture !== undefined) g.prefecture = clip(b.prefecture, 80).trim();
-    if (b.duration !== undefined) g.duration = clip(b.duration, 80).trim();
-    if (b.tagline !== undefined) g.tagline = clip(b.tagline, 200).trim();
-    g.reviewedAt = new Date().toISOString();
-    g.updatedAt = g.reviewedAt;
-    guides[i] = g;
-    writeGuides(guides);
-    res.json({ ok: true, guide: g });
-  } catch (e) { jsonError(res, 500, e.message); }
+      if (b.reviewNote !== undefined) g.reviewNote = clip(b.reviewNote, 600);
+      // Same field set the studio sends, so the admin panel and the studio agree.
+      if (b.category !== undefined && CATEGORIES.includes(b.category)) g.category = b.category;
+      if (b.title !== undefined && clip(b.title, 120).trim()) g.title = clip(b.title, 120).trim();
+      if (b.city !== undefined) g.city = clip(b.city, 80).trim();
+      if (b.prefecture !== undefined) g.prefecture = clip(b.prefecture, 80).trim();
+      if (b.duration !== undefined) g.duration = clip(b.duration, 80).trim();
+      if (b.tagline !== undefined) g.tagline = clip(b.tagline, 200).trim();
+      if (translated) {
+        // Creators write English only — the Japanese version is produced here.
+        g.ja = translated.ja;
+        g.jaSourceHash = translated.jaSourceHash;
+      }
+      g.reviewedAt = new Date().toISOString();
+      g.updatedAt = g.reviewedAt;
+      guides[i] = g;
+      writeGuides(guides);
+      res.json({ ok: true, guide: g });
+    } catch (e) { jsonError(res, 500, e.message); }
+  });
 });
 
 // Admins can remove a guide outright. Unlike the creator's own delete route
 // there is no published-guide guard and no notice is sent to the creator.
 app.delete('/api/admin/guides/:id', requireAdmin, (req, res) => {
-  const guides = readGuides();
-  const g = guides.find((x) => x.id === req.params.id);
-  if (!g) return jsonError(res, 404, 'Guide not found');
-  writeGuides(guides.filter((x) => x.id !== g.id));
-  res.json({ ok: true });
+  mutate(() => {
+    const guides = readGuides();
+    const g = guides.find((x) => x.id === req.params.id);
+    if (!g) return jsonError(res, 404, 'Guide not found');
+    writeGuides(guides.filter((x) => x.id !== g.id));
+    res.json({ ok: true });
+  });
 });
 
 // Pass a relative path + root (same as express.static). An absolute path makes
@@ -1710,4 +1873,6 @@ app.listen(PORT, HOST, () => {
   setInterval(() => {
     refreshFollowerCounts(false).catch((e) => console.error('Follower refresh failed:', e.message));
   }, FOLLOWERS_TTL_MS).unref();
+  // Keep the session file from growing forever.
+  setInterval(() => { mutate(() => pruneSessions()); }, 60 * 60 * 1000).unref();
 });
