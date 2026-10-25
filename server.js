@@ -597,7 +597,7 @@ function redactKeys(msg) {
 
 app.get('/api/me', requireUser, (req, res) => {
   const u = req.user;
-  res.json({ id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar, createdAt: u.createdAt, updatedAt: u.updatedAt, freeGuideClaimed: !!findFreeClaim(u.email), bio: u.bio || '', area: u.area || '', handle: u.handle || '', youtubeUrl: u.youtubeUrl || '', instagramUrl: u.instagramUrl || '', tiktokUrl: u.tiktokUrl || '', twitchUrl: u.twitchUrl || '', instagramFollowers: u.instagramFollowers || 0, tiktokFollowers: u.tiktokFollowers || 0 });
+  res.json({ id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar, createdAt: u.createdAt, updatedAt: u.updatedAt, freeGuideClaimed: !!findFreeClaim(u.email), bio: u.bio || '', area: u.area || '', handle: u.handle || '', youtubeUrl: u.youtubeUrl || '', instagramUrl: u.instagramUrl || '', tiktokUrl: u.tiktokUrl || '', twitchUrl: u.twitchUrl || '', followersCount: u.followersCount || 0 });
 });
 
 app.patch('/api/me', requireUser, (req, res) => {
@@ -627,9 +627,8 @@ app.patch('/api/me', requireUser, (req, res) => {
     if (body.tiktokUrl !== undefined) u.tiktokUrl = clip(body.tiktokUrl, 300).trim();
     if (body.twitchUrl !== undefined) u.twitchUrl = clip(body.twitchUrl, 300).trim();
     // Instagram and TikTok have no API that reports on other people's accounts,
-    // so those figures are entered by hand. Store them as plain integers.
-    if (body.instagramFollowers !== undefined) u.instagramFollowers = clampCount(body.instagramFollowers);
-    if (body.tiktokFollowers !== undefined) u.tiktokFollowers = clampCount(body.tiktokFollowers);
+    // so the creator enters their own figure. Numbers only.
+    if (body.followersCount !== undefined) u.followersCount = clampCount(body.followersCount);
     if (body.password && body.oldPassword) {
       if (!verifyPassword(body.oldPassword, u.passwordHash)) return jsonError(res, 401, 'Current password is incorrect');
       u.passwordHash = hashPassword(body.password);
@@ -653,7 +652,7 @@ app.patch('/api/me', requireUser, (req, res) => {
       bio: u.bio || '', area: u.area || '', handle: u.handle || '',
       youtubeUrl: u.youtubeUrl || '', instagramUrl: u.instagramUrl || '',
       tiktokUrl: u.tiktokUrl || '', twitchUrl: u.twitchUrl || '',
-      instagramFollowers: u.instagramFollowers || 0, tiktokFollowers: u.tiktokFollowers || 0,
+      followersCount: u.followersCount || 0,
       updatedAt: u.updatedAt
     });
   } catch (e) { jsonError(res, 500, redactKeys(e.message)); }
@@ -1538,23 +1537,17 @@ app.get('/api/creator-profiles', (req, res) => {
           (x) => String(x.email || '').toLowerCase() === String(c.email || '').toLowerCase()
         );
         const live = fcache[c.id] || {};
-        // Live counts where the platform allows them; manual figures for the
-        // platforms whose APIs cannot report on other people's accounts.
-        const manual = {
-          instagram: Number(u && u.instagramFollowers) || 0,
-          tiktok: Number(u && u.tiktokFollowers) || 0,
-        };
         const counts = {
           youtube: Number(live.youtube) || 0,
           twitch: Number(live.twitch) || 0,
-          instagram: manual.instagram,
-          tiktok: manual.tiktok,
         };
         const countsAt = {
           youtube: live.youtubeAt || null,
           twitch: live.twitchAt || null,
         };
-        // Legacy single figure, kept so existing data still renders.
+        // The creator's own figure, shown next to the handle when we cannot read
+        // a live count from a platform.
+        const own = Number(u && u.followersCount) || 0;
         const hasLive = counts.youtube > 0 || counts.twitch > 0;
         const followers = hasLive
           ? [counts.youtube && 'YouTube ' + formatCount(counts.youtube),
@@ -1582,6 +1575,7 @@ app.get('/api/creator-profiles', (req, res) => {
           tiktokUrl: c.tiktokUrl || '',
           twitchUrl: c.twitchUrl || '',
           followers: followers,
+          followersCount: own,
           counts: counts,
           countsAt: countsAt,
           countsLive: hasLive,

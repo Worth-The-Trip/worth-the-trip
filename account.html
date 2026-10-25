@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Your account — Worth The Trip</title>
-  <link rel="stylesheet" href="/src/css/styles.css?v=39">
+  <link rel="stylesheet" href="/src/css/styles.css?v=40">
   <link rel="icon" href="/public/Branding/WTT Logo 1.svg">
   <style>
     :root { --app-bg: #0d0d0d; }
@@ -229,13 +229,18 @@
             <input id="pf-handle" maxlength="80" placeholder="@yourname">
           </div>
           <div class="field">
-            <label for="pf-area">Where you cover</label>
-            <input id="pf-area" maxlength="80" placeholder="Tokyo">
+            <label for="pf-followers">Follower count</label>
+            <input id="pf-followers" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="128000" maxlength="9">
           </div>
+        </div>
+        <div class="field">
+          <label for="pf-area">Where you cover</label>
+          <input id="pf-area" maxlength="80" placeholder="Tokyo">
         </div>
         <div class="field">
           <label for="pf-bio">Short bio</label>
           <textarea id="pf-bio" maxlength="600"></textarea>
+          <p class="hint">Follower count takes numbers only and is shown as 128K or 8.9M.</p>
         </div>
         <div class="field">
           <label>Links to your platforms</label>
@@ -249,17 +254,10 @@
           <div class="field"><label for="pf-tiktok">TikTok link</label><input id="pf-tiktok" maxlength="300" placeholder="https://tiktok.com/@yourname"></div>
           <div class="field"><label for="pf-twitch">Twitch link</label><input id="pf-twitch" maxlength="300" placeholder="https://twitch.tv/yourchannel"></div>
         </div>
-        <div class="row2">
-          <div class="field">
-            <label for="pf-instagram-followers">Instagram followers</label>
-            <input id="pf-instagram-followers" type="number" min="0" step="1" inputmode="numeric">
-            <p class="hint">Entered by hand — Instagram's API can't report other people's counts.</p>
-          </div>
-          <div class="field">
-            <label for="pf-tiktok-followers">TikTok followers</label>
-            <input id="pf-tiktok-followers" type="number" min="0" step="1" inputmode="numeric">
-            <p class="hint">Entered by hand — TikTok's API only reports your own account.</p>
-          </div>
+        <div class="field">
+          <label for="pf-followers">Follower count</label>
+          <input id="pf-followers" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="128000" maxlength="9">
+          <p class="hint">Numbers only — shown as 128K or 8.9M. Used when we cannot read a count from your platforms automatically.</p>
         </div>
         <div class="btn-row">
           <button type="button" class="btn btn-ghost" id="pf-cancel">Cancel</button>
@@ -449,8 +447,7 @@
       $('#pf-instagram').value = u.instagramUrl || '';
       $('#pf-tiktok').value = u.tiktokUrl || '';
       $('#pf-twitch').value = u.twitchUrl || '';
-      $('#pf-instagram-followers').value = u.instagramFollowers || '';
-      $('#pf-tiktok-followers').value = u.tiktokFollowers || '';
+      $('#pf-followers').value = u.followersCount || '';
       $('#pf-error').classList.remove('show');
     }
 
@@ -483,8 +480,8 @@
             instagramUrl: $('#pf-instagram').value.trim(),
             tiktokUrl: $('#pf-tiktok').value.trim(),
             twitchUrl: $('#pf-twitch').value.trim(),
-            instagramFollowers: Number($('#pf-instagram-followers').value) || 0,
-            tiktokFollowers: Number($('#pf-tiktok-followers').value) || 0,
+            // Strip anything that isn't a digit — the field is numbers-only.
+            followersCount: Number(String($('#pf-followers').value).replace(/[^0-9]/g, '')) || 0,
           }),
         });
         closeModal(profileModal);
