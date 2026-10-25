@@ -1,5 +1,21 @@
 [
   {
+    "id": "wtt",
+    "name": "Worth The Trip",
+    "handle": "@WorthTheTripJapan",
+    "area": "Tokyo",
+    "email": "team@worththetripapp.com",
+    "bio": "Curated Japan travel itineraries, built from real experiences and the creators who inspire us.",
+    "youtubeUrl": "https://www.youtube.com/@WorthTheTripJapan",
+    "instagramUrl": "https://instagram.com/worththetrippjapan",
+    "tiktokUrl": "",
+    "twitchUrl": "",
+    "status": "accepted",
+    "guides": [],
+    "appliedAt": "2026-10-20T00:00:00.000Z",
+    "reviewNote": null
+  },
+  {
     "id": "c8c46c36-cbeb-46e8-85b4-71cd3271f59e",
     "name": "Jake (demo creator)",
     "handle": "@worththetripjapan",

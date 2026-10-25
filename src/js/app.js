@@ -3023,7 +3023,8 @@
     // The creator's own figure sits next to the handle; a live platform count
     // wins when we have one.
     const ownCount = Number(c.followersCount) || 0;
-    const handleBits = [creatorText(c, 'role'), c.handle, ownCount > 0 ? fmtCount(ownCount) : '']
+    // No role on the record (or none merged from seed data) -> a neutral label.
+    const handleBits = [creatorText(c, 'role') || 'Creator', c.handle, ownCount > 0 ? fmtCount(ownCount) : '']
       .filter(Boolean).join(' · ');
     const counts = c.counts || {};
     const liveBits = CREATOR_PLATFORMS

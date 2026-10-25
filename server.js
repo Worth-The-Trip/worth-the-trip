@@ -133,12 +133,19 @@ function ensureDataFiles() {
   fs.mkdirSync(AVATAR_DIR, { recursive: true });
   fs.mkdirSync(GUIDES_IMG_DIR, { recursive: true });
   if (!fs.existsSync(GUIDES_FILE)) fs.writeFileSync(GUIDES_FILE, '[]');
-  // Seed runtime creator records from the committed copy on first run so the
-  // demo creator survives; afterwards applications persist in RUNTIME_DIR.
-  if (!fs.existsSync(CREATORS_FILE)) {
-    try { fs.copyFileSync(path.join(DATA_DIR, 'creators.json'), CREATORS_FILE); }
-    catch (e) { fs.writeFileSync(CREATORS_FILE, '[]'); }
-  }
+  // Merge committed creator records into the runtime file, matched by id. An
+  // application made on the server is never overwritten by a deploy, but new
+  // official records (the WTT profile) do appear.
+  try {
+    const committed = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'creators.json'), 'utf8')) || [];
+    const runtime = fs.existsSync(CREATORS_FILE) ? loadArray(CREATORS_FILE) : [];
+    const have = new Set(runtime.map((c) => c && c.id));
+    let added = 0;
+    for (const c of committed) {
+      if (c && c.id && !have.has(c.id)) { runtime.push(c); added++; }
+    }
+    if (added) writeArray(CREATORS_FILE, runtime);
+  } catch (e) { /* keep whatever is on disk */ }
 }
 ensureDataFiles();
 
@@ -1553,7 +1560,7 @@ app.get('/api/creator-profiles', (req, res) => {
           ? [counts.youtube && 'YouTube ' + formatCount(counts.youtube),
              counts.twitch && 'Twitch ' + formatCount(counts.twitch)].filter(Boolean).join(' · ')
           : (c.followers || '');
-        return {
+        const out = {
           id: c.id,
           name: c.name,
           handle: c.handle || '',
@@ -1582,6 +1589,10 @@ app.get('/api/creator-profiles', (req, res) => {
           followersUpdatedAt: live.updatedAt || null,
           verified: true,
         };
+        // A missing role must not erase a static one (e.g. WTT's "Official WTT
+        // Guide") when this record is merged over the client's seed data.
+        if (!c.role) delete out.role;
+        return out;
       });
     res.json({ creators: list });
   } catch (e) {
