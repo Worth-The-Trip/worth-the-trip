@@ -142,6 +142,145 @@ function ensureDataFiles() {
 }
 ensureDataFiles();
 
+// ------------------------------------------------------- follower counts
+// Real counts are fetched from the platforms' own APIs, server-side, and cached
+// in RUNTIME_DIR so a redeploy does not lose them.
+//
+// What is actually possible today (checked 2026-10):
+//   YouTube — yes. Needs a Google Cloud project with the YouTube Data API v3
+//             enabled and an API key. No user login required. 1 quota unit a call.
+//   Twitch  — yes. Needs a registered app's Client ID + Client Secret. No user
+//             login required for the follower total.
+//   Instagram — no. The Basic Display API was shut down in Dec 2024; the
+//             replacement only works for accounts that log in AND are
+//             Business/Creator accounts, behind App Review.
+//   TikTok  — no. The Display API only returns stats for the logged-in user's
+//             own account; other accounts cannot be queried.
+// So Instagram/TikTok counts stay whatever the creator typed, and are labelled
+// as such rather than presented as live.
+const FOLLOWERS_FILE = path.join(RUNTIME_DIR, 'followers.json');
+const FOLLOWERS_TTL_MS = 6 * 60 * 60 * 1000; // refresh about every 6 hours
+
+function readFollowerCache() {
+  try { return JSON.parse(fs.readFileSync(FOLLOWERS_FILE, 'utf8')) || {}; } catch { return {}; }
+}
+function writeFollowerCache(cache) {
+  try { fs.writeFileSync(FOLLOWERS_FILE, JSON.stringify(cache, null, 2)); } catch (e) { /* best effort */ }
+}
+function followerCacheFresh(entry) {
+  const t = Date.parse((entry || {}).updatedAt || '');
+  return Number.isFinite(t) && (Date.now() - t) < FOLLOWERS_TTL_MS;
+}
+
+// A pasted number, or empty. 0 means "no figure", which renders as nothing.
+function clampCount(v) {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(n, 999999999);
+}
+
+// Turn a pasted URL or bare handle into the platform's lookup key.
+function youtubeHandle(url) {
+  const s = String(url || '').trim();
+  if (!s) return null;
+  let m = /(?:youtube\.com|youtu\.be)\/(@?[A-Za-z0-9_.-]+)/i.exec(s);
+  if (m) return m[1].replace(/^@/, '');
+  if (/^@?[A-Za-z0-9_.-]{3,}$/.test(s)) return s.replace(/^@/, '');
+  return null;
+}
+function twitchHandle(url) {
+  const s = String(url || '').trim();
+  if (!s) return null;
+  const m = /twitch\.tv\/([A-Za-z0-9_]{3,25})/i.exec(s);
+  if (m) return m[1];
+  if (/^[A-Za-z0-9_]{3,25}$/.test(s)) return s;
+  return null;
+}
+
+async function fetchYouTubeSubs(handle) {
+  const key = process.env.YOUTUBE_API_KEY;
+  if (!key) return { error: 'no key' };
+  const u = 'https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics'
+    + '&forHandle=' + encodeURIComponent(handle) + '&key=' + encodeURIComponent(key);
+  const r = await fetch(u, { headers: { Accept: 'application/json' } });
+  if (!r.ok) return { error: 'HTTP ' + r.status };
+  const j = await r.json();
+  const ch = j && j.items && j.items[0];
+  if (!ch) return { error: 'not found' };
+  return { count: Number(ch.statistics && ch.statistics.subscriberCount) || 0 };
+}
+
+let twitchToken = null;
+async function getTwitchToken() {
+  if (twitchToken && twitchToken.expires > Date.now()) return twitchToken.value;
+  const id = process.env.TWITCH_CLIENT_ID;
+  const secret = process.env.TWITCH_CLIENT_SECRET;
+  if (!id || !secret) return null;
+  const r = await fetch('https://id.twitch.tv/oauth2/token?client_id=' + encodeURIComponent(id)
+    + '&client_secret=' + encodeURIComponent(secret) + '&grant_type=client_credentials', { method: 'POST' });
+  if (!r.ok) return null;
+  const j = await r.json();
+  if (!j.access_token) return null;
+  twitchToken = { value: j.access_token, expires: Date.now() + (j.expires_in - 60) * 1000 };
+  return twitchToken.value;
+}
+
+async function fetchTwitchFollowers(handle) {
+  const id = process.env.TWITCH_CLIENT_ID;
+  if (!id) return { error: 'no key' };
+  const token = await getTwitchToken();
+  if (!token) return { error: 'no token' };
+  const hdr = { Authorization: 'Bearer ' + token, 'Client-Id': id };
+  const u = 'https://api.twitch.tv/helix/users?login=' + encodeURIComponent(handle);
+  const r = await fetch(u, { headers: hdr });
+  if (!r.ok) return { error: 'HTTP ' + r.status };
+  const j = await r.json();
+  const user = j && j.data && j.data[0];
+  if (!user) return { error: 'not found' };
+  const f = await fetch('https://api.twitch.tv/helix/channels/followers?broadcaster_id=' + encodeURIComponent(user.id), { headers: hdr });
+  if (!f.ok) return { error: 'HTTP ' + f.status };
+  const fj = await f.json();
+  return { count: Number(fj.total) || 0 };
+}
+
+// Refresh every creator's counts. Never throws — a failed platform must not take
+// the site down, and the previous cache is left in place.
+async function refreshFollowerCounts(force) {
+  const creators = readCreators().filter((c) => c.status === 'accepted');
+  if (!creators.length) return;
+  const cache = readFollowerCache();
+  let changed = false;
+  for (const c of creators) {
+    const entry = cache[c.id] || {};
+    if (!force && followerCacheFresh(entry)) continue;
+    const next = Object.assign({}, entry);
+    const yt = youtubeHandle(c.youtubeUrl);
+    if (yt) {
+      const r = await fetchYouTubeSubs(yt);
+      if (typeof r.count === 'number') { next.youtube = r.count; next.youtubeAt = new Date().toISOString(); changed = true; }
+      else if (r.error && r.error !== 'no key') console.error('YouTube lookup failed for', c.id + ':', r.error);
+    }
+    const tw = twitchHandle(c.twitchUrl);
+    if (tw) {
+      const r = await fetchTwitchFollowers(tw);
+      if (typeof r.count === 'number') { next.twitch = r.count; next.twitchAt = new Date().toISOString(); changed = true; }
+      else if (r.error && r.error !== 'no key') console.error('Twitch lookup failed for', c.id + ':', r.error);
+    }
+    next.updatedAt = new Date().toISOString();
+    cache[c.id] = next;
+  }
+  if (changed) writeFollowerCache(cache);
+}
+
+// 128000 -> "128K", 486000 -> "486K", 8920000 -> "8.9M"
+function formatCount(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return '';
+  if (v >= 1000000) return (v / 1000000).toFixed(v >= 10000000 ? 0 : 1).replace(/\\.0$/, '') + 'M';
+  if (v >= 1000) return Math.round(v / 1000) + 'K';
+  return String(v);
+}
+
 // ------------------------------------------------------------------ crypto
 function hashPassword(p) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -458,7 +597,7 @@ function redactKeys(msg) {
 
 app.get('/api/me', requireUser, (req, res) => {
   const u = req.user;
-  res.json({ id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar, createdAt: u.createdAt, updatedAt: u.updatedAt, freeGuideClaimed: !!findFreeClaim(u.email) });
+  res.json({ id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar, createdAt: u.createdAt, updatedAt: u.updatedAt, freeGuideClaimed: !!findFreeClaim(u.email), bio: u.bio || '', area: u.area || '', handle: u.handle || '', youtubeUrl: u.youtubeUrl || '', instagramUrl: u.instagramUrl || '', tiktokUrl: u.tiktokUrl || '', twitchUrl: u.twitchUrl || '', instagramFollowers: u.instagramFollowers || 0, tiktokFollowers: u.tiktokFollowers || 0 });
 });
 
 app.patch('/api/me', requireUser, (req, res) => {
@@ -474,6 +613,23 @@ app.patch('/api/me', requireUser, (req, res) => {
     }
     if (body.phone !== undefined) u.phone = body.phone.trim();
     if (body.address !== undefined) u.address = body.address.trim();
+    // Public creator-profile fields. These live on the account so there is one
+    // place to edit them, and are mirrored onto the creator record below so the
+    // Creators tab reflects them without a separate admin step.
+    if (body.bio !== undefined) u.bio = clip(body.bio, 600).trim();
+    if (body.area !== undefined) u.area = clip(body.area, 80).trim();
+    if (body.handle !== undefined) {
+      const h = clip(body.handle, 80).trim();
+      u.handle = h || ('@' + u.name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24));
+    }
+    if (body.youtubeUrl !== undefined) u.youtubeUrl = clip(body.youtubeUrl, 300).trim();
+    if (body.instagramUrl !== undefined) u.instagramUrl = clip(body.instagramUrl, 300).trim();
+    if (body.tiktokUrl !== undefined) u.tiktokUrl = clip(body.tiktokUrl, 300).trim();
+    if (body.twitchUrl !== undefined) u.twitchUrl = clip(body.twitchUrl, 300).trim();
+    // Instagram and TikTok have no API that reports on other people's accounts,
+    // so those figures are entered by hand. Store them as plain integers.
+    if (body.instagramFollowers !== undefined) u.instagramFollowers = clampCount(body.instagramFollowers);
+    if (body.tiktokFollowers !== undefined) u.tiktokFollowers = clampCount(body.tiktokFollowers);
     if (body.password && body.oldPassword) {
       if (!verifyPassword(body.oldPassword, u.passwordHash)) return jsonError(res, 401, 'Current password is incorrect');
       u.passwordHash = hashPassword(body.password);
@@ -491,9 +647,43 @@ app.patch('/api/me', requireUser, (req, res) => {
     const i = users.findIndex((x) => x.id === u.id);
     if (i >= 0) users[i] = u;
     writeLines(AUTH_FILE, users);
-    res.json({ id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar, updatedAt: u.updatedAt });
-  } catch (e) { jsonError(res, 500, e.message); }
+    syncCreatorProfile(u);
+    res.json({
+      id: u.id, email: u.email, name: u.name, phone: u.phone, address: u.address, avatar: u.avatar,
+      bio: u.bio || '', area: u.area || '', handle: u.handle || '',
+      youtubeUrl: u.youtubeUrl || '', instagramUrl: u.instagramUrl || '',
+      tiktokUrl: u.tiktokUrl || '', twitchUrl: u.twitchUrl || '',
+      instagramFollowers: u.instagramFollowers || 0, tiktokFollowers: u.tiktokFollowers || 0,
+      updatedAt: u.updatedAt
+    });
+  } catch (e) { jsonError(res, 500, redactKeys(e.message)); }
 });
+
+// Mirror an account's public profile onto its creator record so the Creators
+// tab stays in step. Only the fields the user owns are copied — never status.
+function syncCreatorProfile(u) {
+  try {
+    const creators = readCreators();
+    const idx = creators.findIndex(
+      (c) => String(c.email || '').toLowerCase() === String(u.email || '').toLowerCase()
+    );
+    if (idx < 0) return;
+    const c = creators[idx];
+    c.name = u.name || c.name;
+    c.bio = u.bio || '';
+    c.area = u.area || '';
+    c.handle = u.handle || c.handle;
+    if (u.youtubeUrl !== undefined) c.youtubeUrl = u.youtubeUrl;
+    if (u.instagramUrl !== undefined) c.instagramUrl = u.instagramUrl;
+    if (u.tiktokUrl !== undefined) c.tiktokUrl = u.tiktokUrl;
+    if (u.twitchUrl !== undefined) c.twitchUrl = u.twitchUrl;
+    c.profileUpdatedAt = new Date().toISOString();
+    creators[idx] = c;
+    writeArray(CREATORS_FILE, creators);
+  } catch (e) {
+    console.error('Creator profile sync error:', e.message);
+  }
+}
 
 // ---- Admin: users ----
 function requireAdmin(req, res, next) {
@@ -1313,6 +1503,24 @@ async function translateGuideToJa(g) {
   g.jaSourceHash = h;
 }
 
+// ---- Admin: force a follower-count refresh ----
+app.post('/api/admin/followers/refresh', requireAdmin, async (req, res) => {
+  try {
+    await refreshFollowerCounts(true);
+    const cache = readFollowerCache();
+    const summary = Object.keys(cache).map((id) => ({
+      id: id,
+      youtube: cache[id].youtube || 0,
+      twitch: cache[id].twitch || 0,
+      updatedAt: cache[id].updatedAt || null,
+    }));
+    res.json({ ok: true, creators: summary });
+  } catch (e) {
+    console.error('Follower refresh error:', e.message);
+    jsonError(res, 502, 'Could not refresh follower counts: ' + redactKeys(e.message));
+  }
+});
+
 // ---- Public: approved creators (the Creators tab) ----
 // NOTE: `/api/creators` is already taken by an admin-only route (creator
 // applications), and Express matches the first one — hence this distinct path.
@@ -1322,12 +1530,36 @@ async function translateGuideToJa(g) {
 app.get('/api/creator-profiles', (req, res) => {
   try {
     const users = readUsers();
+    const fcache = readFollowerCache();
     const list = readCreators()
       .filter((c) => c.status === 'accepted')
       .map((c) => {
         const u = users.find(
           (x) => String(x.email || '').toLowerCase() === String(c.email || '').toLowerCase()
         );
+        const live = fcache[c.id] || {};
+        // Live counts where the platform allows them; manual figures for the
+        // platforms whose APIs cannot report on other people's accounts.
+        const manual = {
+          instagram: Number(u && u.instagramFollowers) || 0,
+          tiktok: Number(u && u.tiktokFollowers) || 0,
+        };
+        const counts = {
+          youtube: Number(live.youtube) || 0,
+          twitch: Number(live.twitch) || 0,
+          instagram: manual.instagram,
+          tiktok: manual.tiktok,
+        };
+        const countsAt = {
+          youtube: live.youtubeAt || null,
+          twitch: live.twitchAt || null,
+        };
+        // Legacy single figure, kept so existing data still renders.
+        const hasLive = counts.youtube > 0 || counts.twitch > 0;
+        const followers = hasLive
+          ? [counts.youtube && 'YouTube ' + formatCount(counts.youtube),
+             counts.twitch && 'Twitch ' + formatCount(counts.twitch)].filter(Boolean).join(' · ')
+          : (c.followers || '');
         return {
           id: c.id,
           name: c.name,
@@ -1343,10 +1575,17 @@ app.get('/api/creator-profiles', (req, res) => {
             ...(c.youtubeUrl ? ['youtube'] : []),
             ...(c.instagramUrl ? ['instagram'] : []),
             ...(c.tiktokUrl ? ['tiktok'] : []),
+            ...(c.twitchUrl ? ['twitch'] : []),
           ],
           youtubeUrl: c.youtubeUrl || '',
           instagramUrl: c.instagramUrl || '',
           tiktokUrl: c.tiktokUrl || '',
+          twitchUrl: c.twitchUrl || '',
+          followers: followers,
+          counts: counts,
+          countsAt: countsAt,
+          countsLive: hasLive,
+          followersUpdatedAt: live.updatedAt || null,
           verified: true,
         };
       });
@@ -1455,4 +1694,15 @@ app.listen(PORT, HOST, () => {
   if (STRIPE_WEBHOOK_SECRET === '__STRIPE_WEBHOOK_NO_KEY__') {
     console.log('⚠️  STRIPE_WEBHOOK_SECRET is not set — real Stripe events will be rejected. Set it from the Stripe Dashboard.');
   }
+  if (process.env.YOUTUBE_API_KEY) console.log('Follower counts: YouTube live');
+  else console.log('⚠️  YOUTUBE_API_KEY is not set — YouTube follower counts will not refresh.');
+  if (process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET) console.log('Follower counts: Twitch live');
+  else console.log('⚠️  TWITCH_CLIENT_ID/SECRET not set — Twitch follower counts will not refresh.');
+
+  // Refresh follower counts in the background so a slow platform never blocks a
+  // request, then keep them roughly in step.
+  refreshFollowerCounts(false).catch((e) => console.error('Follower refresh failed:', e.message));
+  setInterval(() => {
+    refreshFollowerCounts(false).catch((e) => console.error('Follower refresh failed:', e.message));
+  }, FOLLOWERS_TTL_MS).unref();
 });

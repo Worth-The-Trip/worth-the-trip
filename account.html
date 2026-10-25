@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Your account — Worth The Trip</title>
-  <link rel="stylesheet" href="/src/css/styles.css?v=36">
+  <link rel="stylesheet" href="/src/css/styles.css?v=39">
   <link rel="icon" href="/public/Branding/WTT Logo 1.svg">
   <style>
     :root { --app-bg: #0d0d0d; }
@@ -44,6 +44,34 @@
       font-size: 15px;
     }
     .field input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .field textarea {
+      width: 100%; min-height: 96px; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: var(--surface); color: var(--foreground);
+      font-size: 15px; font-family: inherit; resize: vertical;
+    }
+    .field textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .field .hint { font-size: 12px; color: var(--muted-foreground); margin-top: 5px; }
+
+    /* ---- profile / password editor ---- */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0, 0, 0, 0.62);
+      display: none; align-items: flex-start; justify-content: center;
+      padding: 5vh 16px 24px; overflow-y: auto;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 22px;
+      width: 100%; max-width: 560px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+    }
+    .modal h2 { margin: 0 0 4px; font-size: 19px; }
+    .modal .sub { color: var(--muted-foreground); font-size: 13.5px; margin: 0 0 18px; }
+    .modal .btn-row { justify-content: flex-end; margin-top: 20px; }
+    .modal .error { display: none; color: #ff6b6b; font-size: 13px; margin-top: 12px; }
+    .modal .error.show { display: block; }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
 
@@ -151,12 +179,14 @@
             <img class="avatar" id="avatar-preview" alt="avatar">
             <div style="min-width:0;">
               <h1 id="dash-name"></h1>
-              <p class="sub" id="dash-email"></p>
+              <p class="sub" id="dash-email" style="margin-bottom:4px;"></p>
+              <p class="sub" id="dash-handle" style="margin-bottom:4px;"></p>
             </div>
           </div>
           <button class="btn btn-ghost btn-sm" id="pick-avatar">Change photo</button>
           <input type="file" id="avatar-input" accept="image/*" style="display:none">
         </div>
+        <p class="sub" id="dash-bio" style="margin-top:12px;"></p>
         <div class="btn-row" style="margin-top:8px;">
           <button class="btn btn-ghost btn-sm" id="edit-profile-btn">Edit profile</button>
           <button class="btn btn-ghost btn-sm" id="change-pw-btn">Change password</button>
@@ -181,6 +211,91 @@
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- Profile editor. Replaces the old browser prompt(), which could not offer
+       the public creator fields or any real validation. -->
+  <div class="modal-backdrop" id="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+    <div class="modal">
+      <h2 id="profile-modal-title">Edit profile</h2>
+      <p class="sub">This is what travellers see on the Creators tab.</p>
+      <form id="profile-form" novalidate>
+        <div class="field">
+          <label for="pf-name">Display name</label>
+          <input id="pf-name" required maxlength="120" autocomplete="name">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="pf-handle">Social handle</label>
+            <input id="pf-handle" maxlength="80" placeholder="@yourname">
+          </div>
+          <div class="field">
+            <label for="pf-area">Where you cover</label>
+            <input id="pf-area" maxlength="80" placeholder="Tokyo">
+          </div>
+        </div>
+        <div class="field">
+          <label for="pf-bio">Short bio</label>
+          <textarea id="pf-bio" maxlength="600"></textarea>
+        </div>
+        <div class="field">
+          <label>Links to your platforms</label>
+          <p class="hint">Paste the full URL. We read follower counts straight from YouTube and Twitch when you add them.</p>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="pf-youtube">YouTube link</label><input id="pf-youtube" maxlength="300" placeholder="https://youtube.com/@yourchannel"></div>
+          <div class="field"><label for="pf-instagram">Instagram link</label><input id="pf-instagram" maxlength="300" placeholder="https://instagram.com/yourname"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="pf-tiktok">TikTok link</label><input id="pf-tiktok" maxlength="300" placeholder="https://tiktok.com/@yourname"></div>
+          <div class="field"><label for="pf-twitch">Twitch link</label><input id="pf-twitch" maxlength="300" placeholder="https://twitch.tv/yourchannel"></div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="pf-instagram-followers">Instagram followers</label>
+            <input id="pf-instagram-followers" type="number" min="0" step="1" inputmode="numeric">
+            <p class="hint">Entered by hand — Instagram's API can't report other people's counts.</p>
+          </div>
+          <div class="field">
+            <label for="pf-tiktok-followers">TikTok followers</label>
+            <input id="pf-tiktok-followers" type="number" min="0" step="1" inputmode="numeric">
+            <p class="hint">Entered by hand — TikTok's API only reports your own account.</p>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn btn-ghost" id="pf-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="pf-save">Save profile</button>
+        </div>
+        <p class="error" id="pf-error"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Change password, also replacing three stacked prompts. -->
+  <div class="modal-backdrop" id="pw-modal" role="dialog" aria-modal="true" aria-labelledby="pw-modal-title">
+    <div class="modal">
+      <h2 id="pw-modal-title">Change password</h2>
+      <p class="sub">Use at least 6 characters.</p>
+      <form id="pw-form" novalidate>
+        <div class="field">
+          <label for="pw-current">Current password</label>
+          <input id="pw-current" type="password" required autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label for="pw-new">New password</label>
+          <input id="pw-new" type="password" required minlength="6" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label for="pw-confirm">Repeat new password</label>
+          <input id="pw-confirm" type="password" required minlength="6" autocomplete="new-password">
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn btn-ghost" id="pw-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="pw-save">Change password</button>
+        </div>
+        <p class="error" id="pw-error"></p>
+      </form>
+    </div>
+  </div>
 
   <script>
   (function () {
@@ -269,6 +384,11 @@
       $('#avatar-preview').src = user.avatar || '/public/Branding/WTT profile.svg';
       $('#dash-name').textContent = user.name || 'Hello there';
       $('#dash-email').textContent = user.email;
+      const handle = [user.handle, user.area].filter(Boolean).join(' · ');
+      $('#dash-handle').textContent = handle;
+      $('#dash-handle').style.display = handle ? '' : 'none';
+      $('#dash-bio').textContent = user.bio || '';
+      $('#dash-bio').style.display = user.bio ? '' : 'none';
     }
 
     // Just signed in — show the dashboard and populate it. boot() does the same
@@ -311,37 +431,115 @@
         .catch((err) => { $('#auth-error').textContent = err.message; });
     });
 
-    // ---- profile ----
+    // ---- profile editor ----
+    // The old flow used window.prompt(), which could only edit the name and
+    // offered no way to reach the public creator fields.
+    const profileModal = $('#profile-modal');
+    const pwModal = $('#pw-modal');
+
+    function openModal(el) { el.classList.add('open'); }
+    function closeModal(el) { el.classList.remove('open'); }
+
+    function fillProfileForm(u) {
+      $('#pf-name').value = u.name || '';
+      $('#pf-handle').value = u.handle || '';
+      $('#pf-area').value = u.area || '';
+      $('#pf-bio').value = u.bio || '';
+      $('#pf-youtube').value = u.youtubeUrl || '';
+      $('#pf-instagram').value = u.instagramUrl || '';
+      $('#pf-tiktok').value = u.tiktokUrl || '';
+      $('#pf-twitch').value = u.twitchUrl || '';
+      $('#pf-instagram-followers').value = u.instagramFollowers || '';
+      $('#pf-tiktok-followers').value = u.tiktokFollowers || '';
+      $('#pf-error').classList.remove('show');
+    }
+
     $('#edit-profile-btn').addEventListener('click', async () => {
       const user = await loadCurrentUser();
-      const name = prompt('Name', user.name || '');
-      if (name === null) return;
+      fillProfileForm(user);
+      openModal(profileModal);
+      $('#pf-name').focus();
+    });
+
+    $('#pf-cancel').addEventListener('click', () => closeModal(profileModal));
+    profileModal.addEventListener('click', (e) => { if (e.target === profileModal) closeModal(profileModal); });
+
+    $('#profile-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = $('#pf-error');
+      const name = $('#pf-name').value.trim();
+      if (!name) { err.textContent = 'Please enter a display name.'; err.classList.add('show'); return; }
+      const btn = $('#pf-save');
+      btn.disabled = true;
       try {
         const up = await api('/api/me', {
           method: 'PATCH',
-          body: JSON.stringify({ name }),
+          body: JSON.stringify({
+            name: name,
+            handle: $('#pf-handle').value.trim(),
+            area: $('#pf-area').value.trim(),
+            bio: $('#pf-bio').value.trim(),
+            youtubeUrl: $('#pf-youtube').value.trim(),
+            instagramUrl: $('#pf-instagram').value.trim(),
+            tiktokUrl: $('#pf-tiktok').value.trim(),
+            twitchUrl: $('#pf-twitch').value.trim(),
+            instagramFollowers: Number($('#pf-instagram-followers').value) || 0,
+            tiktokFollowers: Number($('#pf-tiktok-followers').value) || 0,
+          }),
         });
+        closeModal(profileModal);
         showDashboard(up);
         toast('Profile saved');
-      } catch (err) { toast(err.message); }
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.add('show');
+      } finally {
+        btn.disabled = false;
+      }
     });
 
     // change password
-    $('#change-pw-btn').addEventListener('click', async () => {
-      const oldPw = prompt('Current password');
-      if (oldPw === null) return;
-      const newPw = prompt('New password (6+ chars)');
-      if (newPw === null) return;
-      const confirm = prompt('Repeat new password');
-      if (confirm !== newPw) { toast('Passwords do not match'); return; }
+    $('#change-pw-btn').addEventListener('click', () => {
+      $('#pw-current').value = '';
+      $('#pw-new').value = '';
+      $('#pw-confirm').value = '';
+      $('#pw-error').classList.remove('show');
+      openModal(pwModal);
+      $('#pw-current').focus();
+    });
+
+    $('#pw-cancel').addEventListener('click', () => closeModal(pwModal));
+    pwModal.addEventListener('click', (e) => { if (e.target === pwModal) closeModal(pwModal); });
+
+    $('#pw-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = $('#pw-error');
+      const cur = $('#pw-current').value;
+      const next = $('#pw-new').value;
+      const again = $('#pw-confirm').value;
+      if (next.length < 6) { err.textContent = 'New password must be at least 6 characters.'; err.classList.add('show'); return; }
+      if (next !== again) { err.textContent = 'Passwords do not match.'; err.classList.add('show'); return; }
+      const btn = $('#pw-save');
+      btn.disabled = true;
       try {
-        const up = await api('/api/me', {
+        await api('/api/me', {
           method: 'PATCH',
-          body: JSON.stringify({ oldPassword: oldPw, password: newPw }),
+          body: JSON.stringify({ oldPassword: cur, password: next }),
         });
-        showDashboard(up);
+        closeModal(pwModal);
         toast('Password changed');
-      } catch (err) { toast(err.message); }
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.add('show');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // Escape closes either editor.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      [profileModal, pwModal].forEach(closeModal);
     });
 
     // avatar upload (triggered by Change photo button)

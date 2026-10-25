@@ -317,6 +317,15 @@
     ));
   }
 
+  // 128000 -> "128K", 8920000 -> "8.9M"
+  function fmtCount(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v) || v <= 0) return '';
+    if (v >= 1000000) return (v / 1000000).toFixed(v >= 10000000 ? 0 : 1).replace(/\.0$/, '') + 'M';
+    if (v >= 1000) return Math.round(v / 1000) + 'K';
+    return String(v);
+  }
+
   // "Jake Penlington" -> "JP"
   function initials(name) {
     const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -3012,7 +3021,13 @@
     // Join only the parts that exist, so a creator with no role/followers does
     // not render a dangling separator.
     const handleBits = [creatorText(c, 'role'), c.handle].filter(Boolean).join(' · ');
-    const metaBits = [c.followers, t('creators.guidesCount').replace('{n}', n)].filter(Boolean).join(' · ');
+    // Prefer real per-platform figures; fall back to the stored single value.
+    const counts = c.counts || {};
+    const countBits = CREATOR_PLATFORMS
+      .filter((p) => Number(counts[p]) > 0)
+      .map((p) => `<span class="creator-count" title="${escHtml(CREATOR_PLATFORM_LABELS[p] || p)} followers">${escHtml(fmtCount(counts[p]))}</span>`)
+      .join('');
+    const metaBits = [countBits, t('creators.guidesCount').replace('{n}', n)].filter(Boolean).join(' · ');
     return `
       <div class="creator-card">
         ${avatar}

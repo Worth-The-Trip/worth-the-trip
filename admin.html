@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin — Worth The Trip</title>
-  <link rel="stylesheet" href="/src/css/styles.css?v=36">
+  <link rel="stylesheet" href="/src/css/styles.css?v=39">
   <link rel="icon" href="/public/Branding/WTT Logo 1.svg">
   <style>
     * { box-sizing: border-box; }
@@ -449,8 +449,13 @@
     // ---- creators ----
     function renderCreators(creators) {
       const el = $('#panel-creators');
-      if (!creators || !creators.length) { el.innerHTML = '<p class="empty">No creator applications.</p>'; return; }
-      let html = '<div class="table-wrap"><table class="table"><thead><tr>' +
+      // Follower counts refresh themselves in the background every ~6h; this
+      // forces one now (handy after adding a creator's YouTube or Twitch link).
+      const head = '<div class="btn-row" style="margin-bottom:12px">' +
+        '<button class="btn btn-ghost btn-sm" id="refresh-followers">Refresh follower counts</button>' +
+        '<span class="hint" id="followers-status"></span></div>';
+      if (!creators || !creators.length) { el.innerHTML = head + '<p class="empty">No creator applications.</p>'; }
+      let html = head + '<div class="table-wrap"><table class="table"><thead><tr>' +
         '<th>Name</th><th>Email</th><th>Area</th><th>Status</th><th>Guides</th><th>Applied</th><th></th>' +
         '</tr></thead><tbody>';
       creators.forEach((c) => {
@@ -481,6 +486,24 @@
           loadAll();
         });
       });
+
+      const rf = el.querySelector('#refresh-followers');
+      if (rf) {
+        rf.addEventListener('click', async () => {
+          const status = el.querySelector('#followers-status');
+          rf.disabled = true;
+          if (status) status.textContent = 'Refreshing…';
+          try {
+            const res = await api('/api/admin/followers/refresh', { method: 'POST' });
+            const n = (res && res.creators) ? res.creators.length : 0;
+            if (status) status.textContent = n ? 'Updated ' + n + ' creator(s).' : 'No approved creators yet.';
+          } catch (err) {
+            if (status) status.textContent = err.message;
+          } finally {
+            rf.disabled = false;
+          }
+        });
+      }
     }
 
     // ---- guides (creator submissions awaiting review) ----
