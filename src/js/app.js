@@ -297,6 +297,20 @@
     return WTT_CREATORS[id];
   }
 
+  // Guides are stamped with a creator's account id, which is not always the
+  // creator-record id, so resolve whatever key a guide carries back to the
+  // canonical creator id. Unknown ids pass through unchanged.
+  function creatorKey(id) {
+    const c = creatorById(id);
+    return (c && c.canonicalId) || id;
+  }
+
+  // Visibility is stored as raw ids, which may predate the profiles fetch —
+  // accept either the raw key or its canonical form.
+  function isCreatorVisible(id) {
+    return state.visibleCreators.has(id) || state.visibleCreators.has(creatorKey(id));
+  }
+
   function escHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -367,7 +381,7 @@
   function filteredGuides() {
     const result = WTT_GUIDES.filter(g => {
       // Additive map: WTT guides always show, plus every added creator.
-      if (!state.visibleCreators.has(g.creatorId || 'wtt')) return false;
+      if (!isCreatorVisible(g.creatorId || 'wtt')) return false;
       if (state.activeFilter !== 'all' && g.category !== state.activeFilter) return false;
       if (state.searchQuery) {
         const q = state.searchQuery.toLowerCase();
@@ -2922,7 +2936,8 @@
   }
 
   function guidesByCreator(id) {
-    return WTT_GUIDES.filter(g => g.creatorId === id);
+    const key = creatorKey(id);
+    return WTT_GUIDES.filter(g => creatorKey(g.creatorId) === key);
   }
 
   function toggleFollowCreator(id) {
@@ -2946,6 +2961,10 @@
   }
 
   function creatorMatches(c) {
+    // Placeholders are invented by creator-guides.js for a guide whose creator
+    // has no approved profile; aliases are the account-id view of a real
+    // creator. Neither belongs in the public list.
+    if (c.placeholder || c.alias) return false;
     if (state.creatorPlatform === 'following' && !state.followedCreators.has(c.id)) return false;
     if (state.creatorPlatform !== 'all' && state.creatorPlatform !== 'following' &&
         !(c.platforms || []).includes(state.creatorPlatform)) return false;
@@ -3007,7 +3026,7 @@
             ${plats}
           </div>
           <div class="creator-card-actions">
-            ${state.visibleCreators.has(c.id)
+            ${isCreatorVisible(c.id)
               ? `<button class="creator-btn onmap" data-hidemap="${c.id}">${t('creators.removeFromMap')}</button>`
               : `<button class="creator-btn primary" data-showmap="${c.id}">${t('creators.showOnMap')}</button>`}
           </div>
@@ -3111,7 +3130,7 @@
       try {
         // Published creator guides are live on the map, so their creators must
         // not be filtered out by the Creators visibility toggle (default: wtt only).
-        (window.WTT_CREATOR_IDS || []).forEach(function (id) { if (id) state.visibleCreators.add(id); });
+        (window.WTT_CREATOR_IDS || []).forEach(function (id) { if (id) state.visibleCreators.add(creatorKey(id)); });
       } catch (e) { /* ignore */ }
       init();
       syncPurchasedUnlocks();

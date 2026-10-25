@@ -102,7 +102,10 @@
             verified: false,
             platforms: [],
             followers: '',
-            youtubeUrl: (raw.video && raw.video.url) || ''
+            youtubeUrl: (raw.video && raw.video.url) || '',
+            // Invented here, not from the server — hidden from the public list
+            // unless an approved profile later claims this id.
+            placeholder: true
           };
         }
         WTT_GUIDES.push(normalize(raw));

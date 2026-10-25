@@ -21,11 +21,22 @@
       var list = (res && res.creators) || [];
       list.forEach(function (c) {
         if (!c || !c.id) return;
-        var existing = WTT_CREATORS[c.id] || {};
+        var canonical = c.id;
+        var existing = WTT_CREATORS[canonical] || {};
         var merged = Object.assign({}, existing, c);
         // Keep the previous avatar when the creator has not uploaded one.
         if (!c.avatar) merged.avatar = existing.avatar || null;
-        WTT_CREATORS[c.id] = merged;
+        // An approved profile replaces any placeholder this id was given.
+        merged.placeholder = false;
+        WTT_CREATORS[canonical] = merged;
+        // Guides are stamped with the creator's account id, which is not always
+        // the creator-record id. Alias that key to the same profile so guide
+        // attribution resolves, but keep it out of the public list.
+        if (c.userId && c.userId !== canonical) {
+          WTT_CREATORS[c.userId] = Object.assign({}, merged, {
+            id: c.userId, alias: true, canonicalId: canonical, placeholder: false
+          });
+        }
       });
       return list.length;
     })

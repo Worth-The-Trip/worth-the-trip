@@ -1335,6 +1335,8 @@ app.get('/api/creator-profiles', (req, res) => {
           area: c.area || '',
           bio: c.bio || '',
           avatar: (u && u.avatar) || null,
+          // Guides are stamped with the account id, not the creator-record id.
+          userId: (u && u.id) || null,
           platforms: [
             ...(c.youtubeUrl ? ['youtube'] : []),
             ...(c.instagramUrl ? ['instagram'] : []),
