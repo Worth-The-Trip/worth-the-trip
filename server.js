@@ -105,7 +105,11 @@ const GUIDES_SRC = path.join(DATA_DIR, 'src', 'js', 'data', 'guides.js');
 const GUIDES_FILE = path.join(RUNTIME_DIR, 'guides.json');
 
 const vm = require('vm');
-const STRIPE = require('stripe')(STRIPE_SECRET_KEY);
+// The account runs Managed Payments, which needs API version 2025-03-31.basil or
+// newer — the SDK's bundled default is older and is rejected outright.
+const STRIPE = require('stripe')(STRIPE_SECRET_KEY, {
+  apiVersion: process.env.STRIPE_API_VERSION || '2025-03-31.basil',
+});
 
 // ------------------------------------------------------------------ data
 function loadLines(file) {
