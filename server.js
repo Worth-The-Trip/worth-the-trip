@@ -166,7 +166,6 @@ function ensureDataFiles() {
     if (added) writeArray(CREATORS_FILE, runtime);
   } catch (e) { /* keep whatever is on disk */ }
 }
-ensureDataFiles();
 
 // ------------------------------------------------------- follower counts
 // Real counts are fetched from the platforms' own APIs, server-side, and cached
@@ -188,10 +187,11 @@ const FOLLOWERS_FILE = path.join(RUNTIME_DIR, 'followers.json');
 const FOLLOWERS_TTL_MS = 6 * 60 * 60 * 1000; // refresh about every 6 hours
 
 function readFollowerCache() {
-  try { return JSON.parse(fs.readFileSync(FOLLOWERS_FILE, 'utf8')) || {}; } catch { return {}; }
+  const r = db().prepare('SELECT value FROM meta WHERE key = ?').get('followers');
+  try { return r ? JSON.parse(r.value) || {} : {}; } catch { return {}; }
 }
 function writeFollowerCache(cache) {
-  try { fs.writeFileSync(FOLLOWERS_FILE, JSON.stringify(cache, null, 2)); } catch (e) { /* best effort */ }
+  setMeta(db(), 'followers', JSON.stringify(cache));
 }
 function followerCacheFresh(entry) {
   const t = Date.parse((entry || {}).updatedAt || '');
@@ -338,17 +338,322 @@ function genToken() { return crypto.randomBytes(32).toString('hex'); }
 function genId() { return crypto.randomUUID(); }
 
 // ------------------------------------------------------------------ data access
+// All state lives in one SQLite file under RUNTIME_DIR. The read helpers return
+// plain arrays and the write helpers take plain arrays — exactly what the JSONL
+// versions did — so the handlers are unchanged; only the storage moved.
+//
+// SQLite gives real transactions, so a read-modify-write is atomic without the
+// serialised write chain the flat files needed.
+
+const DB_PATH = process.env.WTT_DB_PATH || path.join(RUNTIME_DIR, 'wtt.sqlite');
+let _db = null;
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL DEFAULT '',
+  password_hash TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  avatar TEXT,
+  banned INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT '',
+  bio TEXT NOT NULL DEFAULT '',
+  area TEXT NOT NULL DEFAULT '',
+  handle TEXT NOT NULL DEFAULT '',
+  youtube_url TEXT NOT NULL DEFAULT '',
+  instagram_url TEXT NOT NULL DEFAULT '',
+  tiktok_url TEXT NOT NULL DEFAULT '',
+  twitch_url TEXT NOT NULL DEFAULT '',
+  followers_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  user_id TEXT,
+  kind TEXT NOT NULL DEFAULT 'user',
+  expires_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS purchases (
+  id TEXT PRIMARY KEY,
+  session_id TEXT,
+  type TEXT NOT NULL DEFAULT 'payment',
+  guide_id TEXT,
+  guide_title TEXT,
+  buyer_email TEXT,
+  stripe_customer_id TEXT,
+  amount INTEGER,
+  currency TEXT,
+  purchased_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS free_claims (
+  email TEXT PRIMARY KEY,
+  guide_id TEXT,
+  user_id TEXT,
+  claimed_at TEXT
+);
+CREATE TABLE IF NOT EXISTS creators (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT '',
+  handle TEXT NOT NULL DEFAULT '',
+  area TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  bio TEXT NOT NULL DEFAULT '',
+  youtube_url TEXT NOT NULL DEFAULT '',
+  instagram_url TEXT NOT NULL DEFAULT '',
+  tiktok_url TEXT NOT NULL DEFAULT '',
+  twitch_url TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  guides TEXT NOT NULL DEFAULT '[]',
+  applied_at TEXT,
+  review_note TEXT,
+  profile_updated_at TEXT
+);
+CREATE TABLE IF NOT EXISTS creator_guides (
+  id TEXT PRIMARY KEY,
+  data TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+`;
+
+function db() {
+  if (_db) return _db;
+  let DatabaseSync;
+  try {
+    ({ DatabaseSync } = require('node:sqlite'));
+  } catch (e) {
+    throw new Error('node:sqlite is unavailable (needs Node 22.5+, no flag on 24+): ' + e.message);
+  }
+  fs.mkdirSync(RUNTIME_DIR, { recursive: true });
+  _db = new DatabaseSync(DB_PATH);
+  // WAL lets readers run alongside the writer; busy_timeout makes a competing
+  // writer wait instead of failing.
+  _db.exec('PRAGMA journal_mode=WAL');
+  _db.exec('PRAGMA busy_timeout=5000');
+  _db.exec(SCHEMA);
+  importLegacy(_db);
+  return _db;
+}
+
+function getMeta(d, key) {
+  const r = d.prepare('SELECT value FROM meta WHERE key = ?').get(key);
+  return r ? r.value : null;
+}
+function setMeta(d, key, value) {
+  d.prepare('INSERT INTO meta (key, value) VALUES (?, ?) '
+    + 'ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, String(value));
+}
+
+// One-way import from the old flat files, run once. Only fills a table that is
+// still empty, so it can never overwrite newer SQLite data.
+function importLegacy(d) {
+  if (getMeta(d, 'legacy_imported')) return;
+  const parseEach = (file) => loadLines(file)
+    .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+    .filter(Boolean);
+
+  const users = parseEach(AUTH_FILE);
+  const sessions = parseEach(SESSIONS_FILE);
+  const purchases = parseEach(PURCHASES_FILE);
+  const claims = parseEach(FREE_CLAIMS_FILE);
+  const creators = loadArray(CREATORS_FILE);
+  const guides = loadArray(GUIDES_FILE);
+
+  d.exec('BEGIN');
+  try {
+    if (!d.prepare('SELECT COUNT(*) AS n FROM users').get().n && users.length) {
+      for (const u of users) insertUser(d, u);
+    }
+    if (!d.prepare('SELECT COUNT(*) AS n FROM sessions').get().n && sessions.length) {
+      for (const s of sessions) insertSession(d, s);
+    }
+    if (!d.prepare('SELECT COUNT(*) AS n FROM purchases').get().n && purchases.length) {
+      for (const p of purchases) insertPurchase(d, p);
+    }
+    if (!d.prepare('SELECT COUNT(*) AS n FROM free_claims').get().n && claims.length) {
+      for (const c of claims) insertFreeClaim(d, c);
+    }
+    if (!d.prepare('SELECT COUNT(*) AS n FROM creators').get().n && creators.length) {
+      for (const c of creators) insertCreator(d, c);
+    }
+    if (!d.prepare('SELECT COUNT(*) AS n FROM creator_guides').get().n && guides.length) {
+      for (const g of guides) insertCreatorGuide(d, g);
+    }
+    setMeta(d, 'legacy_imported', new Date().toISOString());
+    d.exec('COMMIT');
+  } catch (e) {
+    try { d.exec('ROLLBACK'); } catch (e2) { /* already rolled back */ }
+    console.error('Legacy import failed:', e.message);
+  }
+}
+
+// ---------------------------------------------------------------- row mapping
+const USER_COLS = ['id','email','name','password_hash','phone','address','avatar','banned',
+  'created_at','updated_at','bio','area','handle','youtube_url','instagram_url','tiktok_url',
+  'twitch_url','followers_count'];
+const USER_PLACEHOLDERS = USER_COLS.map(() => '?').join(',');
+
+function insertUser(d, u) {
+  // A row with no id cannot be addressed later — skip it rather than let the
+  // whole write fail (and take the endpoint down with it).
+  if (!u || !u.id) { console.error('Skipped a user row with no id'); return; }
+  d.prepare(`INSERT OR REPLACE INTO users (${USER_COLS.join(',')}) VALUES (${USER_PLACEHOLDERS})`).run(
+    u.id, String(u.email || '').toLowerCase(), u.name || '', u.passwordHash || '', u.phone || '',
+    u.address || '', u.avatar ?? null, u.banned ? 1 : 0, u.createdAt || '', u.updatedAt || '',
+    u.bio || '', u.area || '', u.handle || '', u.youtubeUrl || '', u.instagramUrl || '',
+    u.tiktokUrl || '', u.twitchUrl || '', Number(u.followersCount) || 0);
+}
+function userFromRow(r) {
+  return {
+    id: r.id, email: r.email, name: r.name, passwordHash: r.password_hash,
+    phone: r.phone, address: r.address, avatar: r.avatar, banned: !!r.banned,
+    createdAt: r.created_at, updatedAt: r.updated_at, bio: r.bio, area: r.area,
+    handle: r.handle, youtubeUrl: r.youtube_url, instagramUrl: r.instagram_url,
+    tiktokUrl: r.tiktok_url, twitchUrl: r.twitch_url,
+    followersCount: Number(r.followers_count) || 0,
+  };
+}
+function insertSession(d, s) {
+  if (!s || !s.token) { console.error('Skipped a session row with no token'); return; }
+  d.prepare('INSERT OR REPLACE INTO sessions (token, user_id, kind, expires_at) VALUES (?,?,?,?)')
+    .run(s.token, s.userId ?? null, s.kind || 'user', Number(s.expiresAt) || 0);
+}
+function sessionFromRow(r) {
+  return { token: r.token, userId: r.user_id, kind: r.kind, expiresAt: Number(r.expires_at) || 0 };
+}
+function insertPurchase(d, p) {
+  // A purchase without an id is untraceable back to Stripe — skip it rather
+  // than fail the write (and return a 500 to the webhook).
+  if (!p || !p.id) { console.error('Skipped a purchase row with no id'); return; }
+  d.prepare(`INSERT OR REPLACE INTO purchases
+      (id, session_id, type, guide_id, guide_title, buyer_email, stripe_customer_id, amount, currency, purchased_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`)
+    .run(p.id, p.sessionId ?? null, p.type || 'payment', p.guideId ?? null, p.guideTitle ?? null,
+      p.buyerEmail ?? null, p.stripeCustomerId ?? null,
+      p.amount == null ? null : Number(p.amount), p.currency ?? null, Number(p.purchasedAt) || 0);
+}
+function purchaseFromRow(r) {
+  return {
+    id: r.id, sessionId: r.session_id, type: r.type, guideId: r.guide_id,
+    guideTitle: r.guide_title, buyerEmail: r.buyer_email,
+    stripeCustomerId: r.stripe_customer_id, amount: r.amount,
+    currency: r.currency, purchasedAt: Number(r.purchased_at) || 0,
+  };
+}
+function insertFreeClaim(d, c) {
+  if (!c || !c.email) { console.error('Skipped a free-claim row with no email'); return; }
+  d.prepare('INSERT OR REPLACE INTO free_claims (email, guide_id, user_id, claimed_at) VALUES (?,?,?,?)')
+    .run(String(c.email || '').toLowerCase(), c.guideId ?? null, c.userId ?? null, c.claimedAt ?? null);
+}
+function freeClaimFromRow(r) {
+  return { email: r.email, guideId: r.guide_id, userId: r.user_id, claimedAt: r.claimed_at };
+}
+function insertCreator(d, c) {
+  if (!c || !c.id) { console.error('Skipped a creator row with no id'); return; }
+  d.prepare(`INSERT OR REPLACE INTO creators
+      (id, name, handle, area, email, bio, youtube_url, instagram_url, tiktok_url, twitch_url,
+       status, guides, applied_at, review_note, profile_updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(c.id, c.name || '', c.handle || '', c.area || '', c.email || '', c.bio || '',
+      c.youtubeUrl || '', c.instagramUrl || '', c.tiktokUrl || '', c.twitchUrl || '',
+      c.status || 'pending', JSON.stringify(Array.isArray(c.guides) ? c.guides : []),
+      c.appliedAt ?? null, c.reviewNote ?? null, c.profileUpdatedAt ?? null);
+}
+function creatorFromRow(r) {
+  let guides = [];
+  try { guides = JSON.parse(r.guides || '[]'); } catch (e) { guides = []; }
+  return {
+    id: r.id, name: r.name, handle: r.handle, area: r.area, email: r.email, bio: r.bio,
+    youtubeUrl: r.youtube_url, instagramUrl: r.instagram_url, tiktokUrl: r.tiktok_url,
+    twitchUrl: r.twitch_url, status: r.status, guides: guides,
+    appliedAt: r.applied_at, reviewNote: r.review_note, profileUpdatedAt: r.profile_updated_at,
+  };
+}
+function insertCreatorGuide(d, g) {
+  if (!g || !g.id) { console.error('Skipped a creator guide with no id'); return; }
+  d.prepare('INSERT OR REPLACE INTO creator_guides (id, data) VALUES (?,?)')
+    .run(g.id, JSON.stringify(g));
+}
+
+// Replace a whole table inside one transaction. Callers already hold the write
+// lock where one is needed; the transaction is what makes the swap atomic.
+function replaceRows(d, table, cols, rows, insertFn) {
+  d.exec('BEGIN');
+  try {
+    d.exec(`DELETE FROM ${table}`);
+    for (const row of rows) insertFn(d, row);
+    d.exec('COMMIT');
+  } catch (e) {
+    try { d.exec('ROLLBACK'); } catch (e2) { /* already rolled back */ }
+    throw e;
+  }
+  return rows.length;
+}
+
+// ------------------------------------------------------------------ reads
 function readUsers() {
-  return loadLines(AUTH_FILE).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  return db().prepare(`SELECT ${USER_COLS.join(',')} FROM users`).all().map(userFromRow);
 }
 function readSessions() {
-  return loadLines(SESSIONS_FILE).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  return db().prepare('SELECT token, user_id, kind, expires_at FROM sessions').all().map(sessionFromRow);
 }
 function readPurchases() {
-  return loadLines(PURCHASES_FILE).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  return db().prepare('SELECT id, session_id, type, guide_id, guide_title, buyer_email, '
+    + 'stripe_customer_id, amount, currency, purchased_at FROM purchases').all().map(purchaseFromRow);
 }
 function readFreeClaims() {
-  return loadLines(FREE_CLAIMS_FILE).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  return db().prepare('SELECT email, guide_id, user_id, claimed_at FROM free_claims').all().map(freeClaimFromRow);
+}
+function readCreators() {
+  return db().prepare('SELECT * FROM creators').all().map(creatorFromRow);
+}
+function readCreatorGuides() {
+  return db().prepare('SELECT data FROM creator_guides').all()
+    .map((r) => { try { return JSON.parse(r.data); } catch { return null; } })
+    .filter(Boolean);
+}
+
+// ------------------------------------------------------------------ writes
+// Dispatch on the file constant so the handlers keep calling writeLines() with
+// the same arguments they always did.
+function writeLines(file, arr) {
+  const d = db();
+  if (file === AUTH_FILE) {
+    return replaceRows(d, 'users', USER_COLS, arr, insertUser);
+  }
+  if (file === SESSIONS_FILE) {
+    return replaceRows(d, 'sessions', null, arr, insertSession);
+  }
+  if (file === PURCHASES_FILE) {
+    // A retried Stripe webhook would otherwise record the same session twice.
+    const byId = new Map();
+    for (const p of arr) byId.set(p.id, p);
+    return replaceRows(d, 'purchases', null, Array.from(byId.values()), insertPurchase);
+  }
+  if (file === FREE_CLAIMS_FILE) {
+    return replaceRows(d, 'free_claims', null, arr, insertFreeClaim);
+  }
+  return legacyWrite(file, arr);
+}
+
+function writeArray(file, arr) {
+  const d = db();
+  if (file === CREATORS_FILE) {
+    return replaceRows(d, 'creators', null, arr, insertCreator);
+  }
+  return legacyWrite(file, arr);
+}
+
+// Fallback for any file not yet ported — keeps the old behaviour rather than
+// silently dropping a write.
+function legacyWrite(file, arr) {
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, arr.map(JSON.stringify).join('\n') + '\n');
+  fs.renameSync(tmp, file);
 }
 // The first free guide is tracked per email, case-insensitive — Stripe and the
 // browser both hand us mixed-case addresses.
@@ -356,7 +661,6 @@ function findFreeClaim(email) {
   const e = String(email || '').toLowerCase();
   return readFreeClaims().find((c) => String(c.email || '').toLowerCase() === e) || null;
 }
-function readCreators() { return loadArray(CREATORS_FILE); }
 function parseGuidesJs(file) {
   const src = fs.readFileSync(file, 'utf8');
   return JSON.parse(src.replace(/^const WTT_GUIDES = /, '').replace(/;\s*$/, ''));
@@ -366,7 +670,7 @@ function readGuides() {
   // authored in the studio live in the persistent runtime dir and survive deploys.
   const base = parseGuidesJs(GUIDES_SRC);
   const baseIds = new Set(base.map((g) => g.id));
-  const extra = loadArray(GUIDES_FILE).filter((g) => !baseIds.has(g.id));
+  const extra = readCreatorGuides().filter((g) => !baseIds.has(g.id));
   return base.concat(extra).map(canonicalizeGuide);
 }
 function canonicalizeGuide(g) {
@@ -404,8 +708,7 @@ function writeGuides(arr) {
   // pin stale copies of WTT's own guides and block repo updates from landing.
   const baseIds = new Set(parseGuidesJs(GUIDES_SRC).map((g) => g.id));
   const creatorGuides = arr.filter((g) => !baseIds.has(g.id));
-  fs.mkdirSync(RUNTIME_DIR, { recursive: true });
-  fs.writeFileSync(GUIDES_FILE, JSON.stringify(creatorGuides, null, 2));
+  replaceRows(db(), 'creator_guides', null, creatorGuides, insertCreatorGuide);
 }
 // What the buyer sees on the checkout page and their receipt.
 function guideDescription(g) {
@@ -1845,6 +2148,9 @@ app.use('/guide-images', express.static(GUIDES_IMG_DIR));
 // the spacey path. Missing here, they fall through to the committed tree.
 app.use('/public/Guide%20Images', express.static(GUIDES_IMG_DIR));
 app.use(express.static(DATA_DIR));
+
+// Must run after the module-level `const` declarations below are initialised.
+ensureDataFiles();
 
 app.listen(PORT, HOST, () => {
   console.log('WTT app server running at http://' + HOST + ':' + PORT);
