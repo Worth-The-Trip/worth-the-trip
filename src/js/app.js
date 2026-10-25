@@ -3007,8 +3007,12 @@
     }).join('');
     // No uploaded photo: show their initial instead of an empty circle.
     const avatar = c.avatar
-      ? `<img class="creator-avatar" src="${c.avatar}" alt="${c.name}" loading="lazy" onerror="this.outerHTML='<div class=&quot;creator-avatar creator-avatar-fallback&quot;>${escHtml(initials(c.name))}</div>'">`
+      ? `<img class="creator-avatar" src="${c.avatar}" alt="${escHtml(c.name)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;creator-avatar creator-avatar-fallback&quot;>${escHtml(initials(c.name))}</div>'">`
       : `<div class="creator-avatar creator-avatar-fallback">${escHtml(initials(c.name))}</div>`;
+    // Join only the parts that exist, so a creator with no role/followers does
+    // not render a dangling separator.
+    const handleBits = [creatorText(c, 'role'), c.handle].filter(Boolean).join(' · ');
+    const metaBits = [c.followers, t('creators.guidesCount').replace('{n}', n)].filter(Boolean).join(' · ');
     return `
       <div class="creator-card">
         ${avatar}
@@ -3016,13 +3020,13 @@
           <div class="creator-card-toprow">
             <div>
               <div class="creator-card-name">${escHtml(c.name)}</div>
-              <div class="creator-card-handle">${escHtml(creatorText(c, 'role'))} · ${escHtml(c.handle)}${c.city ? ' · ' + escHtml(cityLabel(c.city)) : ''}</div>
+              <div class="creator-card-handle">${escHtml(handleBits)}${c.city ? ' · ' + escHtml(cityLabel(c.city)) : ''}</div>
             </div>
             <button class="creator-btn follow-pill${following ? ' following' : ''}" data-follow="${c.id}">${following ? '♥ ' + t('creators.following') : t('creators.follow')}</button>
           </div>
           <div class="creator-card-bio">${creatorText(c, 'bio')}</div>
           <div class="creator-card-meta">
-            <span class="creator-followers">${c.followers || ''} · ${t('creators.guidesCount').replace('{n}', n)}</span>
+            <span class="creator-followers">${metaBits}</span>
             ${plats}
           </div>
           <div class="creator-card-actions">

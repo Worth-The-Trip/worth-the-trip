@@ -1332,7 +1332,9 @@ app.get('/api/creator-profiles', (req, res) => {
           id: c.id,
           name: c.name,
           handle: c.handle || '',
+          role: c.role || 'Creator',
           area: c.area || '',
+          city: c.area || '',
           bio: c.bio || '',
           avatar: (u && u.avatar) || null,
           // Guides are stamped with the account id, not the creator-record id.
