@@ -723,8 +723,9 @@ app.post('/api/checkout/guide', async (req, res) => {
           product_data: {
             name: guideId.replace(/-/g, ' ') + ' — Worth The Trip',
             description: 'Japan travel guide by local experts',
-            // Stripe's managed-payments model requires a tax code on the product.
-            tax_code: 'txcd_99999999',
+            // Stripe's managed-payments model requires an eligible digital-goods
+            // tax code on the product. Guides are downloaded digital books.
+            tax_code: 'txcd_10302000',
           },
         },
       }],
