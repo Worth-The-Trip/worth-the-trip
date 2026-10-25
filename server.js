@@ -728,7 +728,6 @@ app.post('/api/checkout/guide', async (req, res) => {
           },
         },
       }],
-      automatic_tax: { enabled: false },
       metadata: { guideId: guideId, guideTitle: g.title || guideId },
     });
     res.json({ url: session.url });
