@@ -1424,8 +1424,30 @@
   }
 
   // -------- Unlock persistence --------
+  // Unlocks belong to an EMAIL, not to a device. localStorage is only ever a
+  // cache for the account currently signed in, and it is thrown away the moment
+  // a different email signs in — otherwise one person's unlocks leak onto the
+  // next account that uses the same browser.
+  const UNLOCK_OWNER_KEY = 'wtt_unlocked_owner';
+
   function persistUnlocked() {
     try { localStorage.setItem('wtt_unlocked', JSON.stringify(Array.from(state.unlockedGuides))); } catch (e) {}
+  }
+
+  function unlockOwner() {
+    try { return localStorage.getItem(UNLOCK_OWNER_KEY) || ''; } catch (e) { return ''; }
+  }
+
+  function setUnlockOwner(email) {
+    try {
+      if (email) localStorage.setItem(UNLOCK_OWNER_KEY, String(email).toLowerCase());
+      else localStorage.removeItem(UNLOCK_OWNER_KEY);
+    } catch (e) {}
+  }
+
+  function clearUnlocked() {
+    state.unlockedGuides = new Set();
+    try { localStorage.removeItem('wtt_unlocked'); } catch (e) {}
   }
 
   function loadFreeUnlocked() {
@@ -1440,9 +1462,38 @@
     try { return new Set(JSON.parse(localStorage.getItem('wtt_unlocked') || '[]')); } catch (e) { return new Set(); }
   }
 
-  // Guides bought on the account are recorded on the server; merge them into
-  // the local unlock set so a purchase follows the user across devices.
-  async function syncPurchasedUnlocks() {
+  // Rebuild the unlock set from what the SERVER says this email owns.
+  //
+  // This replaces rather than merges: a guide is unlocked if and only if the
+  // signed-in email paid for it (or claimed the free one, or holds the
+  // unlock-all subscription). Anything left over from a previous account on
+  // this device is discarded.
+  async function syncAccountUnlocks() {
+    let me = null;
+    try {
+      const r = await fetch('/api/me?_ts=' + Date.now(), { credentials: 'include' });
+      if (r.ok) me = await r.json();
+    } catch (e) { /* not signed in */ }
+
+    if (!me || !me.email) {
+      // Guest, or an account just signed out. A guest may keep local unlocks;
+      // after a sign-out they must go, or the next person to use this browser
+      // inherits them.
+      if (unlockOwner()) {
+        clearUnlocked();
+        setUnlockOwner('');
+        try { renderTripsPage(); } catch (e) { /* not rendered yet */ }
+      }
+      return;
+    }
+
+    const email = String(me.email).toLowerCase();
+    const firstRunForThisAccount = unlockOwner() !== email;
+    if (firstRunForThisAccount) {
+      clearUnlocked();
+      setUnlockOwner(email);
+    }
+
     let list = [];
     try {
       const r = await fetch('/api/purchases/my?_ts=' + Date.now(), { credentials: 'include' });
@@ -1450,20 +1501,28 @@
         const body = await r.json();
         list = (body && body.purchases) || [];
       }
-    } catch (e) { return; /* not signed in */ }
+    } catch (e) { list = []; }
 
-    let changed = false;
+    const owned = new Set();
+    let hasSubscription = false;
     list.forEach(function (p) {
-      if (p && p.guideId && guideById(p.guideId) && !state.unlockedGuides.has(p.guideId)) {
-        state.unlockedGuides.add(p.guideId);
-        changed = true;
-      }
+      if (!p) return;
+      if (p.type === 'subscription') { hasSubscription = true; return; }
+      if (p.guideId && guideById(p.guideId)) owned.add(p.guideId);
     });
-    if (!changed) return;
+    // The unlock-all subscription opens every guide for that email.
+    if (hasSubscription) WTT_GUIDES.forEach(function (g) { if (g && g.id) owned.add(g.id); });
 
-    persistUnlocked();
-    try { renderTripsPage(); } catch (e) { /* trips page not rendered yet */ }
-    try { refreshMapMarkers(); } catch (e) { /* map not ready yet */ }
+    const changed = firstRunForThisAccount
+      || owned.size !== state.unlockedGuides.size
+      || Array.from(owned).some(function (id) { return !state.unlockedGuides.has(id); });
+
+    if (changed) {
+      state.unlockedGuides = owned;
+      persistUnlocked();
+      try { renderTripsPage(); } catch (e) { /* trips page not rendered yet */ }
+      try { refreshMapMarkers(); } catch (e) { /* map not ready yet */ }
+    }
   }
 
   // Resolves once the server's free-guide claim for this account is known, so
@@ -3153,14 +3212,16 @@
   function start() {
     // Both creator payloads have to land before the first render, or approved
     // creators show up with the placeholder name and no avatar.
-    const boot = function () {
+    const boot = async function () {
       try {
         // Published creator guides are live on the map, so their creators must
         // not be filtered out by the Creators visibility toggle (default: wtt only).
         (window.WTT_CREATOR_IDS || []).forEach(function (id) { if (id) state.visibleCreators.add(creatorKey(id)); });
       } catch (e) { /* ignore */ }
+      // Settle this email's unlocks BEFORE the first render, so a brand-new
+      // account can never be shown another account's guides.
+      await syncAccountUnlocks();
       init();
-      syncPurchasedUnlocks();
       freeClaimReady = syncFreeGuideClaim();
       syncAvatar();
     };
