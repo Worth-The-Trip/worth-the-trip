@@ -16,7 +16,9 @@ auth.jsonl
 sessions.jsonl
 purchases.jsonl
 *.jsonl
-data/
-uploads/
+# Anchored to the repo root — an unanchored `data/` also matched src/js/data/,
+# which silently excluded every new file added there from deploys.
+/data/
+/uploads/
 
 .pre_push_secret_test.js
