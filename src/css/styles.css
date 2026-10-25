@@ -2391,6 +2391,13 @@ body {
   object-fit: cover;
   border: 2px solid var(--vermilion);
 }
+/* Creators with no uploaded photo show their initials instead of a blank circle. */
+.creator-avatar-fallback {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff;
+  font-weight: 700; font-size: 17px; letter-spacing: .5px;
+  text-transform: uppercase;
+}
 
 .creator-info {
   flex: 1;

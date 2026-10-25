@@ -1313,6 +1313,46 @@ async function translateGuideToJa(g) {
   g.jaSourceHash = h;
 }
 
+// ---- Public: approved creators (the Creators tab) ----
+// NOTE: `/api/creators` is already taken by an admin-only route (creator
+// applications), and Express matches the first one — hence this distinct path.
+// Guides from creator-guides.js only carry a creatorId, so the app used to invent
+// a placeholder ("Creator", no avatar) for anyone approved after launch. This
+// returns the real profile, including the account's uploaded avatar.
+app.get('/api/creator-profiles', (req, res) => {
+  try {
+    const users = readUsers();
+    const list = readCreators()
+      .filter((c) => c.status === 'accepted')
+      .map((c) => {
+        const u = users.find(
+          (x) => String(x.email || '').toLowerCase() === String(c.email || '').toLowerCase()
+        );
+        return {
+          id: c.id,
+          name: c.name,
+          handle: c.handle || '',
+          area: c.area || '',
+          bio: c.bio || '',
+          avatar: (u && u.avatar) || null,
+          platforms: [
+            ...(c.youtubeUrl ? ['youtube'] : []),
+            ...(c.instagramUrl ? ['instagram'] : []),
+            ...(c.tiktokUrl ? ['tiktok'] : []),
+          ],
+          youtubeUrl: c.youtubeUrl || '',
+          instagramUrl: c.instagramUrl || '',
+          tiktokUrl: c.tiktokUrl || '',
+          verified: true,
+        };
+      });
+    res.json({ creators: list });
+  } catch (e) {
+    console.error('Creator list error:', e.message);
+    jsonError(res, 500, 'Could not load creators');
+  }
+});
+
 // ---- Public: published creator guides (consumed by the explore page) ----
 app.get('/api/guides', (req, res) => {
   const list = readGuides().filter((g) => g.status === 'published')

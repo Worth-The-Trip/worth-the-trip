@@ -297,6 +297,19 @@
     return WTT_CREATORS[id];
   }
 
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  // "Jake Penlington" -> "JP"
+  function initials(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    return (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase();
+  }
+
   function isGuideUnlocked(guideId) {
     return state.unlockedGuides.has(guideId);
   }
@@ -2973,14 +2986,18 @@
         ? `<a class="creator-plat" href="${url}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`
         : `<span class="creator-plat">${label}</span>`;
     }).join('');
+    // No uploaded photo: show their initial instead of an empty circle.
+    const avatar = c.avatar
+      ? `<img class="creator-avatar" src="${c.avatar}" alt="${c.name}" loading="lazy" onerror="this.outerHTML='<div class=&quot;creator-avatar creator-avatar-fallback&quot;>${escHtml(initials(c.name))}</div>'">`
+      : `<div class="creator-avatar creator-avatar-fallback">${escHtml(initials(c.name))}</div>`;
     return `
       <div class="creator-card">
-        <img class="creator-avatar" src="${c.avatar}" alt="${c.name}" loading="lazy" onerror="this.style.display='none'">
+        ${avatar}
         <div class="creator-card-main">
           <div class="creator-card-toprow">
             <div>
-              <div class="creator-card-name">${c.name}</div>
-              <div class="creator-card-handle">${creatorText(c, 'role')} · ${c.handle}${c.city ? ' · ' + cityLabel(c.city) : ''}</div>
+              <div class="creator-card-name">${escHtml(c.name)}</div>
+              <div class="creator-card-handle">${escHtml(creatorText(c, 'role'))} · ${escHtml(c.handle)}${c.city ? ' · ' + escHtml(cityLabel(c.city)) : ''}</div>
             </div>
             <button class="creator-btn follow-pill${following ? ' following' : ''}" data-follow="${c.id}">${following ? '♥ ' + t('creators.following') : t('creators.follow')}</button>
           </div>
@@ -3088,29 +3105,30 @@
   // Creator-published guides arrive from the API; wait for them so they get
   // pins and cards on the first render instead of appearing late.
   function start() {
-    const ready = window.WTT_CREATOR_GUIDES_READY;
-    if (ready && typeof ready.then === 'function') {
-      ready.then(function () {
+    // Both creator payloads have to land before the first render, or approved
+    // creators show up with the placeholder name and no avatar.
+    const boot = function () {
+      try {
         // Published creator guides are live on the map, so their creators must
         // not be filtered out by the Creators visibility toggle (default: wtt only).
-        try {
-          (window.WTT_CREATOR_IDS || []).forEach(function (id) { if (id) state.visibleCreators.add(id); });
-        } catch (e) { /* ignore */ }
-        init();
-        syncPurchasedUnlocks();
-        freeClaimReady = syncFreeGuideClaim();
-        syncAvatar();
-      }, function () {
-        init();
-        syncPurchasedUnlocks();
-        freeClaimReady = syncFreeGuideClaim();
-        syncAvatar();
-      });
-    } else {
+        (window.WTT_CREATOR_IDS || []).forEach(function (id) { if (id) state.visibleCreators.add(id); });
+      } catch (e) { /* ignore */ }
       init();
       syncPurchasedUnlocks();
       freeClaimReady = syncFreeGuideClaim();
       syncAvatar();
+    };
+
+    const waits = [window.WTT_CREATOR_GUIDES_READY, window.WTT_CREATOR_PROFILES_READY]
+      .filter(function (p) { return p && typeof p.then === 'function'; });
+
+    if (waits.length) {
+      // A failing payload must not hold the app hostage — boot anyway.
+      Promise.all(waits.map(function (p) {
+        return p.then(function () { return 0; }, function () { return 0; });
+      })).then(boot, boot);
+    } else {
+      boot();
     }
   }
   if (document.readyState === 'loading') {
