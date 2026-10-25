@@ -16,7 +16,7 @@ const WTT_CREATORS = {
     bio: 'Curated Japan travel itineraries, built from real experiences and the creators who inspire us.',
     city: 'Tokyo',
     platforms: ['youtube', 'instagram'],
-    followers: '128K',
+    followers: '',
     youtubeUrl: 'https://www.youtube.com/@WorthTheTripJapan',
     instagramUrl: 'https://instagram.com/worththetrippjapan', // placeholder — will update
     verified: true
@@ -34,7 +34,7 @@ const WTT_CREATORS = {
     bio: 'Osaka-based food hunter — 300+ spots a year, from queue-worthy ramen to midnight yatai.',
     city: 'Osaka',
     platforms: ['youtube', 'instagram'],
-    followers: '486K',
+    followers: '',
     youtubeUrl: 'https://www.youtube.com/@WorthTheTripJapan',
     instagramUrl: 'https://instagram.com/worththetrippjapan',
     verified: true
@@ -52,7 +52,7 @@ const WTT_CREATORS = {
     bio: 'Climbing all 100 famous mountains of Japan, live. Fuji night-climb streams and honest gear guides.',
     city: 'Mt Fuji',
     platforms: ['youtube', 'twitch'],
-    followers: '124K',
+    followers: '',
     youtubeUrl: 'https://www.youtube.com/@WorthTheTripJapan',
     twitchUrl: 'https://twitch.tv/',
     verified: true
@@ -70,7 +70,7 @@ const WTT_CREATORS = {
     bio: 'Ryokan and onsen hunter — honest reviews of private baths, kaiseki, and slow luxury escapes.',
     city: 'Hakone',
     platforms: ['instagram', 'tiktok'],
-    followers: '892K',
+    followers: '',
     instagramUrl: 'https://instagram.com/worththetrippjapan',
     tiktokUrl: 'https://tiktok.com/',
     verified: true
