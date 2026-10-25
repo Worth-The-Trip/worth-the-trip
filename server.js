@@ -227,6 +227,14 @@ function writeGuides(arr) {
   fs.mkdirSync(RUNTIME_DIR, { recursive: true });
   fs.writeFileSync(GUIDES_FILE, JSON.stringify(creatorGuides, null, 2));
 }
+// What the buyer sees on the checkout page and their receipt.
+function guideDescription(g) {
+  const bits = [];
+  if (g.duration) bits.push(String(g.duration));
+  if (g.category) bits.push(String(g.category).replace(/-/g, ' '));
+  bits.push('instantly downloadable Japan travel guide by local experts');
+  return bits.join(' · ').slice(0, 200);
+}
 function findGuide(id) { return readGuides().find((g) => g.id === id); }
 function findCreatorRecord(email) {
   const e = String(email || '').toLowerCase();
@@ -725,8 +733,10 @@ app.post('/api/checkout/guide', async (req, res) => {
           currency: 'jpy',
           unit_amount: price,
           product_data: {
-            name: guideId.replace(/-/g, ' ') + ' — Worth The Trip',
-            description: 'Japan travel guide by local experts',
+            // The customer sees this on the checkout page and their bank
+            // statement — use the guide's real title, never the slug.
+            name: (g.title || guideId) + ' — Worth The Trip',
+            description: guideDescription(g),
             // Stripe's managed-payments model requires an eligible digital-goods
             // tax code on the product. Guides are downloaded digital books.
             tax_code: 'txcd_10302000',
