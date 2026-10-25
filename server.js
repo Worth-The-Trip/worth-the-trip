@@ -436,6 +436,13 @@ function requireUser(req, res, next) {
   next();
 }
 function jsonError(res, status, msg) { res.status(status).json({ error: msg }); }
+// Never echo an API key back to the browser — Stripe's own messages include the
+// masked key, and a raw key could appear too.
+function redactKeys(msg) {
+  let m = String(msg == null ? '' : msg).replace(/[sr]k_(?:live|test)_[A-Za-z0-9_.*-]+/g, '[redacted]');
+  if (STRIPE_SECRET_KEY) m = m.split(STRIPE_SECRET_KEY).join('[redacted]');
+  return m;
+}
 
 app.get('/api/me', requireUser, (req, res) => {
   const u = req.user;
@@ -686,6 +693,65 @@ app.post('/api/admin/purchases/sync', requireAdmin, async (req, res) => {
     msg = msg.replace(/[sr]k_(?:live|test)_[A-Za-z0-9_.*-]+/g, '[redacted]');
     if (STRIPE_SECRET_KEY) msg = msg.split(STRIPE_SECRET_KEY).join('[redacted]');
     res.status(500).json({ error: msg });
+  }
+});
+
+// ---- Customer: start a guide purchase ----
+// Checkout Sessions are single-use: a URL created ahead of time dies after the
+// first payment (or ~24h), which is why the old hardcoded links showed Stripe's
+// "You're all done here". A fresh session is created per click instead.
+app.post('/api/checkout/guide', async (req, res) => {
+  try {
+    const guideId = String((req.body || {}).guideId || '').trim();
+    const g = guideId ? findGuide(guideId) : null;
+    if (!g) return jsonError(res, 404, 'Guide not found');
+    const price = Number(g.price) || 0;
+    if (!price) return jsonError(res, 400, 'This guide has no price yet');
+
+    const base = process.env.WTT_BASE_URL || 'https://worththetripapp.com';
+    const session = await STRIPE.checkout.sessions.create({
+      mode: 'payment',
+      billing_address_collection: 'auto',
+      allow_promotion_codes: false,
+      success_url: base + '/?session_id={CHECKOUT_SESSION_ID}&guide_id=' + encodeURIComponent(guideId),
+      cancel_url: base + '/',
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency: 'jpy',
+          unit_amount: price,
+          product_data: {
+            name: guideId.replace(/-/g, ' ') + ' — Worth The Trip',
+            description: 'Japan travel guide by local experts',
+          },
+        },
+      }],
+      metadata: { guideId: guideId, guideTitle: g.title || guideId },
+    });
+    res.json({ url: session.url });
+  } catch (e) {
+    console.error('Checkout session error:', e.message);
+    jsonError(res, 502, 'Could not start checkout: ' + redactKeys(e.message));
+  }
+});
+
+// ---- Customer: start an "unlock all guides" subscription ----
+app.post('/api/checkout/unlock-all', async (req, res) => {
+  try {
+    const priceId = process.env.UNLOCK_ALL_PRICE_ID || 'price_1UPk8UGlWwt59oq4nOxRuzT5';
+    const base = process.env.WTT_BASE_URL || 'https://worththetripapp.com';
+    const session = await STRIPE.checkout.sessions.create({
+      mode: 'subscription',
+      allow_promotion_codes: false,
+      success_url: base + '/?unlock_all=1',
+      cancel_url: base + '/',
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: { unlockAll: '1' },
+    });
+    res.json({ url: session.url });
+  } catch (e) {
+    console.error('Unlock-all session error:', e.message);
+    jsonError(res, 502, 'Could not start checkout: ' + redactKeys(e.message));
   }
 });
 

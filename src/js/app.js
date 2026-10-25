@@ -1489,7 +1489,7 @@
         showToast(t('toast.alreadyUnlocked'), 'success');
         return;
       }
-      openCheckout(CONFIG.stripeUnlockAllCheckoutUrl);
+      startUnlockAllCheckout();
       return;
     }
 
@@ -1515,17 +1515,48 @@
       return;
     }
 
-    if (!CONFIG.stripePaymentLinks[guideId]) {
-      showToast(t('toast.noPaymentLink'), 'success');
-      return;
-    }
-    openCheckout(CONFIG.stripePaymentLinks[guideId]);
+    // A Checkout Session is single-use, so the link must be minted per click.
+    startGuideCheckout(guideId);
   }
 
-  function openCheckout(url) {
-    const fullLink = new URL(url);
-    fullLink.searchParams.set('prefilled_email', '');
-    window.location.href = fullLink.toString();
+  // Mint a fresh Stripe Checkout Session for this guide, then hand off to it.
+  async function startGuideCheckout(guideId) {
+    showToast(t('toast.startingCheckout') || 'Opening checkout…', 'success');
+    try {
+      const r = await fetch('/api/checkout/guide', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guideId }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok || !body.url) throw new Error(body.error || 'Could not start checkout');
+      // Prefill the buyer's email when we know it.
+      const link = new URL(body.url);
+      try {
+        const me = await fetch('/api/me?_ts=' + Date.now(), { credentials: 'include' });
+        if (me.ok) {
+          const u = await me.json();
+          if (u && u.email) link.searchParams.set('prefilled_email', u.email);
+        }
+      } catch (e) { /* guest checkout */ }
+      window.location.href = link.toString();
+    } catch (e) {
+      showToast(e.message || 'Could not start checkout', true);
+    }
+  }
+
+  // Same single-use problem for the "unlock all" subscription.
+  async function startUnlockAllCheckout() {
+    showToast(t('toast.startingCheckout') || 'Opening checkout…', 'success');
+    try {
+      const r = await fetch('/api/checkout/unlock-all', { method: 'POST', credentials: 'include' });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok || !body.url) throw new Error(body.error || 'Could not start checkout');
+      window.location.href = body.url;
+    } catch (e) {
+      showToast(e.message || 'Could not start checkout', true);
+    }
   }
 
   window.toast = showToast;
