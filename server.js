@@ -2135,6 +2135,52 @@ app.get('/admin', (req, res) => res.sendFile('admin.html', { root: DATA_DIR, cac
 app.get('/creator', (req, res) => res.sendFile('creator.html', { root: DATA_DIR, cacheControl: false }));
 
 // ------------------------------------------------------------------ start
+// One-time data cleanups. Idempotent, so safe to leave in: each runs only when
+// there is something to change.
+function migrateData() {
+  try {
+    const d = db();
+    const done = [];
+
+    // Every guide belongs to the Worth The Trip account — there are no other
+    // creators yet. This covers guides made in the studio while test creators
+    // existed (including the leftover test draft).
+    const guides = readCreatorGuides();
+    const stray = guides.filter((g) => g && g.creatorId && g.creatorId !== 'wtt');
+    if (stray.length) {
+      const fixed = guides.map((g) => (
+        g && g.creatorId && g.creatorId !== 'wtt' ? Object.assign({}, g, { creatorId: 'wtt' }) : g
+      ));
+      replaceRows(d, 'creator_guides', null, fixed, insertCreatorGuide);
+      done.push('reassigned ' + stray.length + ' guide(s) to wtt');
+    }
+
+    // The demo creator was test data (jake@wtt.local). It is no longer in the
+    // committed creators.json, but a record may still exist from before.
+    const DEMO_EMAIL = 'jake@wtt.local';
+    const demoUser = d.prepare('SELECT id FROM users WHERE email = ?').get(DEMO_EMAIL);
+    const demoCreator = d.prepare('SELECT id FROM creators WHERE email = ?').get(DEMO_EMAIL);
+    if (demoUser || demoCreator) {
+      d.exec('BEGIN');
+      try {
+        if (demoUser) d.prepare('DELETE FROM sessions WHERE user_id = ?').run(demoUser.id);
+        if (demoUser) d.prepare('DELETE FROM users WHERE id = ?').run(demoUser.id);
+        if (demoCreator) d.prepare('DELETE FROM creators WHERE id = ?').run(demoCreator.id);
+        d.exec('COMMIT');
+        done.push('removed the demo creator account');
+      } catch (e) {
+        try { d.exec('ROLLBACK'); } catch (e2) { /* already rolled back */ }
+        console.error('migrateData (demo account):', e.message);
+      }
+    }
+
+    if (done.length) console.log('Data migration:', done.join('; '));
+  } catch (e) {
+    // A failed cleanup must never stop the site from booting.
+    console.error('migrateData failed:', e.message);
+  }
+}
+
 // User uploads live in the persistent runtime dir; committed images stay in
 // DATA_DIR. Mount the runtime copies first so new uploads win, then fall
 // through to the committed tree.
@@ -2151,6 +2197,7 @@ app.use(express.static(DATA_DIR));
 
 // Must run after the module-level `const` declarations below are initialised.
 ensureDataFiles();
+migrateData();
 
 app.listen(PORT, HOST, () => {
   console.log('WTT app server running at http://' + HOST + ':' + PORT);

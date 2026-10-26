@@ -374,7 +374,7 @@ const WTT_GUIDES = [
   },
   {
     "id": "osaka-food-crawl",
-    "creatorId": "yuki-eats",
+    "creatorId": "wtt",
     "status": "published",
     "title": "Osaka Food Crawl",
     "tagline": "2 Days · Street Food & Nightspots",
@@ -710,7 +710,7 @@ const WTT_GUIDES = [
   },
   {
     "id": "fuji-summit-hike",
-    "creatorId": "ken-hikes",
+    "creatorId": "wtt",
     "status": "published",
     "title": "Mt Fuji Summit Hike",
     "tagline": "2 Days · Climb Japan's Icon",
@@ -862,7 +862,7 @@ const WTT_GUIDES = [
   },
   {
     "id": "hakone-luxury-escape",
-    "creatorId": "hana-stays",
+    "creatorId": "wtt",
     "status": "published",
     "title": "Hakone Luxury Escape",
     "tagline": "3 Days · Ryokan & Private Onsen",
@@ -1166,7 +1166,7 @@ const WTT_GUIDES = [
   },
   {
     "id": "fukuoka-ramen-trail",
-    "creatorId": "yuki-eats",
+    "creatorId": "wtt",
     "status": "published",
     "title": "Fukuoka Ramen Trail",
     "tagline": "2 Days · Tonkotsu & Yatai Stalls",
