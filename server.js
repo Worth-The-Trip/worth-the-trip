@@ -29,6 +29,10 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '127.0.0.1';
 const DATA_DIR = __dirname;
+// Committed seed records live here; the runtime copies live in RUNTIME_DIR.
+// (DATA_DIR is the repo root, so `DATA_DIR/creators.json` is the runtime file
+// itself — reading it as the seed source silently merged nothing.)
+const SEED_DIR = path.join(DATA_DIR, 'src', 'js', 'data');
 
 // SiteGround runs the app from .nodeapp/<id>/app_source and recreates that
 // folder on every deploy, so anything written inside it is wiped on the next
@@ -156,7 +160,8 @@ function ensureDataFiles() {
   // application made on the server is never overwritten by a deploy, but new
   // official records (the WTT profile) do appear.
   try {
-    const committed = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'creators.json'), 'utf8')) || [];
+    const seedPath = path.join(SEED_DIR, 'creators.json');
+    const committed = fs.existsSync(seedPath) ? JSON.parse(fs.readFileSync(seedPath, 'utf8')) || [] : [];
     const runtime = fs.existsSync(CREATORS_FILE) ? loadArray(CREATORS_FILE) : [];
     const have = new Set(runtime.map((c) => c && c.id));
     let added = 0;
