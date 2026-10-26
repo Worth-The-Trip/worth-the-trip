@@ -569,10 +569,6 @@ body {
 #compass-arrow {
   transition: transform 120ms ease-out;
 }
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-}
 
 #map {
   width: 100%;
@@ -2860,6 +2856,8 @@ body.nav-split .nav-banner {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-md);
+  /* The follow button is pinned to the top-right corner of the card. */
+  position: relative;
 }
 .creators-list .creator-card .creator-avatar {
   width: 72px;
@@ -2886,7 +2884,18 @@ body.nav-split .nav-banner {
   width: 100%;
 }
 .creator-card-toprow .creator-btn.follow-pill {
-  align-self: center;
+  /* Pinned to the card's top-right corner rather than sitting under the name. */
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+}
+/* On narrow cards the corner would overlap the centred avatar, so the button
+   drops back into the flow underneath the handle. */
+@media (max-width: 560px) {
+  .creator-card-toprow .creator-btn.follow-pill {
+    position: static;
+    align-self: center;
+  }
 }
 .creator-card-name {
   text-align: center;
@@ -2923,12 +2932,15 @@ body.nav-split .nav-banner {
   font-size: 16px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 .creator-card-handle {
   color: var(--muted-foreground);
   font-size: 13px;
   margin-top: 1px;
+  /* Centred under the name, matching the name above it. */
+  text-align: center;
 }
 .creator-card-bio {
   font-size: 14px;

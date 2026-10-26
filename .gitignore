@@ -22,3 +22,7 @@ purchases.jsonl
 /uploads/
 
 .pre_push_secret_test.js
+wtt.sqlite*
+# Anchored so these only match the runtime copies at the repo root.
+/creators.json
+/guides.json
