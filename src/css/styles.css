@@ -2963,18 +2963,6 @@ a.creator-plat:hover {
   color: #fff;
   font-weight: 600;
 }
-/* Real per-platform follower figures, e.g. "128K · 45K · 6 guides" */
-.creator-count {
-  font-size: 12px;
-  padding: 2px 8px;
-  margin-right: 6px;
-  border-radius: 999px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  color: var(--foreground);
-  font-weight: 600;
-  white-space: nowrap;
-}
 .creator-card-actions {
   display: flex;
   gap: 8px;

@@ -3079,22 +3079,19 @@
       : `<div class="creator-avatar creator-avatar-fallback">${escHtml(initials(c.name))}</div>`;
     // Join only the parts that exist, so a creator with no role/followers does
     // not render a dangling separator.
-    // The creator's own figure sits next to the handle; a live platform count
-    // wins when we have one.
     const ownCount = Number(c.followersCount) || 0;
-    // No role on the record (or none merged from seed data) -> a neutral label.
-    const handleBits = [creatorText(c, 'role') || 'Creator', c.handle, ownCount > 0 ? fmtCount(ownCount) : '']
-      .filter(Boolean).join(' · ');
+    // Followers belong in the grey line under the name — never in the red
+    // badge, which carries the guide count only.
     const counts = c.counts || {};
-    const liveBits = CREATOR_PLATFORMS
+    const liveFollowers = CREATOR_PLATFORMS
       .filter((p) => Number(counts[p]) > 0)
-      .map((p) => `<span class="creator-count" title="${escHtml(CREATOR_PLATFORM_LABELS[p] || p)} followers">${escHtml(fmtCount(counts[p]))}</span>`)
-      .join('');
-    // No live data -> fall back to the creator's own figure in the badge too.
-    const badgeCounts = liveBits || (ownCount > 0
-      ? `<span class="creator-count" title="Follower count">${escHtml(fmtCount(ownCount))}</span>`
-      : '');
-    const metaBits = [badgeCounts, t('creators.guidesCount').replace('{n}', n)].filter(Boolean).join(' · ');
+      .map((p) => escHtml((CREATOR_PLATFORM_LABELS[p] || p) + ' ' + fmtCount(counts[p])))
+      .join(' · ');
+    const followersText = liveFollowers || (ownCount > 0 ? escHtml(fmtCount(ownCount)) : '');
+    // No role on the record (or none merged from seed data) -> a neutral label.
+    const handleBits = [creatorText(c, 'role') || 'Creator', c.handle, followersText]
+      .filter(Boolean).join(' · ');
+    const metaBits = t('creators.guidesCount').replace('{n}', n);
     return `
       <div class="creator-card">
         ${avatar}
