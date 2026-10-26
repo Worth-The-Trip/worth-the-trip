@@ -318,7 +318,12 @@ function formatCount(n) {
   const v = Number(n);
   if (!Number.isFinite(v) || v <= 0) return '';
   if (v >= 1000000) return (v / 1000000).toFixed(v >= 10000000 ? 0 : 1).replace(/\\.0$/, '') + 'M';
-  if (v >= 1000) return Math.round(v / 1000) + 'K';
+  // Below 10K, rounding to a whole K loses real precision (4500 -> "5K"),
+  // so keep one decimal while the value is not a whole thousand.
+  if (v >= 1000) {
+    const k = v / 1000;
+    return (v % 1000 === 0 ? String(Math.round(k)) : k.toFixed(1).replace(/\.0$/, '')) + 'K';
+  }
   return String(v);
 }
 
