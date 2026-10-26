@@ -3010,6 +3010,10 @@ a.creator-plat:hover {
   background: none;
   border: none;
   padding: 0;
+  /* The source SVG is 800x990, not square. Without `contain` it was being
+     stretched into a 40x40 box, which squashed the artwork vertically. */
+  object-fit: contain;
+  object-position: center;
 }
 
 /* Creator card header + follow pill */
