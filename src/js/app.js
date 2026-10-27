@@ -2509,8 +2509,13 @@
         try {
           await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: $('#creator-password').value.trim() }) });
         } catch (e) {
-          showToast(e.message || t('toast.cantCreate'), 'success');
-          return;
+          // 409 = this email already has an account; reuse it as an upgrade
+          if (e.status === 409) {
+            signedIn = true;
+          } else {
+            showToast(e.message || t('toast.cantCreate'), 'success');
+            return;
+          }
         }
       }
       // 2) submit the creator application
