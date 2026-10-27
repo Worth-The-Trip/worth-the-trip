@@ -2282,6 +2282,8 @@
           <input type="url" id="creator-youtube" class="field-input" placeholder="https://youtube.com/@yourchannel" autocomplete="url">
           <label class="field-label" for="creator-instagram">${t('creator.instagram')}</label>
           <input type="text" id="creator-instagram" class="field-input" placeholder="@yourhandle" autocomplete="username">
+          <label class="field-label" for="creator-password">${t('creator.password')}</label>
+          <input type="password" id="creator-password" class="field-input" placeholder="6+ characters" autocomplete="new-password" minlength="6">
           <button class="btn-primary" id="creator-join-btn"><span class="btn-label">${t('creator.join')}</span></button>`
       };
     }
@@ -2505,9 +2507,9 @@
       let signedIn = !!state.me && !!state.me.user;
       if (!signedIn) {
         try {
-          await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email }) });
+          await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: $('#creator-password').value.trim() }) });
         } catch (e) {
-          showToast(t('toast.cantCreate'), 'success');
+          showToast(e.message || t('toast.cantCreate'), 'success');
           return;
         }
       }
