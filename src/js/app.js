@@ -26,6 +26,28 @@
     freeUnlocked: loadFreeUnlocked(),
   };
 
+  function api(path, options) {
+    options = options || {};
+    // Bust any cached copy of a GET on the proxy (caches on URL alone).
+    if ((options.method || 'GET').toUpperCase() === 'GET') {
+      path += (path.indexOf('?') === -1 ? '?' : '&') + '_ts=' + Date.now();
+    }
+    return fetch(path, Object.assign({}, options, {
+      headers: Object.assign({ 'Content-Type': 'application/json' }, (options && options.headers) || {}),
+      credentials: 'include'
+    })).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        if (!r.ok) {
+          var e = new Error(body.error || t('errGeneric'));
+          e.status = r.status;
+          e.problems = body.problems || null;
+          throw e;
+        }
+        return body;
+      });
+    });
+  }
+
   // -------- Config --------
   const CONFIG = {
     defaultCenter: [138.5, 35.5],
