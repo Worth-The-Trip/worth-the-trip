@@ -300,7 +300,13 @@
           })
         : Promise.resolve();
       step
-        .then(function () { return api('/api/creator/apply', { method: 'POST', body: JSON.stringify(payload) }); })
+        .then(function () {
+          if (!state.me || !state.me.signedIn || !state.me.user) {
+            $('#gate-error').textContent = 'You need to sign in before applying.';
+            throw new Error('Not signed in');
+          }
+          return api('/api/creator/apply', { method: 'POST', body: JSON.stringify(payload) });
+        })
         .then(loadMe).then(route)
         .catch(function (err) { $('#gate-error').textContent = err.message; });
     });

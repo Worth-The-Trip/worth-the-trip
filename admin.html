@@ -186,6 +186,7 @@
       }
       return fetch(path, {
         ...options,
+        cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
         },
