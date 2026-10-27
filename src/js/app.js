@@ -2472,18 +2472,39 @@
     });
 
     const creatorBtn = $('#creator-join-btn');
-    if (creatorBtn) creatorBtn.addEventListener('click', () => {
+    if (creatorBtn) creatorBtn.addEventListener('click', async () => {
       const name = $('#creator-name').value.trim();
       const email = $('#creator-email').value.trim();
       if (!name || !email) {
         showToast(t('toast.needNameEmail'), 'success');
         return;
       }
-      const list = JSON.parse(localStorage.getItem('wtt_creator_waitlist') || '[]');
-      list.push({ name, email, area: $('#creator-area').value.trim(), youtube: $('#creator-youtube').value.trim(), instagram: $('#creator-instagram').value.trim(), at: Date.now() });
-      try { localStorage.setItem('wtt_creator_waitlist', JSON.stringify(list)); } catch (e) {}
+      // 1) ensure we have a session (create the account if not signed in)
+      let signedIn = !!state.me && !!state.me.user;
+      if (!signedIn) {
+        try {
+          await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email }) });
+        } catch (e) {
+          showToast(t('toast.cantCreate'), 'success');
+          return;
+        }
+      }
+      // 2) submit the creator application
+      const payload = {
+        name,
+        email,
+        area: $('#creator-area').value.trim(),
+        youtube: $('#creator-youtube').value.trim(),
+        instagram: $('#creator-instagram').value.trim()
+      };
+      try {
+        await api('/api/creator/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      } catch (e) {
+        showToast(e.message || t('errGeneric'), 'success');
+        return;
+      }
       closeMenuPage();
-      showToast(t('toast.waitlist'), 'success');
+      showToast(t('toast.applicationSubmitted'), 'success');
     });
 
     const helpBtn = $('#help-send-btn');
