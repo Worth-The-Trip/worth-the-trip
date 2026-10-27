@@ -1419,6 +1419,17 @@ app.patch('/api/creators/:id', requireAdmin, (req, res) => {
   });
 });
 
+app.delete('/api/creators/:id', requireAdmin, (req, res) => {
+  mutate(() => {
+    const creators = readCreators();
+    const idx = creators.findIndex((x) => x.id === req.params.id);
+    if (idx < 0) return jsonError(res, 404, 'Creator not found');
+    creators.splice(idx, 1);
+    writeArray(CREATORS_FILE, creators);
+    res.json({ ok: true });
+  });
+});
+
 // ---- Admin: login ----
 app.post('/api/admin/login', rateLimitAuth, (req, res) => {
   mutate(() => {

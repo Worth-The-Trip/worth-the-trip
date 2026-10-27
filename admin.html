@@ -472,7 +472,8 @@
           `<td>${c.appliedAt ? new Date(c.appliedAt).toLocaleDateString() : '—'}</td>` +
           `<td style="white-space:nowrap">` +
           `<button class="btn btn-sm ${c.status === 'accepted' ? 'btn-ghost' : 'btn-primary'}` + (c.status === 'accepted' ? '' : ' glass') + `" data-set="${c.id}" data-status="accepted">Approve</button> ` +
-          `<button class="btn btn-sm ${c.status === 'rejected' ? 'btn-ghost' : 'btn-danger'}" data-set="${c.id}" data-status="rejected">Reject</button>` +
+          `<button class="btn btn-sm ${c.status === 'rejected' ? 'btn-ghost' : 'btn-danger'}" data-set="${c.id}" data-status="rejected">Reject</button> ` +
+          `<button class="btn btn-sm btn-danger" data-del="${c.id}">Delete</button>` +
           `</td>` +
           '</tr>';
       });
@@ -485,6 +486,18 @@
           const status = b.dataset.status;
           await api('/api/creators/' + id, { method: 'PATCH', body: JSON.stringify({ status }) });
           loadAll();
+        });
+      });
+
+      el.querySelectorAll('[data-del]').forEach((b) => {
+        b.addEventListener('click', async () => {
+          const id = b.dataset.del;
+          if (!confirm('Delete this creator application? This cannot be undone.')) return;
+          try {
+            await api('/api/creators/' + id, { method: 'DELETE' });
+            toast('Creator application deleted');
+            loadAll();
+          } catch (e) { toast(e.message); }
         });
       });
 
