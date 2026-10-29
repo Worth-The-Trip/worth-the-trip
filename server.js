@@ -388,9 +388,16 @@ function storeVerificationToken(email, kind) {
 function consumeVerificationToken(token) {
   const d = db();
   const row = d.prepare('SELECT * FROM verification_tokens WHERE token = ?').get(token);
-  if (!row) return null;
-  if (row.used_at) return null;
+  if (!row) {
+    console.log('[WTT token] not_found token=' + token);
+    return null;
+  }
+  if (row.used_at) {
+    console.log('[WTT token] already_used token=' + token + ' usedAt=' + row.used_at);
+    return null;
+  }
   if (Date.now() > row.expires_at) {
+    console.log('[WTT token] expired token=' + token + ' expiresAt=' + row.expires_at + ' now=' + Date.now());
     d.prepare('DELETE FROM verification_tokens WHERE id = ?').run(row.id);
     return null;
   }
@@ -1039,7 +1046,11 @@ app.get('/verify', (req, res) => {
   mutate(() => {
     try {
       const row = consumeVerificationToken(token);
-      if (!row) return res.redirect('/account?verify=error');
+      if (!row) {
+        console.log('[WTT verify] FAILED token=' + token + ' reason=not_found_or_used_or_expired');
+        return res.redirect('/account?verify=error');
+      }
+      console.log('[WTT verify] SUCCESS token=' + token + ' email=' + row.email + ' kind=' + row.kind);
       const d = db();
       d.prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE email = ?')
         .run(new Date().toISOString(), row.email);
@@ -1058,6 +1069,7 @@ app.get('/verify', (req, res) => {
       // Forward back to the app.
       res.redirect('/account?verified=1');
     } catch (e) {
+      console.log('[WTT verify] ERROR token=' + token + ' err=' + e.message);
       res.redirect('/account?verify=error');
     }
   });
