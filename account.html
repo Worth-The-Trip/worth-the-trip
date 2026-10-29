@@ -212,7 +212,19 @@
 
   <div class="toast" id="toast"></div>
 
-  <!-- Profile editor. Replaces the old browser prompt(), which could not offer
+  <!-- Email verification popup -->
+  <div class="modal-backdrop" id="verify-popup">
+    <div class="modal">
+      <h2 id="verify-popup-title">Check your email</h2>
+      <p id="verify-popup-body"></p>
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn btn-primary" id="verify-popup-resend" style="display:none">Resend verification email</button>
+      </div>
+      <p class="hint" id="verify-popup-hint" style="margin-top:10px"></p>
+    </div>
+  </div>
+
+  <!-- Profile editor. Replaces the old browser prompt()...
        the public creator fields or any real validation. -->
   <div class="modal-backdrop" id="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
     <div class="modal">
@@ -619,6 +631,100 @@
         const panel = document.getElementById(panelId);
         if (panel) panel.classList.toggle('open');
       });
+    }
+
+    // ---- email verification ----
+    const verifyPopup = $('#verify-popup');
+    const verifyPopupEmail = null;
+
+    function lang() { return document.documentElement.getAttribute('lang') === 'ja' ? 'ja' : 'en'; }
+
+    function tVerify(key) {
+      const en = {
+        'verify.popupTitle': 'Check your email',
+        'verify.popupBody': 'We just sent a verification link to {email}. Click it and you will be taken back to Worth The Trip.',
+        'verify.popupResend': 'Resend verification email',
+        'verify.popupResendError': "Couldn't resend the email — check your inbox, or try again in a moment.",
+        'verify.sentTitle': 'Verification email sent',
+        'verify.sentBody': 'We have sent a verification link to {email}.',
+        'verify.successTitle': 'Account created',
+        'verify.successBody': 'Your account is verified and ready — welcome to Worth The Trip!',
+      };
+      const ja = {
+        'verify.popupTitle': 'メールを確認してください',
+        'verify.popupBody': '確認用のメールを送信しました。メール内のリンクを開くと、アプリに戻ります。',
+        'verify.popupResend': '確認メールを再送',
+        'verify.popupResendError': 'メールを再送できませんでした — 受信箱を確認するか、しばらくしてから再試行してください。',
+        'verify.sentTitle': '確認メールを送信しました',
+        'verify.sentBody': '確認用リンクを {email} 宛に送信しました。',
+        'verify.successTitle': 'アカウント作成',
+        'verify.successBody': 'アカウントが確認できました。Worth The Tripへようこそ！',
+      };
+      const keyMap = lang() === 'ja' ? ja : en;
+      return (keyMap[key] || en[key] || key).replace(/{email}/g, verifyPopupEmail || '');
+    }
+
+    function showVerifyPopup(email) {
+      verifyPopupEmail = email;
+      $('#verify-popup-title').textContent = tVerify('verify.popupTitle');
+      $('#verify-popup-body').textContent = tVerify('verify.popupBody');
+      $('#verify-popup-resend').style.display = 'inline-flex';
+      $('#verify-popup-resend').textContent = tVerify('verify.popupResend');
+      $('#verify-popup-hint').textContent = '';
+      verifyPopup.classList.add('open');
+    }
+
+    function resendVerification() {
+      const email = verifyPopupEmail;
+      if (!email) return;
+      $('#verify-popup-resend').disabled = true;
+      $('#verify-popup-hint').textContent = 'Sending…';
+      api('/api/resend-verification', { method: 'POST', body: JSON.stringify({ email }) })
+        .then(() => {
+          $('#verify-popup-hint').textContent = tVerify('verify.sentTitle') + ' ' + tVerify('verify.sentBody', email);
+        })
+        .catch(() => {
+          $('#verify-popup-hint').textContent = tVerify('verify.popupResendError');
+        })
+        .finally(() => { $('#verify-popup-resend').disabled = false; });
+    }
+
+    $('#verify-popup-resend').addEventListener('click', resendVerification);
+
+    $('#signup-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = $('#su-email').value.trim();
+      const password = $('#su-password').value;
+      const name = $('#su-name').value.trim();
+      $('#auth-error').textContent = '';
+      api('/api/users', { method: 'POST', body: JSON.stringify({ email, password, name }) })
+        .then((res) => {
+          if (res.requiresVerification) {
+            showVerifyPopup(email);
+            return;
+          }
+          localStorage.setItem(AUTH_KEY, res.token);
+          return loadCurrentUser();
+        })
+        .then(enterDashboard)
+        .catch((err) => { $('#auth-error').textContent = err.message; });
+    });
+
+    // Email verification succeeded via the link in the email.
+    if (location.search.includes('verified=1')) {
+      const toast = () => {
+        const t = (k) => tVerify(k);
+        const el = $('#toast');
+        el.textContent = t('verify.successTitle') + ' — ' + t('verify.successBody');
+        el.classList.add('show');
+        clearTimeout(el._t);
+        el._t = setTimeout(() => el.classList.remove('show'), 4000);
+      };
+      // The session cookie only exists after verification. If logged in, show
+      // the toast on the dashboard; otherwise fetch /api/me first.
+      const show = () => toast();
+      if (isLoggedIn()) toast();
+      else loadCurrentUser().then(show).catch(show);
     }
 
     // ---- init ----

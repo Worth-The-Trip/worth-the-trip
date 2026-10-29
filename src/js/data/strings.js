@@ -238,6 +238,22 @@ const WTT_STRINGS = {
     'nav.end': 'End',
     'nav.mapBtn': 'Map',
     'nav.allTrips': 'All trips',
+
+    // ------------------------------------------------------------------
+    // Email verification
+    // ------------------------------------------------------------------
+    'verify.popupTitle': 'Check your email',
+    'verify.popupBody': 'We just sent a verification link to {email}. Click it and you will be taken back to Worth The Trip.',
+    'verify.popupResend': 'Resend verification email',
+    'verify.popupResendError': 'Couldn\'t resend the email — check your inbox, or try again in a moment.',
+    'verify.appliedTitle': 'Application received',
+    'verify.appliedBody': 'You will receive a confirmation email shortly. Click the link inside to confirm your application.',
+    'verify.sentTitle': 'Verification email sent',
+    'verify.sentBody': 'We have sent a verification link to {email}.',
+    'verify.successTitle': 'Account created',
+    'verify.successBody': 'Your account is verified and ready — welcome to Worth The Trip!',
+    'verify.linkExpired': 'This verification link has expired. Please sign up again.',
+    'verify.linkInvalid': 'This verification link is not valid. Please sign up again.',
   },
   ja: {
     'nav.explore': '探す',
@@ -471,5 +487,21 @@ const WTT_STRINGS = {
     'nav.end': '終了',
     'nav.mapBtn': '地図',
     'nav.allTrips': '旅行一覧',
+
+    // ------------------------------------------------------------------
+    // Email verification
+    // ------------------------------------------------------------------
+    'verify.popupTitle': 'メールを確認してください',
+    'verify.popupBody': '確認用のメールを送信しました。メール内のリンクを開くと、アプリに戻ります。',
+    'verify.popupResend': '確認メールを再送',
+    'verify.popupResendError': 'メールを再送できませんでした — 受信箱を確認するか、しばらくしてから再試行してください。',
+    'verify.appliedTitle': '申請を受付しました',
+    'verify.appliedBody': '確認用のメールを送信しました。メール内のリンクを開くと、申請が確定します。',
+    'verify.sentTitle': '確認メールを送信しました',
+    'verify.sentBody': '確認用リンクを {email} 宛に送信しました。',
+    'verify.successTitle': 'アカウント作成',
+    'verify.successBody': 'アカウントが確認できました。Worth The Tripへようこそ！',
+    'verify.linkExpired': 'この確認リンクの有効期限が切れました。もう一度アカウントを作成してください。',
+    'verify.linkInvalid': 'この確認リンクは無効です。もう一度アカウントを作成してください。',
   }
 };

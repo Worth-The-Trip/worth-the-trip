@@ -266,6 +266,37 @@
       '<div class="btn-row"><button class="btn btn-primary" type="submit">' + esc(t('apply')) + '</button></div></form>';
   }
 
+  // Email verification popup.
+  var verifyPopup = $('#verify-popup');
+  var verifyPopupEmail = null;
+
+  function showVerifyPopup(email) {
+    verifyPopupEmail = email;
+    verifyPopup.classList.add('open');
+    $('#verify-popup-title').textContent = t('verify.popupTitle');
+    $('#verify-popup-body').textContent = t('verify.popupBody').replace(/{email}/g, email || '');
+    $('#verify-popup-resend').style.display = 'inline-flex';
+    $('#verify-popup-resend').textContent = t('verify.popupResend');
+    $('#verify-popup-hint').textContent = '';
+  }
+
+  function resendVerification() {
+    var email = verifyPopupEmail;
+    if (!email) return;
+    $('#verify-popup-resend').disabled = true;
+    $('#verify-popup-hint').textContent = 'Sending…';
+    api('/api/resend-verification', { method: 'POST', body: JSON.stringify({ email }) })
+      .then(function () {
+        $('#verify-popup-hint').textContent = t('verify.sentTitle') + ' ' + t('verify.sentBody').replace(/{email}/g, email);
+      })
+      .catch(function () {
+        $('#verify-popup-hint').textContent = t('verify.popupResendError');
+      })
+      .finally(function () { $('#verify-popup-resend').disabled = false; });
+  }
+
+  $('#verify-popup-resend').addEventListener('click', resendVerification);
+
   function wireGate() {
     var sf = $('#signin-form');
     if (sf) sf.addEventListener('submit', function (e) {
@@ -278,7 +309,17 @@
     if (uf) uf.addEventListener('submit', function (e) {
       e.preventDefault();
       api('/api/users', { method: 'POST', body: JSON.stringify({ email: $('#su-email').value.trim(), password: $('#su-password').value, name: $('#su-name').value.trim() }) })
-        .then(function (res) { try { localStorage.setItem(AUTH_KEY, res.token); } catch (x) {} return loadMe(); })
+        .then(function (res) {
+          if (res && res.requiresVerification) {
+            // Account created but unverified: the signup gate does not force a
+            // session. Show the verification popup and let the user confirm from
+            // their email. The apply form is shown only after signing in.
+            showVerifyPopup(res.user.email);
+            return;
+          }
+          try { localStorage.setItem(AUTH_KEY, res.token); } catch (x) {}
+          return loadMe();
+        })
         .then(route).catch(function (err) { $('#gate-error').textContent = err.message; });
     });
     var af = $('#apply-form');
@@ -294,20 +335,34 @@
         ? api('/api/users', {
             method: 'POST',
             body: JSON.stringify({ email: email.value.trim(), password: $('#ap-password').value, name: payload.name })
-          }).then(function (res) {
-            try { localStorage.setItem(AUTH_KEY, res.token); } catch (x) {}
-            return loadMe();
           })
         : Promise.resolve();
+      var applying = false;
       step
-        .then(function () {
-          if (!state.me || !state.me.signedIn || !state.me.user) {
-            $('#gate-error').textContent = 'You need to sign in before applying.';
-            throw new Error('Not signed in');
+        .then(function (res) {
+          if (res && res.requiresVerification) {
+            // Account created (unverified): mark signed-in so the apply steps
+            // forward, but do not apply yet. /api/creator/apply requires a
+            // session cookie, minted only after the user clicks the verification
+            // link.
+            state.me = { signedIn: true, user: res.user };
+            showVerifyPopup(res.user.email);
+            applying = true;
+            return;
           }
-          return api('/api/creator/apply', { method: 'POST', body: JSON.stringify(payload) });
+          return loadMe().then(function (me) {
+            state.me = me;
+            return api('/api/creator/apply', { method: 'POST', body: JSON.stringify(payload) });
+          });
         })
-        .then(loadMe).then(route)
+        .then(function (res) {
+          if (applying) return;
+          if (res && res.requiresVerification) {
+            showVerifyPopup(state.me.user.email);
+            return;
+          }
+          return loadMe().then(route);
+        })
         .catch(function (err) { $('#gate-error').textContent = err.message; });
     });
   }

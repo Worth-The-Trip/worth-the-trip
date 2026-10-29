@@ -22,6 +22,7 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const email = require('./lib/email');
 const fs = require('fs');
 const path = require('path');
 
@@ -344,8 +345,58 @@ function verifyPassword(p, stored) {
   const b = Buffer.from(hash, 'hex');
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+
 function genToken() { return crypto.randomBytes(32).toString('hex'); }
 function genId() { return crypto.randomUUID(); }
+
+function columnExists(table, column) {
+  const cols = db().prepare('PRAGMA table_info(' + table + ')').all();
+  return cols.some(c => c.name === column);
+}
+
+function migrateDatabase() {
+  try {
+    const d = db();
+    const done = [];
+    if (!columnExists('users', 'email_verified')) {
+      d.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
+      done.push('users.email_verified');
+    }
+    if (!columnExists('creators', 'email_verified')) {
+      d.exec('ALTER TABLE creators ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
+      done.push('creators.email_verified');
+    }
+    if (!columnExists('verification_tokens', 'id')) {
+      d.exec('CREATE TABLE IF NOT EXISTS verification_tokens (id TEXT PRIMARY KEY, email TEXT NOT NULL, token TEXT NOT NULL UNIQUE, kind TEXT NOT NULL DEFAULT \'signup\', expires_at INTEGER NOT NULL, used_at INTEGER)');
+      done.push('verification_tokens');
+    }
+    if (done.length) console.log('DB migration:', done.join('; '));
+  } catch (e) {
+    console.error('DB migration error:', e.message);
+  }
+}
+
+function storeVerificationToken(email, kind) {
+  const d = db();
+  const id = genId();
+  const token = generateToken();
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  d.prepare('INSERT INTO verification_tokens (id, email, token, kind, expires_at) VALUES (?,?,?,?,?)').run(id, email, token, kind, expiresAt);
+  return token;
+}
+
+function consumeVerificationToken(token) {
+  const d = db();
+  const row = d.prepare('SELECT * FROM verification_tokens WHERE token = ?').get(token);
+  if (!row) return null;
+  if (row.used_at) return null;
+  if (Date.now() > row.expires_at) {
+    d.prepare('DELETE FROM verification_tokens WHERE id = ?').run(row.id);
+    return null;
+  }
+  d.prepare('UPDATE verification_tokens SET used_at = ? WHERE id = ?').run(Date.now(), row.id);
+  return row;
+}
 
 // ------------------------------------------------------------------ data access
 // All state lives in one SQLite file under RUNTIME_DIR. The read helpers return
@@ -361,7 +412,9 @@ let _db = null;
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
+
   email TEXT NOT NULL UNIQUE,
+  email_verified INTEGER NOT NULL DEFAULT 0,
   name TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL DEFAULT '',
   phone TEXT NOT NULL DEFAULT '',
@@ -408,7 +461,9 @@ CREATE TABLE IF NOT EXISTS creators (
   name TEXT NOT NULL DEFAULT '',
   handle TEXT NOT NULL DEFAULT '',
   area TEXT NOT NULL DEFAULT '',
+
   email TEXT NOT NULL DEFAULT '',
+  email_verified INTEGER NOT NULL DEFAULT 0,
   bio TEXT NOT NULL DEFAULT '',
   youtube_url TEXT NOT NULL DEFAULT '',
   instagram_url TEXT NOT NULL DEFAULT '',
@@ -949,17 +1004,78 @@ app.post('/api/users', rateLimitAuth, (req, res) => {
     const users = readUsers();
     users.push(user);
     writeLines(AUTH_FILE, users);
-    const token = genToken();
-    const session = { token, userId: user.id, kind: 'user', expiresAt: Date.now() + SESSION_TTL_MS };
-    // Drop sessions past their expiry while we hold the write lock, so
-    // sessions.jsonl cannot grow without bound (every authenticated request
-    // scans it).
-    const sessions = pruneSessions();
-    sessions.push(session);
-    writeLines(SESSIONS_FILE, sessions);
-    res.setHeader('Set-Cookie', [`wtt_session=${token}; HttpOnly; Path=/; SameSite=lax; Max-Age=${SESSION_TTL_MS / 1000}`]);
-    res.status(201).json({ ok: true, token, user: { id: user.id, email: user.email, name: user.name } });
+
+    // Email verification: the account is created as unverified until the user
+    // clicks the link in the verification email. No session is created yet —
+    // the user is only fully signed in after they verify their address.
+    const token = storeVerificationToken(user.email, 'signup');
+    email.sendVerificationEmail(user.email, {
+      name: user.name,
+      token: token,
+      kind: 'signup',
+      baseUrl: process.env.WTT_BASE_URL || 'https://worththetripapp.com'
+    }).catch(() => { /* SMTP not configured yet — never block signup on email */ });
+
+    res.status(201).json({ ok: true, requiresVerification: true, user: { id: user.id, email: user.email, name: user.name } });
   } catch (e) { jsonError(res, 500, e.message); }
+  });
+});
+
+// Verify an email with the token from the verification email. Marks the
+// account (and any creator application) as verified, signs the user in, and
+// forwards them back to the app.
+app.get('/verify', (req, res) => {
+  const token = String(req.query.token || '').trim();
+  if (!token) return res.redirect('/account');
+  mutate(() => {
+    try {
+      const row = consumeVerificationToken(token);
+      if (!row) return res.redirect('/account?verify=error');
+      const d = db();
+      d.prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?')
+        .run(new Date().toISOString(), row.email);
+      // Confirm any creator application on this email.
+      d.prepare('UPDATE creators SET email_verified = 1, updated_at = ? WHERE email = ?')
+        .run(new Date().toISOString(), row.email);
+      const user = findUser(row.email);
+      if (user) {
+        const sessionToken = genToken();
+        const session = { token: sessionToken, userId: user.id, kind: 'user', expiresAt: Date.now() + SESSION_TTL_MS };
+        const sessions = pruneSessions();
+        sessions.push(session);
+        writeLines(SESSIONS_FILE, sessions);
+        res.setHeader('Set-Cookie', [`wtt_session=${sessionToken}; HttpOnly; Path=/; SameSite=lax; Max-Age=${SESSION_TTL_MS / 1000}`]);
+      }
+      // Forward back to the app.
+      res.redirect('/account?verified=1');
+    } catch (e) {
+      res.redirect('/account?verify=error');
+    }
+  });
+});
+
+// Resend a verification email (used when the user needs to click the link
+// again from the correct email address).
+app.post('/api/resend-verification', rateLimitAuth, (req, res) => {
+  mutate(() => {
+    try {
+      const { email } = req.body || {};
+      if (!email) return jsonError(res, 400, 'Email is required');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError(res, 400, 'Please enter a valid email');
+      const user = findUser(email);
+      if (!user) return jsonError(res, 404, 'No account with this email');
+      if (user.email_verified) return jsonError(res, 409, 'This account is already verified');
+      const token = storeVerificationToken(user.email, 'signup');
+      email.sendVerificationEmail(user.email, {
+        name: user.name,
+        token: token,
+        kind: 'signup',
+        baseUrl: process.env.WTT_BASE_URL || 'https://worththetripapp.com'
+      }).catch(() => { /* SMTP not configured — never block the resend */ });
+      res.json({ ok: true });
+    } catch (e) {
+      jsonError(res, 500, e.message);
+    }
   });
 });
 
@@ -1598,8 +1714,20 @@ app.post('/api/creator/apply', requireUser, (req, res) => {
       reviewNote: null,
     };
     if (existing) creators[idx] = record; else creators.push(record);
+
     writeArray(CREATORS_FILE, creators);
-    res.json({ ok: true, status: 'pending' });
+
+    // Email confirmation for the application: the applicant clicks the link
+    // before the application is considered confirmed.
+    const applyToken = storeVerificationToken(record.email, 'apply');
+    email.sendVerificationEmail(record.email, {
+      name: record.name,
+      token: applyToken,
+      kind: 'apply',
+      baseUrl: process.env.WTT_BASE_URL || 'https://worththetripapp.com'
+    }).catch(() => { /* SMTP not configured yet — never block the apply */ });
+
+    res.json({ ok: true, status: 'pending', requiresVerification: true });
   } catch (e) { jsonError(res, 500, e.message); }
   });
 });
@@ -2219,6 +2347,8 @@ app.use(express.static(DATA_DIR));
 // Must run after the module-level `const` declarations below are initialised.
 ensureDataFiles();
 migrateData();
+
+migrateDatabase();
 
 app.listen(PORT, HOST, () => {
   console.log('WTT app server running at http://' + HOST + ':' + PORT);

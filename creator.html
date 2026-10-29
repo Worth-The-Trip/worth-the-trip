@@ -170,7 +170,19 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- Email verification popup (used by signup and creator application). -->
+  <div class="modal-backdrop" id="verify-popup">
+    <div class="modal">
+      <h2 id="verify-popup-title">Check your email</h2>
+      <p id="verify-popup-body"></p>
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn btn-primary" id="verify-popup-resend" style="display:none">Resend verification email</button>
+      </div>
+      <p class="hint" id="verify-popup-hint" style="margin-top:10px"></p>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="src/js/creator.js?v=12"></script>
+  <script src="src/js/creator.js?v=13"></script>
 </body>
 </html>
