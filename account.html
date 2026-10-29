@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Your account — Worth The Trip</title>
-  <link rel="stylesheet" href="/src/css/styles.css?v=44">
+  <link rel="stylesheet" href="/src/css/styles.css?v=45">
   <link rel="icon" href="/public/Branding/WTT Logo 1.svg">
   <style>
     :root { --app-bg: #0d0d0d; }
@@ -431,11 +431,23 @@
       $('#auth-error').textContent = '';
       api('/api/users', { method: 'POST', body: JSON.stringify({ email, password, name }) })
         .then((res) => {
-          localStorage.setItem(AUTH_KEY, res.token);
-          return loadCurrentUser();
+          if (res.requiresVerification) {
+            $('#auth-error').textContent = 'Verification email sent to your address, please click the link provided.';
+            $('#auth-error').className = 'success';
+            if (typeof showVerifyPopup === 'function') showVerifyPopup(email);
+            return;
+          }
+          return api('/api/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+            .then((lr) => {
+              localStorage.setItem(AUTH_KEY, lr.token);
+              return loadCurrentUser();
+            });
         })
-        .then(enterDashboard)
-        .catch((err) => { $('#auth-error').textContent = err.message; });
+        .then((user) => { if (user) enterDashboard(user); })
+        .catch((err) => {
+          $('#auth-error').textContent = err.message || 'Signup failed';
+          $('#auth-error').className = 'error';
+        });
     });
 
     // ---- profile editor ----
