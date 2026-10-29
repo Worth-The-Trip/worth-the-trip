@@ -168,6 +168,7 @@
           </div>
           <div class="btn-row">
             <button class="btn btn-primary" type="submit">Create account</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="signup-resend" style="display:none">Resend verification email</button>
           </div>
         </form>
       </div>
@@ -434,6 +435,8 @@
           if (res.requiresVerification) {
             $('#auth-error').textContent = 'Verification email sent to your address, please click the link provided.';
             $('#auth-error').className = 'success';
+            const resendBtn = $('#signup-resend');
+            if (resendBtn) resendBtn.style.display = 'inline-flex';
             if (typeof showVerifyPopup === 'function') showVerifyPopup(email);
             return;
           }
@@ -449,6 +452,23 @@
           $('#auth-error').className = 'error';
         });
     });
+
+    const resendBtn = $('#signup-resend');
+    if (resendBtn) {
+      resendBtn.addEventListener('click', async () => {
+        const email = $('#su-email').value.trim();
+        if (!email) return;
+        resendBtn.disabled = true;
+        try {
+          await api('/api/resend-verification', { method: 'POST', body: JSON.stringify({ email }) });
+          toast('Verification email resent');
+        } catch (err) {
+          toast(err.message || 'Could not resend email');
+        } finally {
+          resendBtn.disabled = false;
+        }
+      });
+    }
 
     // ---- profile editor ----
     // The old flow used window.prompt(), which could only edit the name and
