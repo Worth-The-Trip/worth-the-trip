@@ -95,6 +95,7 @@
     .avatar-label { font-size: 12px; color: var(--muted-foreground); margin-top: 6px; }
 
     .section-title { font-size: 16px; font-weight: 700; margin: 22px 0 12px; }
+    #signup-toggle:hover { color: var(--accent); }
     .list { width: 100%; border-collapse: collapse; font-size: 14px; }
     .list th, .list td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
     .list th { color: var(--muted-foreground); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
@@ -152,25 +153,27 @@
           </div>
         </form>
 
-        <div class="section-title">Create account</div>
-        <form id="signup-form">
-          <div class="field">
-            <label for="su-email">Email</label>
-            <input id="su-email" type="email" required autocomplete="email">
-          </div>
-          <div class="field">
-            <label for="su-password">Password (6+ chars)</label>
-            <input id="su-password" type="password" required minlength="6" autocomplete="new-password">
-          </div>
-          <div class="field">
-            <label for="su-name">Name</label>
-            <input id="su-name" type="text" required autocomplete="name">
-          </div>
-          <div class="btn-row">
-            <button class="btn btn-primary" type="submit">Create account</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="signup-resend" style="display:none">Resend verification email</button>
-          </div>
-        </form>
+        <div class="section-title" id="signup-toggle" style="cursor:pointer; user-select:none;">Create account <span id="signup-chevron" style="display:inline-block; transition:transform .2s;">▼</span></div>
+        <div id="signup-panel" style="max-height:0; overflow:hidden; transition:max-height .25s ease, opacity .2s ease; opacity:0;">
+          <form id="signup-form">
+            <div class="field">
+              <label for="su-email">Email</label>
+              <input id="su-email" type="email" required autocomplete="email">
+            </div>
+            <div class="field">
+              <label for="su-password">Password (6+ chars)</label>
+              <input id="su-password" type="password" required minlength="6" autocomplete="new-password">
+            </div>
+            <div class="field">
+              <label for="su-name">Name</label>
+              <input id="su-name" type="text" required autocomplete="name">
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" type="submit">Create account</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="signup-resend" style="display:none">Resend verification email</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
 
@@ -452,6 +455,24 @@
           $('#auth-error').className = 'error';
         });
     });
+
+    const signupToggle = $('#signup-toggle');
+    const signupPanel = $('#signup-panel');
+    const signupChevron = $('#signup-chevron');
+    if (signupToggle && signupPanel) {
+      signupToggle.addEventListener('click', () => {
+        const open = signupPanel.style.maxHeight !== '0px' && signupPanel.style.maxHeight !== '';
+        if (open) {
+          signupPanel.style.maxHeight = '0px';
+          signupPanel.style.opacity = '0';
+          if (signupChevron) signupChevron.style.transform = 'rotate(0deg)';
+        } else {
+          signupPanel.style.maxHeight = signupPanel.scrollHeight + 'px';
+          signupPanel.style.opacity = '1';
+          if (signupChevron) signupChevron.style.transform = 'rotate(180deg)';
+        }
+      });
+    }
 
     const resendBtn = $('#signup-resend');
     if (resendBtn) {
