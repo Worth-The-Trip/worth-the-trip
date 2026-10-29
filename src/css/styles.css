@@ -2521,6 +2521,11 @@ body {
   color: var(--vermilion);
 }
 
+.toast.error {
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
 /* -------- Responsive -------- */
 @media (min-width: 768px) {
   #search-bar {

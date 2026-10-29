@@ -558,7 +558,7 @@ function importLegacy(d) {
 
 // ---------------------------------------------------------------- row mapping
 const USER_COLS = ['id','email','name','password_hash','phone','address','avatar','banned',
-  'created_at','updated_at','bio','area','handle','youtube_url','instagram_url','tiktok_url',
+  'email_verified','created_at','updated_at','bio','area','handle','youtube_url','instagram_url','tiktok_url',
   'twitch_url','followers_count'];
 const USER_PLACEHOLDERS = USER_COLS.map(() => '?').join(',');
 
@@ -568,14 +568,15 @@ function insertUser(d, u) {
   if (!u || !u.id) { console.error('Skipped a user row with no id'); return; }
   d.prepare(`INSERT OR REPLACE INTO users (${USER_COLS.join(',')}) VALUES (${USER_PLACEHOLDERS})`).run(
     u.id, String(u.email || '').toLowerCase(), u.name || '', u.passwordHash || '', u.phone || '',
-    u.address || '', u.avatar ?? null, u.banned ? 1 : 0, u.createdAt || '', u.updatedAt || '',
-    u.bio || '', u.area || '', u.handle || '', u.youtubeUrl || '', u.instagramUrl || '',
+    u.address || '', u.avatar ?? null, u.banned ? 1 : 0, Number(u.emailVerified) || 0,
+    u.createdAt || '', u.updatedAt || '', u.bio || '', u.area || '', u.handle || '', u.youtubeUrl || '', u.instagramUrl || '',
     u.tiktokUrl || '', u.twitchUrl || '', Number(u.followersCount) || 0);
 }
 function userFromRow(r) {
   return {
     id: r.id, email: r.email, name: r.name, passwordHash: r.password_hash,
     phone: r.phone, address: r.address, avatar: r.avatar, banned: !!r.banned,
+    emailVerified: !!r.email_verified,
     createdAt: r.created_at, updatedAt: r.updated_at, bio: r.bio, area: r.area,
     handle: r.handle, youtubeUrl: r.youtube_url, instagramUrl: r.instagram_url,
     tiktokUrl: r.tiktok_url, twitchUrl: r.twitch_url,
@@ -995,10 +996,17 @@ app.post('/api/users', rateLimitAuth, (req, res) => {
     if (!email || !password) return jsonError(res, 400, 'Email and password are required');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError(res, 400, 'Please enter a valid email');
     if (password.length < 6) return jsonError(res, 400, 'Password must be at least 6 characters');
-    if (findUser(email)) return jsonError(res, 409, 'An account with this email already exists');
+    if (findUser(email)) {
+      const existing = findUser(email);
+      if (!existing.emailVerified) {
+        return jsonError(res, 409, 'An account with this email already exists. Please check your inbox for the verification link, or resend it.');
+      }
+      return jsonError(res, 409, 'An account with this email already exists');
+    }
     const user = {
       id: genId(), email: email.toLowerCase().trim(), name: (name || email.split('@')[0]).trim(),
       passwordHash: hashPassword(password), phone: '', address: '', avatar: null, banned: false,
+      emailVerified: 0,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     const users = readUsers();
@@ -1089,6 +1097,7 @@ app.post('/api/login', rateLimitAuth, (req, res) => {
       return jsonError(res, 401, 'Email or password is incorrect');
     }
     if (user.banned) return jsonError(res, 403, 'This account has been banned.');
+    if (!user.emailVerified) return jsonError(res, 403, 'Please verify your email before logging in. Check your inbox for the verification link, or resend it.');
     const token = genToken();
     const session = { token, userId: user.id, kind: 'user', expiresAt: Date.now() + SESSION_TTL_MS };
     // Drop sessions past their expiry while we hold the write lock, so

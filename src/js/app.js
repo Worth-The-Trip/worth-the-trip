@@ -1425,6 +1425,66 @@
     if (signedIn) els.profileSignedinEmail.textContent = p.email;
   }
 
+  // ---- email verification ----
+  let verifyPopupEmail = '';
+
+  function tVerify(key) {
+    const en = {
+      'verify.popupTitle': 'Check your email',
+      'verify.popupBody': 'We just sent a verification link to {email}. Click it and you will be taken back to Worth The Trip.',
+      'verify.popupResend': 'Resend verification email',
+      'verify.popupResendError': "Couldn't resend the email — check your inbox, or try again in a moment.",
+      'verify.sentTitle': 'Verification email sent',
+      'verify.sentBody': 'We have sent a verification link to {email}.',
+    };
+    const ja = {
+      'verify.popupTitle': 'メールを確認してください',
+      'verify.popupBody': '確認用のメールを送信しました。メール内のリンクを開くと、アプリに戻ります。',
+      'verify.popupResend': '確認メールを再送',
+      'verify.popupResendError': 'メールを再送できませんでした — 受信箱を確認するか、しばらくしてから再試行してください。',
+      'verify.sentTitle': '確認メールを送信しました',
+      'verify.sentBody': '確認用リンクを {email} 宛に送信しました。',
+    };
+    const lang = document.documentElement.getAttribute('lang') === 'ja' ? 'ja' : 'en';
+    const map = lang === 'ja' ? ja : en;
+    return (map[key] || en[key] || key).replace(/{email}/g, verifyPopupEmail || '');
+  }
+
+  function showVerifyPopup(email) {
+    verifyPopupEmail = email;
+    $('#verify-popup-title').textContent = tVerify('verify.popupTitle');
+    $('#verify-popup-body').textContent = tVerify('verify.popupBody');
+    $('#verify-popup-resend').style.display = 'inline-flex';
+    $('#verify-popup-resend').textContent = tVerify('verify.popupResend');
+    $('#verify-popup-hint').textContent = '';
+    $('#verify-popup').classList.add('active');
+    $('#verify-popup').setAttribute('aria-hidden', 'false');
+  }
+
+  function hideVerifyPopup() {
+    $('#verify-popup').classList.remove('active');
+    $('#verify-popup').setAttribute('aria-hidden', 'true');
+  }
+
+  async function resendVerification() {
+    const email = verifyPopupEmail;
+    if (!email) return;
+    $('#verify-popup-resend').disabled = true;
+    $('#verify-popup-hint').textContent = 'Sending…';
+    try {
+      await api('/api/resend-verification', { method: 'POST', body: JSON.stringify({ email }) });
+      $('#verify-popup-hint').textContent = tVerify('verify.sentTitle') + ' ' + tVerify('verify.sentBody');
+    } catch {
+      $('#verify-popup-hint').textContent = tVerify('verify.popupResendError');
+    } finally {
+      $('#verify-popup-resend').disabled = false;
+    }
+  }
+
+  if ($('#verify-popup-resend')) {
+    $('#verify-popup-resend').addEventListener('click', resendVerification);
+  }
+
   function showSignupView() {
     els.profileSignin.style.display = 'none';
     els.profileSignup.style.display = 'block';
@@ -1982,7 +2042,7 @@
       const email = els.profileSignupEmail.value.trim();
       const password = els.profileSignupPassword.value;
       if (!username || !email || !password) {
-        showToast(t('toast.needSignup'), 'success');
+        showToast(t('toast.needSignup'), 'error');
         return;
       }
       try {
@@ -1993,6 +2053,10 @@
         });
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || 'Signup failed');
+        if (body.requiresVerification) {
+          showVerifyPopup(email);
+          return;
+        }
         const lr = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2005,7 +2069,7 @@
         closeProfile();
         location.href = '/account';
       } catch (err) {
-        showToast(err.message, 'success');
+        showToast(err.message, 'error');
       }
     });
 
