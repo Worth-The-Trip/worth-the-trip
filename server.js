@@ -1040,7 +1040,7 @@ app.get('/verify', (req, res) => {
       const row = consumeVerificationToken(token);
       if (!row) return res.redirect('/account?verify=error');
       const d = db();
-      d.prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?')
+      d.prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE email = ?')
         .run(new Date().toISOString(), row.email);
       // Confirm any creator application on this email.
       d.prepare('UPDATE creators SET email_verified = 1, updated_at = ? WHERE email = ?')
