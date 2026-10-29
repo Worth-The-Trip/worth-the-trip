@@ -253,6 +253,8 @@ const WTT_STRINGS = {
     'verify.sentBody': 'We have sent a verification link to {email}.',
     'verify.successTitle': 'Account created',
     'verify.successBody': 'Your account is verified and ready — welcome to Worth The Trip!',
+    'verify.emailVerifiedTitle': 'Email Verified',
+    'verify.emailVerifiedBody': 'Your account is now active. You can sign in below.',
     'verify.linkExpired': 'This verification link has expired. Please sign up again.',
     'verify.linkInvalid': 'This verification link is not valid. Please sign up again.',
   },
@@ -503,6 +505,8 @@ const WTT_STRINGS = {
     'verify.sentBody': '確認用リンクを {email} 宛に送信しました。',
     'verify.successTitle': 'アカウント作成',
     'verify.successBody': 'アカウントが確認できました。Worth The Tripへようこそ！',
+    'verify.emailVerifiedTitle': 'メール確認完了',
+    'verify.emailVerifiedBody': 'アカウントが有効になりました。サインインしてください。',
     'verify.linkExpired': 'この確認リンクの有効期限が切れました。もう一度アカウントを作成してください。',
     'verify.linkInvalid': 'この確認リンクは無効です。もう一度アカウントを作成してください。',
   }

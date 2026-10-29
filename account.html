@@ -112,9 +112,11 @@
 
     .auth-step h2 { margin-bottom: 8px; }
     .error { color: #b3261e; background: #b3261e10; border: 1px solid #b3261e30; padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
+    .success { color: #0f7b3f; background: #0f7b3f10; border: 1px solid #0f7b3f30; padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
     /* The auth-error div is always in the markup, so hide it until it has text —
        otherwise its red background/border renders as an empty red bar. */
     .error:empty { display: none; }
+    .success:empty { display: none; }
 
     .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted-foreground); }
   </style>
@@ -649,6 +651,8 @@
         'verify.sentBody': 'We have sent a verification link to {email}.',
         'verify.successTitle': 'Account created',
         'verify.successBody': 'Your account is verified and ready — welcome to Worth The Trip!',
+        'verify.emailVerifiedTitle': 'Email Verified',
+        'verify.emailVerifiedBody': 'Your account is now active. You can sign in below.',
       };
       const ja = {
         'verify.popupTitle': 'メールを確認してください',
@@ -659,6 +663,8 @@
         'verify.sentBody': '確認用リンクを {email} 宛に送信しました。',
         'verify.successTitle': 'アカウント作成',
         'verify.successBody': 'アカウントが確認できました。Worth The Tripへようこそ！',
+        'verify.emailVerifiedTitle': 'メール確認完了',
+        'verify.emailVerifiedBody': 'アカウントが有効になりました。サインインしてください。',
       };
       const keyMap = lang() === 'ja' ? ja : en;
       return (keyMap[key] || en[key] || key).replace(/{email}/g, verifyPopupEmail || '');
@@ -672,6 +678,19 @@
       $('#verify-popup-resend').textContent = tVerify('verify.popupResend');
       $('#verify-popup-hint').textContent = '';
       verifyPopup.classList.add('open');
+    }
+
+    function showVerifySuccessPopup(email) {
+      verifyPopupEmail = email;
+      $('#verify-popup-title').textContent = tVerify('verify.emailVerifiedTitle');
+      $('#verify-popup-title').style.color = '#0f7b3f';
+      $('#verify-popup-body').textContent = tVerify('verify.emailVerifiedBody');
+      $('#verify-popup-resend').style.display = 'none';
+      $('#verify-popup-hint').textContent = '';
+      verifyPopup.classList.add('open');
+      if (email) {
+        $('#si-email').value = email;
+      }
     }
 
     function resendVerification() {
@@ -697,34 +716,50 @@
       const password = $('#su-password').value;
       const name = $('#su-name').value.trim();
       $('#auth-error').textContent = '';
+      $('#auth-error').className = 'error';
       api('/api/users', { method: 'POST', body: JSON.stringify({ email, password, name }) })
         .then((res) => {
           if (res.requiresVerification) {
             showVerifyPopup(email);
+            $('#auth-error').textContent = 'Verification Email sent to your address, please click the link provided.';
+            $('#auth-error').className = 'success';
             return;
           }
           localStorage.setItem(AUTH_KEY, res.token);
-          return loadCurrentUser();
+          return loadCurrentUser().then(enterDashboard);
         })
-        .then(enterDashboard)
-        .catch((err) => { $('#auth-error').textContent = err.message; });
+        .catch((err) => {
+          $('#auth-error').textContent = err.message;
+          $('#auth-error').className = 'error';
+        });
     });
 
     // Email verification succeeded via the link in the email.
     if (location.search.includes('verified=1')) {
-      const toast = () => {
-        const t = (k) => tVerify(k);
-        const el = $('#toast');
-        el.textContent = t('verify.successTitle') + ' — ' + t('verify.successBody');
-        el.classList.add('show');
-        clearTimeout(el._t);
-        el._t = setTimeout(() => el.classList.remove('show'), 4000);
+      // Show the verify popup in success state and auto-fill the signin email.
+      const showSuccess = (user) => {
+        const email = (user && user.email) ? user.email : '';
+        showVerifySuccessPopup(email);
       };
-      // The session cookie only exists after verification. If logged in, show
-      // the toast on the dashboard; otherwise fetch /api/me first.
-      const show = () => toast();
-      if (isLoggedIn()) toast();
-      else loadCurrentUser().then(show).catch(show);
+      if (isLoggedIn()) {
+        loadCurrentUser().then(showSuccess).catch(() => showSuccess({}));
+      } else {
+        loadCurrentUser().then(showSuccess).catch(() => showSuccess({}));
+      }
+    }
+
+    // Reset verify popup title color when closed.
+    const closeVerifyPopup = () => {
+      $('#verify-popup-title').style.color = '';
+    };
+    if ($('#verify-popup')) {
+      $('#verify-popup').addEventListener('click', (e) => {
+        if (e.target === $('#verify-popup')) {
+          verifyPopup.classList.remove('open');
+          $('#verify-popup').setAttribute('aria-hidden', 'true');
+          closeVerifyPopup();
+        }
+      });
     }
 
     // ---- init ----
