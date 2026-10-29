@@ -748,6 +748,18 @@
       }
     }
 
+    if (location.search.includes('verify=error')) {
+      const toast = () => {
+        const t = (k) => tVerify(k);
+        const el = $('#toast');
+        el.textContent = t('verify.linkInvalid');
+        el.classList.add('show');
+        clearTimeout(el._t);
+        el._t = setTimeout(() => el.classList.remove('show'), 4000);
+      };
+      toast();
+    }
+
     // Reset verify popup title color when closed.
     const closeVerifyPopup = () => {
       $('#verify-popup-title').style.color = '';
