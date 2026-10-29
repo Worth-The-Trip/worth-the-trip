@@ -1017,6 +1017,7 @@ app.post('/api/users', rateLimitAuth, (req, res) => {
     // clicks the link in the verification email. No session is created yet —
     // the user is only fully signed in after they verify their address.
     const token = storeVerificationToken(user.email, 'signup');
+    console.log('[WTT signup] sending verification email to=' + user.email + ' name=' + (user.name || '') + ' userId=' + user.id);
     email.sendVerificationEmail(user.email, {
       name: user.name,
       token: token,
@@ -1074,6 +1075,7 @@ app.post('/api/resend-verification', rateLimitAuth, (req, res) => {
       if (!user) return jsonError(res, 404, 'No account with this email');
       if (user.email_verified) return jsonError(res, 409, 'This account is already verified');
       const token = storeVerificationToken(userEmail, 'signup');
+      console.log('[WTT resend] resending verification email to=' + userEmail + ' name=' + (user.name || '') + ' userId=' + user.id);
       email.sendVerificationEmail(userEmail, {
         name: user.name,
         token: token,
