@@ -379,7 +379,7 @@ function migrateDatabase() {
 function storeVerificationToken(email, kind) {
   const d = db();
   const id = genId();
-  const token = generateToken();
+  const token = genToken();
   const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
   d.prepare('INSERT INTO verification_tokens (id, email, token, kind, expires_at) VALUES (?,?,?,?,?)').run(id, email, token, kind, expiresAt);
   return token;
