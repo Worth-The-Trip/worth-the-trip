@@ -992,19 +992,19 @@ app.post('/webhooks/stripe', (req, res) => {
 app.post('/api/users', rateLimitAuth, (req, res) => {
   mutate(() => {
   try {
-    const { email, password, name } = req.body || {};
-    if (!email || !password) return jsonError(res, 400, 'Email and password are required');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError(res, 400, 'Please enter a valid email');
+    const { email: userEmail, password, name } = req.body || {};
+    if (!userEmail || !password) return jsonError(res, 400, 'Email and password are required');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) return jsonError(res, 400, 'Please enter a valid email');
     if (password.length < 6) return jsonError(res, 400, 'Password must be at least 6 characters');
-    if (findUser(email)) {
-      const existing = findUser(email);
+    if (findUser(userEmail)) {
+      const existing = findUser(userEmail);
       if (!existing.emailVerified) {
         return jsonError(res, 409, 'An account with this email already exists. Please check your inbox for the verification link, or resend it.');
       }
       return jsonError(res, 409, 'An account with this email already exists');
     }
     const user = {
-      id: genId(), email: email.toLowerCase().trim(), name: (name || email.split('@')[0]).trim(),
+      id: genId(), email: userEmail.toLowerCase().trim(), name: (name || userEmail.split('@')[0]).trim(),
       passwordHash: hashPassword(password), phone: '', address: '', avatar: null, banned: false,
       emailVerified: 0,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
@@ -1067,14 +1067,14 @@ app.get('/verify', (req, res) => {
 app.post('/api/resend-verification', rateLimitAuth, (req, res) => {
   mutate(() => {
     try {
-      const { email } = req.body || {};
-      if (!email) return jsonError(res, 400, 'Email is required');
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError(res, 400, 'Please enter a valid email');
-      const user = findUser(email);
+      const { email: userEmail } = req.body || {};
+      if (!userEmail) return jsonError(res, 400, 'Email is required');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) return jsonError(res, 400, 'Please enter a valid email');
+      const user = findUser(userEmail);
       if (!user) return jsonError(res, 404, 'No account with this email');
       if (user.email_verified) return jsonError(res, 409, 'This account is already verified');
-      const token = storeVerificationToken(user.email, 'signup');
-      email.sendVerificationEmail(user.email, {
+      const token = storeVerificationToken(userEmail, 'signup');
+      email.sendVerificationEmail(userEmail, {
         name: user.name,
         token: token,
         kind: 'signup',
