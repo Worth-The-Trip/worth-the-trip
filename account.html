@@ -796,15 +796,8 @@
         // If the user was in the middle of a creator application, submit it now.
         (async () => {
           try {
-            const raw = sessionStorage.getItem('pendingCreatorApply');
-            if (!raw) return;
-            const data = JSON.parse(raw);
-            if (!data || !data.email) return;
-            sessionStorage.removeItem('pendingCreatorApply');
-            if (!email) return;
-            const payload = { name: data.name || '', email: data.email, area: data.area || '', youtube: data.youtube || '', instagram: data.instagram || '' };
-            await api('/api/creator/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            toast('Creator application submitted');
+            const r = await api('/api/creator/apply-pending', { method: 'POST' });
+            if (r && r.submitted) toast('Creator application submitted');
           } catch (e) {
             console.error('Auto creator apply failed:', e);
           }

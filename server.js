@@ -1569,6 +1569,81 @@ app.delete('/api/creators/:id', requireAdmin, (req, res) => {
   });
 });
 
+// Store a creator application before the user verifies their email.
+// No auth required — the email itself is the anchor.
+app.post('/api/creator/save-pending', (req, res) => {
+  mutate(() => {
+  try {
+    const b = req.body || {};
+    const email = String(b.email || '').trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return jsonError(res, 400, 'A valid email is required');
+    }
+    const payload = {
+      name: clip(b.name, 120).trim(),
+      area: clip(b.area, 80).trim(),
+      youtube: clip(b.youtube || b.youtubeUrl, 300).trim(),
+      instagram: clip(b.instagram || b.instagramUrl, 300).trim(),
+    };
+    if (!payload.name) return jsonError(res, 400, 'Name is required');
+    setMeta(db(), 'pending_creator:' + email, JSON.stringify(payload));
+    res.json({ ok: true });
+  } catch (e) { jsonError(res, 500, e.message); }
+  });
+});
+
+// After the user verifies their email, submit any pending creator application.
+app.post('/api/creator/apply-pending', requireUser, (req, res) => {
+  mutate(() => {
+  try {
+    const email = req.user.email;
+    const key = 'pending_creator:' + email;
+    const raw = getMeta(db(), key);
+    if (!raw) return res.json({ ok: true, submitted: false });
+    let data;
+    try { data = JSON.parse(raw); } catch (e) { data = {}; }
+    db().prepare('DELETE FROM meta WHERE key = ?').run(key);
+
+    const name = clip(data.name || req.user.name, 120).trim();
+    if (!name) return res.json({ ok: true, submitted: false });
+
+    const handle = clip(data.handle || ('@' + name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24)), 80).trim();
+    const creators = readCreators();
+    const idx = creators.findIndex((c) => String(c.email || '').toLowerCase() === email);
+    const existing = idx >= 0 ? creators[idx] : null;
+    if (existing && existing.status === 'accepted') {
+      return res.json({ ok: true, submitted: false, reason: 'already_accepted' });
+    }
+    const record = {
+      id: existing ? existing.id : genId(),
+      name, handle,
+      area: clip(data.area || '', 80).trim(),
+      email,
+      bio: '',
+      youtubeUrl: clip(data.youtube || '', 300).trim(),
+      instagramUrl: clip(data.instagram || '', 300).trim(),
+      tiktokUrl: '',
+      status: 'pending',
+      guides: existing && Array.isArray(existing.guides) ? existing.guides : [],
+      appliedAt: new Date().toISOString(),
+      reviewNote: null,
+    };
+    if (existing) creators[idx] = record; else creators.push(record);
+    writeArray(CREATORS_FILE, creators);
+
+    const applyToken = storeVerificationToken(record.email, 'apply');
+    email.sendVerificationEmail(record.email, {
+      name: record.name,
+      token: applyToken,
+      kind: 'apply',
+      baseUrl: process.env.WTT_BASE_URL || 'https://worththetripapp.com'
+    }).catch(() => {});
+
+    res.json({ ok: true, submitted: true });
+  } catch (e) { jsonError(res, 500, e.message); }
+  });
+});
+
 // ---- Admin: login ----
 app.post('/api/admin/login', rateLimitAuth, (req, res) => {
   mutate(() => {
