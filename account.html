@@ -348,6 +348,7 @@
     }
 
     // ---- bootstrap ----
+    const isVerifying = location.search.includes('verified=1');
     function isLoggedIn() { return !!localStorage.getItem(AUTH_KEY); }
 
     function loadCurrentUser() {
@@ -355,6 +356,7 @@
     }
 
     async function boot() {
+      if (isVerifying) return;
       try {
         const u = await loadCurrentUser();
         showDashboard(u);
@@ -797,7 +799,12 @@
     if (location.search.includes('verified=1')) {
       const afterVerify = (user) => {
         const email = (user && user.email) ? user.email : '';
-        showVerifySuccessPopup(email);
+        if (email) {
+          enterDashboard(user);
+          showVerifySuccessPopup(email);
+        } else {
+          showVerifySuccessPopup('');
+        }
 
         // If the user was in the middle of a creator application, submit it now.
         (async () => {
