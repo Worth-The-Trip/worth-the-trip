@@ -2563,41 +2563,82 @@
     if (creatorBtn) creatorBtn.addEventListener('click', async () => {
       const name = $('#creator-name').value.trim();
       const email = $('#creator-email').value.trim();
+      const password = $('#creator-password').value.trim();
+      const area = $('#creator-area').value.trim();
+      const youtube = $('#creator-youtube').value.trim();
+      const instagram = $('#creator-instagram').value.trim();
       if (!name || !email) {
         showToast(t('toast.needNameEmail'), 'success');
         return;
       }
-      // 1) ensure we have a session (create the account if not signed in)
-      let signedIn = !!state.me && !!state.me.user;
-      if (!signedIn) {
+      // 1) make sure we have a logged-in session
+      let isLoggedIn = false;
+      try {
+        const me = await api('/api/me');
+        if (me && me.email) isLoggedIn = true;
+      } catch (e) {
+        isLoggedIn = false;
+      }
+      // 2) create account if needed
+      if (!isLoggedIn) {
+        if (!password || password.length < 6) {
+          showToast(t('toast.needEmailPw'), 'success');
+          return;
+        }
         try {
-          await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: $('#creator-password').value.trim() }) });
+          const signup = await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password }) });
+          if (signup && signup.requiresVerification) {
+            $('#menu-page-body').innerHTML = `
+              <div style="text-align:center; padding: 24px 0;">
+                <h3 style="margin: 0 0 8px;">${t('creator.verifyTitle')}</h3>
+                <p style="margin: 0 0 16px;">${t('creator.verifyBody').replace('{email}', escHtml(email))}</p>
+                <button class="btn-primary" id="creator-resend-btn"><span class="btn-label">${t('creator.resend')}</span></button>
+                <p id="creator-resend-hint" style="margin-top:10px; min-height:18px;"></p>
+              </div>`;
+            const resendBtn = $('#creator-resend-btn');
+            if (resendBtn) {
+              resendBtn.addEventListener('click', async () => {
+                resendBtn.disabled = true;
+                $('#creator-resend-hint').textContent = 'Sending…';
+                try {
+                  await api('/api/resend-verification', { method: 'POST', body: JSON.stringify({ email }) });
+                  $('#creator-resend-hint').textContent = t('verify.sentTitle') + ' ' + t('verify.sentBody').replace('{email}', escHtml(email));
+                } catch (e) {
+                  $('#creator-resend-hint').textContent = t('verify.popupResendError');
+                } finally {
+                  resendBtn.disabled = false;
+                }
+              });
+            }
+            return;
+          }
+          isLoggedIn = true;
         } catch (e) {
-          // 409 = this email already has an account; reuse it as an upgrade
           if (e.status === 409) {
-            signedIn = true;
+            isLoggedIn = true;
           } else {
             showToast(e.message || t('toast.cantCreate'), 'success');
             return;
           }
         }
       }
-      // 2) submit the creator application
-      const payload = {
-        name,
-        email,
-        area: $('#creator-area').value.trim(),
-        youtube: $('#creator-youtube').value.trim(),
-        instagram: $('#creator-instagram').value.trim()
-      };
+      // 3) submit the creator application
+      const payload = { name, email, area, youtube, instagram };
       try {
         await api('/api/creator/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       } catch (e) {
         showToast(e.message || t('errGeneric'), 'success');
         return;
       }
-      closeMenuPage();
-      showToast(t('toast.applicationSubmitted'), 'success');
+      $('#menu-page-body').innerHTML = `
+        <div style="text-align:center; padding: 24px 0;">
+          <h3 style="margin: 0 0 8px;">${t('creator.submittedTitle')}</h3>
+          <p style="margin: 0 0 16px;">${t('creator.submittedBody')}</p>
+        </div>`;
+      setTimeout(() => {
+        closeMenuPage();
+        showToast(t('toast.applicationSubmitted'), 'success');
+      }, 1800);
     });
 
     const helpBtn = $('#help-send-btn');
