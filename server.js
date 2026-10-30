@@ -1576,6 +1576,7 @@ app.post('/api/creator/save-pending', (req, res) => {
   try {
     const b = req.body || {};
     const email = String(b.email || '').trim().toLowerCase();
+    console.log('[WTT creator] save-pending email=' + email + ' name=' + (b.name || ''));
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return jsonError(res, 400, 'A valid email is required');
     }
@@ -1587,6 +1588,7 @@ app.post('/api/creator/save-pending', (req, res) => {
     };
     if (!payload.name) return jsonError(res, 400, 'Name is required');
     setMeta(db(), 'pending_creator:' + email, JSON.stringify(payload));
+    console.log('[WTT creator] save-pending OK email=' + email);
     res.json({ ok: true });
   } catch (e) { jsonError(res, 500, e.message); }
   });
@@ -1599,6 +1601,7 @@ app.post('/api/creator/apply-pending', requireUser, (req, res) => {
     const email = req.user.email;
     const key = 'pending_creator:' + email;
     const raw = getMeta(db(), key);
+    console.log('[WTT creator] apply-pending email=' + email + ' hasPending=' + (!!raw));
     if (!raw) return res.json({ ok: true, submitted: false });
     let data;
     try { data = JSON.parse(raw); } catch (e) { data = {}; }
@@ -1630,6 +1633,7 @@ app.post('/api/creator/apply-pending', requireUser, (req, res) => {
     };
     if (existing) creators[idx] = record; else creators.push(record);
     writeArray(CREATORS_FILE, creators);
+    console.log('[WTT creator] apply-pending SUCCESS email=' + email + ' creatorId=' + record.id);
 
     const applyToken = storeVerificationToken(record.email, 'apply');
     email.sendVerificationEmail(record.email, {

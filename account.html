@@ -796,10 +796,17 @@
         // If the user was in the middle of a creator application, submit it now.
         (async () => {
           try {
+            console.log('[WTT creator] applying pending creator application');
             const r = await api('/api/creator/apply-pending', { method: 'POST' });
-            if (r && r.submitted) toast('Creator application submitted');
+            console.log('[WTT creator] apply-pending result:', r);
+            if (r && r.submitted) {
+              toast('Creator application submitted');
+            } else {
+              toast('No pending creator application found');
+            }
           } catch (e) {
             console.error('Auto creator apply failed:', e);
+            toast('Creator application auto-submit failed: ' + (e.message || 'unknown error'));
           }
         })();
       };

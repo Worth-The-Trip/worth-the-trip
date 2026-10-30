@@ -2600,7 +2600,13 @@
         try {
           const signup = await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password }) });
           if (signup && signup.requiresVerification) {
-            try { await api('/api/creator/save-pending', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, name, area, youtube, instagram }) }); } catch (e) {}
+            console.log('[WTT creator] saving pending application for', email);
+            try {
+              await api('/api/creator/save-pending', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, name, area, youtube, instagram }) });
+              console.log('[WTT creator] pending application saved');
+            } catch (e) {
+              console.error('[WTT creator] save-pending failed:', e);
+            }
             $('#menu-page-body').innerHTML = `
               <div style="text-align:center; padding: 24px 0;">
                 <h3 style="margin: 0 0 8px;">${t('creator.verifyTitle')}</h3>
