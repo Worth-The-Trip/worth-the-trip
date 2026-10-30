@@ -789,15 +789,31 @@
 
     // Email verification succeeded via the link in the email.
     if (location.search.includes('verified=1')) {
-      // Show the verify popup in success state and auto-fill the signin email.
-      const showSuccess = (user) => {
+      const afterVerify = (user) => {
         const email = (user && user.email) ? user.email : '';
         showVerifySuccessPopup(email);
+
+        // If the user was in the middle of a creator application, submit it now.
+        (async () => {
+          try {
+            const raw = sessionStorage.getItem('pendingCreatorApply');
+            if (!raw) return;
+            const data = JSON.parse(raw);
+            if (!data || !data.email) return;
+            sessionStorage.removeItem('pendingCreatorApply');
+            if (!email) return;
+            const payload = { name: data.name || '', email: data.email, area: data.area || '', youtube: data.youtube || '', instagram: data.instagram || '' };
+            await api('/api/creator/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            toast('Creator application submitted');
+          } catch (e) {
+            console.error('Auto creator apply failed:', e);
+          }
+        })();
       };
       if (isLoggedIn()) {
-        loadCurrentUser().then(showSuccess).catch(() => showSuccess({}));
+        loadCurrentUser().then(afterVerify).catch(() => afterVerify({}));
       } else {
-        loadCurrentUser().then(showSuccess).catch(() => showSuccess({}));
+        loadCurrentUser().then(afterVerify).catch(() => afterVerify({}));
       }
     }
 

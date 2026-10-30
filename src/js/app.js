@@ -2550,7 +2550,7 @@
     $('#menu-page-body').innerHTML = page.html;
     if (key === 'creator') {
       try {
-        const saved = JSON.parse(sessionStorage.getItem('creatorForm') || 'null');
+        const saved = JSON.parse(sessionStorage.getItem('pendingCreatorApply') || 'null');
         if (saved) {
           if (saved.name) $('#creator-name').value = saved.name;
           if (saved.email) $('#creator-email').value = saved.email;
@@ -2600,12 +2600,12 @@
         try {
           const signup = await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password }) });
           if (signup && signup.requiresVerification) {
-            try { sessionStorage.setItem('creatorForm', JSON.stringify({ name, email, area, youtube, instagram })); } catch (e) {}
+            try { sessionStorage.setItem('pendingCreatorApply', JSON.stringify({ name, email, area, youtube, instagram })); } catch (e) {}
             $('#menu-page-body').innerHTML = `
               <div style="text-align:center; padding: 24px 0;">
                 <h3 style="margin: 0 0 8px;">${t('creator.verifyTitle')}</h3>
                 <p style="margin: 0 0 16px;">${t('creator.verifyBody').replace('{email}', escHtml(email))}</p>
-                <p style="margin: 0 0 16px; color: var(--muted-foreground); font-size: 13px;">After verifying, open <strong>Become a Creator</strong> again and tap <strong>Join Waitlist</strong> to finish your application.</p>
+                <p style="margin: 0 0 16px; color: var(--muted-foreground); font-size: 13px;">Click the link in the email — your creator application will be submitted automatically when you return.</p>
                 <button class="btn-primary" id="creator-resend-btn"><span class="btn-label">${t('creator.resend')}</span></button>
                 <p id="creator-resend-hint" style="margin-top:10px; min-height:18px;"></p>
               </div>`;
@@ -2644,7 +2644,7 @@
         showToast(e.message || t('errGeneric'), 'success');
         return;
       }
-      try { sessionStorage.removeItem('creatorForm'); } catch (e) {}
+      try { sessionStorage.removeItem('pendingCreatorApply'); } catch (e) {}
       $('#menu-page-body').innerHTML = `
         <div style="text-align:center; padding: 24px 0;">
           <h3 style="margin: 0 0 8px;">${t('creator.submittedTitle')}</h3>
