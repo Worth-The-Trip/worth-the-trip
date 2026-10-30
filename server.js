@@ -1070,7 +1070,7 @@ app.get('/verify', (req, res) => {
     } catch (e) {
       console.log('[WTT verify] ERROR token=' + token + ' err=' + e.message);
       console.log('[WTT verify] STACK', e.stack);
-      res.redirect('/account?verify=error');
+      res.redirect('/account?verify=error&msg=' + encodeURIComponent(e.message));
     }
   });
 });

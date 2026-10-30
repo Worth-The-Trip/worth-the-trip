@@ -831,8 +831,11 @@
           el.textContent = t('verify.linkUsed');
         } else if (location.search.includes('verify=expired')) {
           el.textContent = t('verify.linkExpired');
-        } else {
+        } else if (location.search.includes('verify=not_found')) {
           el.textContent = t('verify.linkInvalid');
+        } else {
+          const msg = new URLSearchParams(location.search).get('msg');
+          el.textContent = msg ? ('Verification error: ' + msg) : t('verify.linkInvalid');
         }
         el.classList.add('show');
         clearTimeout(el._t);
