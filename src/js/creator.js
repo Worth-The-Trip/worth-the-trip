@@ -272,12 +272,18 @@
 
   function showVerifyPopup(email) {
     verifyPopupEmail = email;
+    verifyPopup.style.display = 'flex';
     verifyPopup.classList.add('open');
     $('#verify-popup-title').textContent = t('verify.popupTitle');
     $('#verify-popup-body').textContent = t('verify.popupBody').replace(/{email}/g, email || '');
     $('#verify-popup-resend').style.display = 'inline-flex';
     $('#verify-popup-resend').textContent = t('verify.popupResend');
     $('#verify-popup-hint').textContent = '';
+  }
+
+  function hideVerifyPopup() {
+    verifyPopup.style.display = 'none';
+    verifyPopup.classList.remove('open');
   }
 
   function resendVerification() {
@@ -296,6 +302,10 @@
   }
 
   $('#verify-popup-resend').addEventListener('click', resendVerification);
+  $('#verify-popup-close').addEventListener('click', hideVerifyPopup);
+  $('#verify-popup').addEventListener('click', function (e) {
+    if (e.target.id === 'verify-popup') hideVerifyPopup();
+  });
 
   function wireGate() {
     var sf = $('#signin-form');
