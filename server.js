@@ -1069,6 +1069,7 @@ app.get('/verify', (req, res) => {
       res.redirect('/account?verified=1');
     } catch (e) {
       console.log('[WTT verify] ERROR token=' + token + ' err=' + e.message);
+      console.log('[WTT verify] STACK', e.stack);
       res.redirect('/account?verify=error');
     }
   });
