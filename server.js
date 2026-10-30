@@ -381,6 +381,7 @@ function storeVerificationToken(email, kind) {
   const id = genId();
   const token = genToken();
   const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  d.prepare('DELETE FROM verification_tokens WHERE email = ?').run(email);
   d.prepare('INSERT INTO verification_tokens (id, email, token, kind, expires_at) VALUES (?,?,?,?,?)').run(id, email, token, kind, expiresAt);
   return token;
 }
