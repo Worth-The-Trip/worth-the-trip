@@ -391,19 +391,19 @@ function consumeVerificationToken(token) {
   const row = d.prepare('SELECT * FROM verification_tokens WHERE token = ?').get(token);
   if (!row) {
     console.log('[WTT token] not_found token=' + token);
-    return null;
+    return { status: 'not_found' };
   }
   if (row.used_at) {
     console.log('[WTT token] already_used token=' + token + ' usedAt=' + row.used_at);
-    return null;
+    return { status: 'already_used' };
   }
   if (Date.now() > row.expires_at) {
     console.log('[WTT token] expired token=' + token + ' expiresAt=' + row.expires_at + ' now=' + Date.now());
     d.prepare('DELETE FROM verification_tokens WHERE id = ?').run(row.id);
-    return null;
+    return { status: 'expired' };
   }
   d.prepare('UPDATE verification_tokens SET used_at = ? WHERE id = ?').run(Date.now(), row.id);
-  return row;
+  return { status: 'ok', row };
 }
 
 // ------------------------------------------------------------------ data access
@@ -1046,19 +1046,18 @@ app.get('/verify', (req, res) => {
   if (!token) return res.redirect('/account');
   mutate(() => {
     try {
-      const row = consumeVerificationToken(token);
-      if (!row) {
-        console.log('[WTT verify] FAILED token=' + token + ' reason=not_found_or_used_or_expired');
-        return res.redirect('/account?verify=error');
+      const result = consumeVerificationToken(token);
+      if (result.status !== 'ok') {
+        console.log('[WTT verify] FAILED token=' + token + ' reason=' + result.status);
+        return res.redirect('/account?verify=' + result.status);
       }
-      console.log('[WTT verify] SUCCESS token=' + token + ' email=' + row.email + ' kind=' + row.kind);
+      console.log('[WTT verify] SUCCESS token=' + token + ' email=' + result.row.email + ' kind=' + result.row.kind);
       const d = db();
       d.prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE email = ?')
-        .run(new Date().toISOString(), row.email);
-      // Confirm any creator application on this email.
+        .run(new Date().toISOString(), result.row.email);
       d.prepare('UPDATE creators SET email_verified = 1, updated_at = ? WHERE email = ?')
-        .run(new Date().toISOString(), row.email);
-      const user = findUser(row.email);
+        .run(new Date().toISOString(), result.row.email);
+      const user = findUser(result.row.email);
       if (user) {
         const sessionToken = genToken();
         const session = { token: sessionToken, userId: user.id, kind: 'user', expiresAt: Date.now() + SESSION_TTL_MS };
@@ -1067,7 +1066,6 @@ app.get('/verify', (req, res) => {
         writeLines(SESSIONS_FILE, sessions);
         res.setHeader('Set-Cookie', [`wtt_session=${sessionToken}; HttpOnly; Path=/; SameSite=lax; Max-Age=${SESSION_TTL_MS / 1000}`]);
       }
-      // Forward back to the app.
       res.redirect('/account?verified=1');
     } catch (e) {
       console.log('[WTT verify] ERROR token=' + token + ' err=' + e.message);

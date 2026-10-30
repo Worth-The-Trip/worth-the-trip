@@ -706,6 +706,9 @@
         'verify.successBody': 'Your account is verified and ready — welcome to Worth The Trip!',
         'verify.emailVerifiedTitle': 'Email Verified',
         'verify.emailVerifiedBody': 'Your account is now active. You can sign in below.',
+        'verify.linkInvalid': 'The verification link is invalid or has expired.',
+        'verify.linkUsed': 'This verification link was already used.',
+        'verify.linkExpired': 'This verification link has expired.',
       };
       const ja = {
         'verify.popupTitle': 'メールを確認してください',
@@ -718,6 +721,9 @@
         'verify.successBody': 'アカウントが確認できました。Worth The Tripへようこそ！',
         'verify.emailVerifiedTitle': 'メール確認完了',
         'verify.emailVerifiedBody': 'アカウントが有効になりました。サインインしてください。',
+        'verify.linkInvalid': '確認リンクが無効または期限切れです。',
+        'verify.linkUsed': 'この確認リンクは既に使用されています。',
+        'verify.linkExpired': 'この確認リンクの有効期限が切れています。',
       };
       const keyMap = lang() === 'ja' ? ja : en;
       return (keyMap[key] || en[key] || key).replace(/{email}/g, verifyPopupEmail || '');
@@ -817,11 +823,17 @@
       }
     }
 
-    if (location.search.includes('verify=error')) {
+    if (location.search.includes('verify=error') || location.search.includes('verify=not_found') || location.search.includes('verify=already_used') || location.search.includes('verify=expired')) {
       const toast = () => {
         const t = (k) => tVerify(k);
         const el = $('#toast');
-        el.textContent = t('verify.linkInvalid');
+        if (location.search.includes('verify=already_used')) {
+          el.textContent = t('verify.linkUsed');
+        } else if (location.search.includes('verify=expired')) {
+          el.textContent = t('verify.linkExpired');
+        } else {
+          el.textContent = t('verify.linkInvalid');
+        }
         el.classList.add('show');
         clearTimeout(el._t);
         el._t = setTimeout(() => el.classList.remove('show'), 4000);
