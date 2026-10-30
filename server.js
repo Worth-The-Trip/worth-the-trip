@@ -1055,8 +1055,8 @@ app.get('/verify', (req, res) => {
       const d = db();
       d.prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE email = ?')
         .run(new Date().toISOString(), result.row.email);
-      d.prepare('UPDATE creators SET email_verified = 1, updated_at = ? WHERE email = ?')
-        .run(new Date().toISOString(), result.row.email);
+      d.prepare('UPDATE creators SET email_verified = 1 WHERE email = ?')
+        .run(result.row.email);
       const user = findUser(result.row.email);
       if (user) {
         const sessionToken = genToken();
