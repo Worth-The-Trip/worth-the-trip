@@ -81,7 +81,10 @@ function loadEnv() {
 }
 loadEnv();
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '1Deathknight90';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD) {
+  console.warn('[WTT] ADMIN_PASSWORD is not set — admin panel is locked. Set ADMIN_PASSWORD in .env to enable it.');
+}
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '__STRIPE_NO_KEY__';
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '__STRIPE_WEBHOOK_NO_KEY__';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -849,10 +852,16 @@ function readCookie(req) {
   return m ? m[1] : '';
 }
 function setSessionCookie(res, token) {
-  res.setHeader('Set-Cookie', [`wtt_session=${token}; HttpOnly; Path=/; SameSite=lax; Max-Age=${SESSION_TTL_MS / 1000}`]);
+  const isSecure = process.env.NODE_ENV === 'production' || process.env.WTT_BASE_URL?.startsWith('https://');
+  const attrs = [`wtt_session=${token}; HttpOnly; Path=/; SameSite=lax; Max-Age=${SESSION_TTL_MS / 1000}`];
+  if (isSecure) attrs.push('Secure');
+  res.setHeader('Set-Cookie', attrs);
 }
 function clearSessionCookie(res) {
-  res.setHeader('Set-Cookie', [`wtt_session=; HttpOnly; Path=/; SameSite=lax; Max-Age=0`]);
+  const isSecure = process.env.NODE_ENV === 'production' || process.env.WTT_BASE_URL?.startsWith('https://');
+  const attrs = [`wtt_session=; HttpOnly; Path=/; SameSite=lax; Max-Age=0`];
+  if (isSecure) attrs.push('Secure');
+  res.setHeader('Set-Cookie', attrs);
 }
 
 // ------------------------------------------------------------------ middleware
@@ -871,10 +880,13 @@ app.use((req, res, next) => {
     res.set('Cache-Control', 'no-store');
     res.set('Vary', 'Cookie');
   } else if (HTML_PAGES.has(p) || p.endsWith('.html')) {
-    // Never let the proxy or the browser pin an old page shell — a stale
-    // account.html keeps calling uncacheable API URLs and hangs on load.
     res.set('Cache-Control', 'no-store');
   }
+  // Security headers
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
   next();
 });
 
