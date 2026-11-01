@@ -2222,6 +2222,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  transition: opacity 0.3s ease;
 }
 
 .timeline-dot {
@@ -2361,6 +2362,13 @@ body {
   opacity: 0.35;
   filter: grayscale(60%);
   pointer-events: none;
+}
+
+.timeline-item.past .timeline-desc,
+.timeline-item.past .timeline-meta,
+.timeline-item.past .timeline-thumb,
+.timeline-item.past .nearby-strip {
+  display: none;
 }
 
 .timeline-item.past .timeline-start-btn {

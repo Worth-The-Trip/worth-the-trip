@@ -1064,6 +1064,15 @@
         el.classList.remove('past');
       }
     });
+
+    // Scroll the current step to the top of the timeline view.
+    const currentBtn = document.querySelector('.timeline-start-btn[data-tidx="' + currentTidx + '"]');
+    if (currentBtn) {
+      const timelineItem = currentBtn.closest('.timeline-item');
+      if (timelineItem) {
+        timelineItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
   }
 
   function navTarget() {
