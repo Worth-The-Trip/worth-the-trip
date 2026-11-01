@@ -2456,6 +2456,23 @@ body {
   align-self: flex-start;
 }
 
+/* Dates picker modal */
+.dates-row {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+.dates-row .field {
+  flex: 1;
+  min-width: 0;
+}
+#dates-modal .modal-sheet {
+  max-width: 420px;
+}
+#dates-modal .field-input[type="date"] {
+  color-scheme: dark;
+}
+
 /* Creator card */
 .creator-card {
   display: flex;

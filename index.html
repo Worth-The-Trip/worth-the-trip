@@ -250,6 +250,7 @@
         <nav class="menu-list">
           <button class="menu-item" data-page="explore" data-i18n="menu.explore">Explore</button>
           <button class="menu-item" data-page="my-guides" data-i18n="menu.myTrips">My Trips</button>
+          <button class="menu-item" id="menu-travel-dates" data-i18n="menu.travelDates">Travel dates</button>
           <button class="menu-item" data-page="saved" data-i18n="menu.saved">Saved</button>
           <button class="menu-item" data-page="translator" data-i18n="menu.translator">Translator</button>
           <button class="menu-item" id="menu-creator-apply" data-page="creator" data-i18n="menu.creator">Become a Creator</button>
@@ -352,6 +353,29 @@
         <p class="page-text" data-i18n="welcome.body">To get you started, your first guide is on us. Pick any guide and unlock it for free.</p>
         <button class="btn-primary" id="welcome-cta"><span class="btn-label" data-i18n="welcome.cta">Unlock my first guide free</span></button>
         <button class="btn-ghost" id="welcome-later"><span data-i18n="welcome.later">Maybe later</span></button>
+      </div>
+    </div>
+
+    <!-- Travel dates picker (first visit) -->
+    <div id="dates-modal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-sheet">
+        <button id="dates-close" class="modal-close" aria-label="Close"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <div class="modal-body">
+          <h2 class="modal-title" data-i18n="dates.title">When are you in Japan?</h2>
+          <p class="page-text" data-i18n="dates.body">We'll show guides that match your dates and pre-fill hotel booking forms.</p>
+          <div class="dates-row">
+            <div class="field">
+              <label class="field-label" for="date-start" data-i18n="dates.start">Arrival</label>
+              <input type="date" id="date-start" class="field-input">
+            </div>
+            <div class="field">
+              <label class="field-label" for="date-end" data-i18n="dates.end">Departure</label>
+              <input type="date" id="date-end" class="field-input">
+            </div>
+          </div>
+          <button class="btn-primary" id="dates-save" style="margin-top:16px"><span class="btn-label" data-i18n="dates.save">Save dates</span></button>
+          <button class="btn-ghost" id="dates-skip" style="margin-top:8px"><span data-i18n="dates.skip">Skip for now</span></button>
+        </div>
       </div>
     </div>
 

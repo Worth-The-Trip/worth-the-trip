@@ -15,6 +15,8 @@
     activeGuideId: null,
     selectedHotelIdx: -1,
     tripsDetailId: null,
+    travelStart: null,
+    travelEnd: null,
     unlockedGuides: loadUnlocked(),
     savedGuides: loadSavedGuides(),
     activeFilter: 'all',
@@ -112,6 +114,12 @@
     modalYoutube: $('#modal-youtube'),
     modalBody: document.querySelector('.modal-body'),
     toast: $('#toast'),
+    datesModal: $('#dates-modal'),
+    dateStart: $('#date-start'),
+    dateEnd: $('#date-end'),
+    datesSave: $('#dates-save'),
+    datesSkip: $('#dates-skip'),
+    datesClose: $('#dates-close'),
     brandLogo: $('#brand-logo'),
     modalStartBtn: $('#modal-start-btn'),
     navBanner: $('#nav-banner'),
@@ -267,6 +275,55 @@
 
   function stayLabel(s) {
     return lang() === 'ja' ? (STAY_LABELS_JA[s] || s) : (STAY_LABELS[s] || s);
+  }
+
+  const TRAVEL_DATES_KEY = 'wtt_travel_dates';
+
+  function loadTravelDates() {
+    try {
+      const raw = localStorage.getItem(TRAVEL_DATES_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && parsed.start && parsed.end ? parsed : {};
+    } catch (e) { return {}; }
+  }
+
+  function saveTravelDates(start, end) {
+    try {
+      localStorage.setItem(TRAVEL_DATES_KEY, JSON.stringify({ start, end }));
+    } catch (e) {}
+  }
+
+  function applyTravelDates(start, end) {
+    state.travelStart = start || null;
+    state.travelEnd = end || null;
+    saveTravelDates(state.travelStart, state.travelEnd);
+  }
+
+  function showDatesModal() {
+    if (!els.datesModal) return;
+    const saved = loadTravelDates();
+    if (saved.start) els.dateStart.value = saved.start;
+    if (saved.end) els.dateEnd.value = saved.end;
+    els.datesModal.classList.add('active');
+    els.datesModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function hideDatesModal() {
+    if (!els.datesModal) return;
+    els.datesModal.classList.remove('active');
+    els.datesModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  function showDatesModalIfFirstVisit() {
+    const saved = loadTravelDates();
+    if (!saved.start || !saved.end) {
+      setTimeout(() => showDatesModal(), 300);
+    } else {
+      applyTravelDates(saved.start, saved.end);
+    }
   }
 
   function priceTierLabel(tier) {
@@ -434,6 +491,25 @@
       }
       return true;
     });
+
+    // Sort by season relevance if travel dates are set.
+    if (state.travelStart && state.travelEnd) {
+      const start = new Date(state.travelStart + 'T00:00:00');
+      const end = new Date(state.travelEnd + 'T00:00:00');
+      const months = new Set();
+      const d = new Date(start);
+      while (d <= end) {
+        months.add(d.toLocaleString('en-US', { month: 'short' }).toLowerCase().slice(0, 3));
+        d.setDate(d.getDate() + 1);
+      }
+      const monthArr = Array.from(months);
+      result.sort((a, b) => {
+        const aMatch = (a.season || []).some(s => monthArr.includes(s)) ? 1 : 0;
+        const bMatch = (b.season || []).some(s => monthArr.includes(s)) ? 1 : 0;
+        return bMatch - aMatch;
+      });
+    }
+
     console.log('[WTT] filteredGuides: ' + result.length + ' guides visible (filter="' + state.activeFilter + '", search="' + state.searchQuery + '")');
     return result;
   }
@@ -788,21 +864,33 @@
     showHotelPins(guide, hotelIdx);
   }
 
+  function buildStay22Link(baseUrl, checkIn, checkOut) {
+    const url = new URL(baseUrl, window.location.origin);
+    const start = state.travelStart || checkIn;
+    const end = state.travelEnd || checkOut;
+    if (start) url.searchParams.set('checkin', start);
+    if (end) url.searchParams.set('checkout', end);
+    return url.toString().replace(window.location.origin, '');
+  }
+
   function updateHotelCard(guide, hotelIdx) {
     const card = document.getElementById('hotel-rec-card-' + guide.id);
     if (!card || !guide.hotelRec) return;
     const hotel = hotelIdx === -1 ? guide.hotelRec.recommended : guide.hotelRec.alternatives[hotelIdx];
     const rec = guide.hotelRec.recommended;
+    const checkIn = hotel.checkIn || rec.checkIn;
+    const checkOut = hotel.checkOut || rec.checkOut;
+    const link = buildStay22Link(hotel.stay22Link, checkIn, checkOut);
     card.innerHTML =
       '<img src="' + (hotel.image || rec.image) + '" alt="' + hotel.name + '" class="hotel-rec-img">' +
       '<div class="hotel-rec-info">' +
         '<div class="hotel-rec-name">' + hotel.name + '</div>' +
         '<div class="hotel-rec-address">' + (hotel.address || rec.address) + '</div>' +
         '<div class="hotel-rec-meta">' +
-          '<span>📅 ' + (hotel.checkIn || rec.checkIn) + ' → ' + (hotel.checkOut || rec.checkOut) + '</span>' +
+          '<span>📅 ' + (state.travelStart || checkIn) + ' → ' + (state.travelEnd || checkOut) + '</span>' +
           '<span>👤 ' + (hotel.guests || rec.guests) + ' ' + t('hotelRec.guests') + '</span>' +
         '</div>' +
-        '<a href="' + hotel.stay22Link + '" target="_blank" rel="noopener" class="btn-primary book-btn">' +
+        '<a href="' + link + '" target="_blank" rel="noopener" class="btn-primary book-btn">' +
           '<span class="btn-label">' + t('hotelRec.book') + '</span>' +
           '<span class="btn-sub">' + t('hotelRec.affiliateNote') + '</span>' +
         '</a>' +
@@ -828,12 +916,12 @@
       type: 'hotel',
       title: hotel.name,
       location: hotel.address || rec.address,
-      dateStart: hotel.checkIn || rec.checkIn,
-      dateEnd: hotel.checkOut || rec.checkOut,
+      dateStart: state.travelStart || hotel.checkIn || rec.checkIn,
+      dateEnd: state.travelEnd || hotel.checkOut || rec.checkOut,
       reference: '',
       image: hotel.image || rec.image,
       notes: 'Booked via Worth The Trip',
-      url: hotel.stay22Link
+      url: buildStay22Link(hotel.stay22Link, hotel.checkIn || rec.checkIn, hotel.checkOut || rec.checkOut)
     };
     saveUserBooking(booking);
     showToast(t('hotelRec.logged'), 'success');
@@ -842,6 +930,9 @@
   function hotelRecBlock(guide, guideId) {
     const rec = guide.hotelRec.recommended;
     const alts = guide.hotelRec.alternatives;
+    const checkIn = state.travelStart || rec.checkIn;
+    const checkOut = state.travelEnd || rec.checkOut;
+    const link = buildStay22Link(rec.stay22Link, rec.checkIn, rec.checkOut);
     let html =
       '<div class="section-label">' + t('hotelRec.title') + '</div>' +
       '<div class="hotel-rec-section" data-guide-id="' + guideId + '">' +
@@ -857,10 +948,10 @@
           '<div class="hotel-rec-name">' + rec.name + '</div>' +
           '<div class="hotel-rec-address">' + rec.address + '</div>' +
           '<div class="hotel-rec-meta">' +
-            '<span>📅 ' + rec.checkIn + ' → ' + rec.checkOut + '</span>' +
+            '<span>📅 ' + checkIn + ' → ' + checkOut + '</span>' +
             '<span>👤 ' + rec.guests + ' ' + t('hotelRec.guests') + '</span>' +
           '</div>' +
-          '<a href="' + rec.stay22Link + '" target="_blank" rel="noopener" class="btn-primary book-btn">' +
+          '<a href="' + link + '" target="_blank" rel="noopener" class="btn-primary book-btn">' +
             '<span class="btn-label">' + t('hotelRec.book') + '</span>' +
             '<span class="btn-sub">' + t('hotelRec.affiliateNote') + '</span>' +
           '</a>' +
@@ -2295,6 +2386,10 @@
         openMenuPage(item.dataset.page);
       });
     });
+    $('#menu-travel-dates').addEventListener('click', () => {
+      closeMenu();
+      showDatesModal();
+    });
     refreshCreatorMenu();
     $('#menu-page-close').addEventListener('click', closeMenuPage);
     $('#menu-page').addEventListener('click', (e) => {
@@ -2357,14 +2452,19 @@
       showToast(t('toast.welcome'), 'success');
       let welcomed = false;
       try { welcomed = localStorage.getItem(WELCOMED_KEY) === '1'; } catch (e) {}
-      // If the account already claimed its free guide on the server, the offer
-      // is spent — don't show the popup again on this device either.
       if (freeClaimReady) {
         try {
           await Promise.race([freeClaimReady, new Promise((r) => setTimeout(r, 1500))]);
         } catch (e) {}
       }
-      if (!welcomed && !state.freeUnlocked) showWelcome();
+      // Show dates picker first, then welcome modal after it's dismissed.
+      const savedDates = loadTravelDates();
+      if (!savedDates.start || !savedDates.end) {
+        showDatesModal();
+      } else {
+        applyTravelDates(savedDates.start, savedDates.end);
+        if (!welcomed && !state.freeUnlocked) showWelcome();
+      }
     }, 600);
 
     $('#welcome-cta').addEventListener('click', () => {
@@ -2374,6 +2474,37 @@
       openTripsPage();
     });
     $('#welcome-later').addEventListener('click', hideWelcome);
+
+    // -------- Dates picker --------
+    $('#dates-save').addEventListener('click', () => {
+      const start = els.dateStart.value;
+      const end = els.dateEnd.value;
+      if (start && end && end >= start) {
+        applyTravelDates(start, end);
+        hideDatesModal();
+        showToast(t('dates.saved'), 'success');
+        refreshMapMarkers();
+        // Refresh any open guide modal / panel with updated dates.
+        if (state.activeGuideId && guideById(state.activeGuideId) && guideById(state.activeGuideId).hotelRec) {
+          updateHotelCard(guideById(state.activeGuideId), state.selectedHotelIdx);
+        }
+      } else if (start && end) {
+        showToast('End date must be after start date', 'success');
+      }
+    });
+    $('#dates-skip').addEventListener('click', () => {
+      hideDatesModal();
+      // After skipping, show welcome if still applicable.
+      let welcomed = false;
+      try { welcomed = localStorage.getItem(WELCOMED_KEY) === '1'; } catch (e) {}
+      if (!welcomed && !state.freeUnlocked) showWelcome();
+    });
+    $('#dates-close').addEventListener('click', () => {
+      hideDatesModal();
+      let welcomed = false;
+      try { welcomed = localStorage.getItem(WELCOMED_KEY) === '1'; } catch (e) {}
+      if (!welcomed && !state.freeUnlocked) showWelcome();
+    });
   }
 
   // -------- Menu drawer + pages --------
