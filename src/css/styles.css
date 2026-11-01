@@ -2377,7 +2377,6 @@ body {
 .nav-panel .timeline-item.past {
   opacity: 0.35 !important;
   filter: grayscale(60%) !important;
-  pointer-events: none;
   transition: opacity 0.4s ease, filter 0.4s ease;
 }
 

@@ -1326,6 +1326,17 @@
         startGuideNav(guideId, tidx);
       });
     });
+
+    // Clicking a collapsed past step re-expands it and everything after it.
+    body.addEventListener('click', (e) => {
+      const pastItem = e.target.closest('.timeline-item.past');
+      if (!pastItem) return;
+      const allItems = Array.from(body.querySelectorAll('.timeline-item'));
+      const startIdx = allItems.indexOf(pastItem);
+      if (startIdx === -1) return;
+      allItems.slice(startIdx).forEach(el => el.classList.remove('past'));
+      pastItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }
 
   function clearNavPanel() {
