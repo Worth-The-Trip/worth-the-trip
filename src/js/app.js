@@ -804,6 +804,7 @@
   // -------- Update pin positions when map moves --------
   function onMapMove() {
     state.pinElements.forEach(p => {
+      if (p.hidden) return;
       positionPin(p.svg, p.lngLat);
     });
     state.hotelPinElements.forEach(p => {
@@ -824,12 +825,14 @@
 
   function hideGuidePins() {
     state.pinElements.forEach(p => {
+      p.hidden = true;
       if (p.svg) p.svg.style.display = 'none';
     });
   }
 
   function showGuidePins() {
     state.pinElements.forEach(p => {
+      p.hidden = false;
       if (p.svg) p.svg.style.display = 'block';
     });
   }
