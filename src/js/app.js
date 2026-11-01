@@ -1687,7 +1687,12 @@
     }
 
     // Per-guide: Unlock Guide button (guideId is in scope here — openGuideModal).
-    els.modalUnlockBtn.addEventListener('click', () => attemptUnlock(guideId));
+    els.modalUnlockBtn.addEventListener('click', () => {
+      if (attemptUnlock(guideId)) {
+        // Free unlock succeeded — refresh the modal to show the unlocked guide.
+        openGuideModal(guideId);
+      }
+    });
 
     els.modalOverlay.classList.add('active');
     els.modalOverlay.setAttribute('aria-hidden', 'false');
