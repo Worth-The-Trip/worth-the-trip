@@ -822,6 +822,18 @@
     state.hotelPinElements = [];
   }
 
+  function hideGuidePins() {
+    state.pinElements.forEach(p => {
+      if (p.svg) p.svg.style.display = 'none';
+    });
+  }
+
+  function showGuidePins() {
+    state.pinElements.forEach(p => {
+      if (p.svg) p.svg.style.display = 'block';
+    });
+  }
+
   function showHotelPins(guide, selectedIdx) {
     clearHotelPins();
     if (!guide.hotelRec || !state.mapOverlay) return;
@@ -857,13 +869,12 @@
   }
 
   // -------- Numbered step pins --------
-  function buildStepPin(number) {
-    const size = 30;
+  function buildStepPin(number, stepIndex) {
+    const size = 34;
     const svg = document.createElement('img');
-    // URL-encode # as %23 for data URI safety.
     const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 52">' +
-      '<path d="M20 0C9.06 0 0 8.78 0 19.6c0 13.58 20 32.4 20 32.4S40 33.18 40 19.6C40 8.78 30.94 0 20 0z" fill="%23D32F2F" stroke="%23fff" stroke-width="2"/>' +
-      '<text x="20" y="27" text-anchor="middle" fill="%23fff" font-size="15" font-weight="700" font-family="Inter,sans-serif">' + number + '</text>' +
+      '<path d="M20 0C9.06 0 0 8.78 0 19.6c0 13.58 20 32.4 20 32.4S40 33.18 40 19.6C40 8.78 30.94 0 20 0z" fill="%23D32F2F"/>' +
+      '<text x="20" y="27" text-anchor="middle" fill="%23fff" font-size="18" font-weight="700" font-family="Inter,sans-serif">' + number + '</text>' +
       '</svg>';
     svg.src = 'data:image/svg+xml,' + svgMarkup;
     svg.alt = 'Step ' + number;
@@ -874,10 +885,10 @@
     svg.style.transform = 'translate(-' + (size / 2) + 'px, -' + (size * 52 / 40) + 'px)';
     svg.style.pointerEvents = 'auto';
     svg.style.cursor = 'pointer';
+    svg.style.zIndex = '15';
     svg.addEventListener('click', (e) => {
       e.stopPropagation();
     });
-    svg.style.zIndex = '15';
     return svg;
   }
 
@@ -887,9 +898,9 @@
     const stops = navStops(guide);
     stops.forEach((stop, idx) => {
       if (!Array.isArray(stop.mapPin)) return;
-      const pin = buildStepPin(idx + 1);
+      const pin = buildStepPin(idx + 1, idx);
       state.mapOverlay.appendChild(pin);
-      state.stepPinElements.push({ svg: pin, lngLat: [stop.mapPin[1], stop.mapPin[0]] });
+      state.stepPinElements.push({ svg: pin, lngLat: [stop.mapPin[1], stop.mapPin[0]], stepIndex: idx });
       if (state.map) positionPin(pin, [stop.mapPin[1], stop.mapPin[0]]);
     });
   }
@@ -1114,6 +1125,15 @@
         el.classList.add('past');
       } else {
         el.classList.remove('past');
+      }
+    });
+
+    // Fade previous step pins on the map.
+    state.stepPinElements.forEach(p => {
+      if (p.stepIndex < currentTidx) {
+        p.svg.style.opacity = '0.2';
+      } else {
+        p.svg.style.opacity = '1';
       }
     });
 
@@ -1384,6 +1404,14 @@
       const startIdx = allItems.indexOf(pastItem);
       if (startIdx === -1) return;
       allItems.slice(startIdx).forEach(el => el.classList.remove('past'));
+      
+      // Restore step pin opacity for re-expanded steps.
+      state.stepPinElements.forEach(p => {
+        if (p.stepIndex >= startIdx) {
+          p.svg.style.opacity = '1';
+        }
+      });
+      
       pastItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
@@ -1462,6 +1490,7 @@
     state.activeGuideId = guideId;
     renderNavPanel(guideId);
     showStepPins(guide);
+    hideGuidePins();
     // Collapse past steps after the nav panel HTML is in the DOM and painted.
     if (startStopIndex != null) {
       requestAnimationFrame(() => collapsePastSteps(guideId, startStopIndex));
@@ -1509,6 +1538,7 @@
     // Clear collapsed/past state when nav ends.
     document.querySelectorAll('.timeline-item.past').forEach(el => el.classList.remove('past'));
     clearStepPins();
+    showGuidePins();
     if (!silent) showToast(t('toast.navEnd'), 'success');
   }
 
