@@ -2846,7 +2846,7 @@ body.nav-split .nav-banner {
   gap: var(--space-md);
   padding: 0 var(--space-lg);
   padding-bottom: calc(56px + var(--space-lg));
-  align-items: start;
+  align-items: stretch;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -2874,11 +2874,10 @@ body.nav-split .nav-banner {
 }
 .creator-card-main {
   flex: 1;
-  min-width: 0;
-  width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  min-width: 0;
+  width: 100%;
   gap: 8px;
 }
 .creator-card-toprow {
@@ -2918,6 +2917,7 @@ body.nav-split .nav-banner {
 .creator-card-actions {
   width: 100%;
   flex-direction: column;
+  margin-top: auto;
 }
 @media (max-width: 900px) {
   .creators-list {
