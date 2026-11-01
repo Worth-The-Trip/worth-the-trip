@@ -1392,9 +1392,9 @@
     $('#popular-sheet').classList.add('hidden');
     state.activeGuideId = guideId;
     renderNavPanel(guideId);
-    // Collapse past steps immediately after the nav panel HTML is in the DOM.
+    // Collapse past steps after the nav panel HTML is in the DOM and painted.
     if (startStopIndex != null) {
-      collapsePastSteps(guideId, startStopIndex);
+      requestAnimationFrame(() => collapsePastSteps(guideId, startStopIndex));
     }
     setSplitView(true);
     els.navBanner.style.display = 'flex';

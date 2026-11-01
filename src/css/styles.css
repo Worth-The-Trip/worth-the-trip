@@ -2345,6 +2345,17 @@ body {
 
 .nav-panel .timeline-start-btn {
   display: inline-flex; /* visible in nav panel during active navigation */
+  flex-shrink: 0;
+  padding: 3px 10px;
+  background: var(--vermilion);
+  color: var(--warm-white);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background var(--duration-fast);
 }
 
 .timeline-start-btn:hover {
@@ -2353,8 +2364,8 @@ body {
 
 /* -------- Collapsed past steps during navigation -------- */
 .nav-panel .timeline-item.past {
-  opacity: 0.35;
-  filter: grayscale(60%);
+  opacity: 0.35 !important;
+  filter: grayscale(60%) !important;
   pointer-events: none;
 }
 
@@ -2362,11 +2373,11 @@ body {
 .nav-panel .timeline-item.past .timeline-meta,
 .nav-panel .timeline-item.past .timeline-thumb,
 .nav-panel .timeline-item.past .nearby-strip {
-  display: none;
+  display: none !important;
 }
 
 .nav-panel .timeline-item.past .timeline-start-btn {
-  display: none;
+  display: none !important;
 }
 
 /* -------- Hotel stay timeline step -------- */
