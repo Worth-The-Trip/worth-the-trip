@@ -1512,20 +1512,19 @@
       onNavError(e);
     }
 
-    // Center between user location and target step when starting from a specific step.
+    // Center map to show both user location and target step.
     const stops = navStops(guide);
     const target = stops[state.nav.stopIndex];
     if (state.map) {
-      if (startStopIndex != null && target) {
-        if (state.nav.userLngLat) {
-          const midLng = (state.nav.userLngLat[1] + target.mapPin[1]) / 2;
-          const midLat = (state.nav.userLngLat[0] + target.mapPin[0]) / 2;
-          state.map.flyTo({ center: [midLng, midLat], zoom: 14, duration: 1.2 });
-        } else {
-          showToast(t('nav.locating'), 'success');
-        }
+      if (startStopIndex != null && target && state.nav.userLngLat) {
+        const bounds = new maplibregl.LngLatBounds();
+        bounds.extend([state.nav.userLngLat[0], state.nav.userLngLat[1]]);
+        bounds.extend([target.mapPin[1], target.mapPin[0]]);
+        state.map.fitBounds(bounds, { padding: { top: 120, bottom: 160, left: 60, right: 60 }, maxZoom: 15, duration: 1.2 });
       } else if (stops.length > 0 && target) {
         state.map.flyTo({ center: [target.mapPin[1], target.mapPin[0]], zoom: 14, duration: 1.6 });
+      } else if (startStopIndex != null) {
+        showToast(t('nav.locating'), 'success');
       }
     }
   }
