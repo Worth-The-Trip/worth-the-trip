@@ -1052,6 +1052,20 @@
     updateNavRoute();
   }
 
+  function collapsePastSteps(guideId, currentTidx) {
+    // Grey out and collapse timeline items before the current step.
+    const items = document.querySelectorAll('.timeline-item');
+    items.forEach(el => {
+      const tidxAttr = el.querySelector('.timeline-start-btn')?.dataset.tidx;
+      const tidx = tidxAttr != null ? parseInt(tidxAttr, 10) : NaN;
+      if (!isNaN(tidx) && tidx < currentTidx) {
+        el.classList.add('past');
+      } else {
+        el.classList.remove('past');
+      }
+    });
+  }
+
   function navTarget() {
     const guide = guideById(state.nav.guideId);
     if (!guide) return null;
@@ -1377,6 +1391,8 @@
     setSplitView(false);
     resetNavState();
     if (els.navBanner) els.navBanner.style.display = 'none';
+    // Clear collapsed/past state when nav ends.
+    document.querySelectorAll('.timeline-item.past').forEach(el => el.classList.remove('past'));
     if (!silent) showToast(t('toast.navEnd'), 'success');
   }
 
@@ -1421,14 +1437,15 @@
           <span class="timeline-time">${item.time}</span>
           <div class="timeline-row">
             <div class="timeline-text">
-              <div class="timeline-title">${item._tTitle}</div>
+              <div class="timeline-title-row">
+                <div class="timeline-title">${item._tTitle}</div>
+                <button class="timeline-start-btn" data-pin='${JSON.stringify(item.mapPin)}' data-tidx="${i}" aria-label="Start navigation to ${item._tTitle}">
+                  ${t('nav.startBtn')}
+                </button>
+              </div>
               <div class="timeline-desc">${item._tDesc}</div>
               <div class="timeline-meta">
                 <span>${travelIcon(item.travelTime)} ${item.travelTime}</span>
-                <button class="timeline-meta-btn" data-pin='${JSON.stringify(item.mapPin)}' data-tidx="${i}" aria-label="Show on map">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.5 12 12 16.5 7.5 12 12 7.5"/></svg>
-                  ${t('nav.mapBtn')}
-                </button>
               </div>
               ${nearbyStripHtml(guide, i)}
             </div>
@@ -1489,6 +1506,9 @@
   function openGuideModal(guideId) {
     const guide = guideById(guideId);
     if (!guide) return;
+
+    // Clear any collapsed/past state from previous navigation.
+    document.querySelectorAll('.timeline-item.past').forEach(el => el.classList.remove('past'));
 
     state.activeGuideId = guideId;
     const unlocked = isGuideUnlocked(guideId);
@@ -3245,6 +3265,26 @@
         retargetNavToStop(guideById(guideId), parseInt(btn.dataset.tidx, 10));
         const titleEl = btn.closest('.timeline-item')?.querySelector('.timeline-title') || btn.querySelector('.sub-dest-card-title');
         showToast(t('toast.flyingTo') + ' ' + (titleEl ? titleEl.textContent : 'location'), 'success');
+      });
+    });
+
+    // Start navigation from a specific timeline step.
+    all.querySelectorAll('.timeline-start-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pin = JSON.parse(btn.dataset.pin);
+        const tidx = parseInt(btn.dataset.tidx, 10);
+        const guide = guideById(guideId);
+        if (!guide) return;
+
+        // Center map on user location and start nav to this stop.
+        if (state.map && state.nav.userLngLat) {
+          state.map.flyTo({ center: [state.nav.userLngLat[1], state.nav.userLngLat[0]], zoom: 15, duration: 1.2 });
+        }
+        startGuideNav(guideId);
+        // After nav starts, retarget to the tapped stop.
+        setTimeout(() => retargetNavToStop(guide, tidx), 300);
+        collapsePastSteps(guideId, tidx);
       });
     });
 

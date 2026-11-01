@@ -257,6 +257,7 @@ const WTT_STRINGS = {
     'nav.navigate': 'Navigate',
     'nav.end': 'End',
     'nav.mapBtn': 'Map',
+    'nav.startBtn': 'Start',
     'nav.allTrips': 'All trips',
 
     // ------------------------------------------------------------------
@@ -528,6 +529,7 @@ const WTT_STRINGS = {
     'nav.navigate': 'ナビ',
     'nav.end': '終了',
     'nav.mapBtn': '地図',
+    'nav.startBtn': '開始',
     'nav.allTrips': '旅行一覧',
 
     // ------------------------------------------------------------------

@@ -2331,6 +2331,42 @@ body {
   color: var(--text-primary);
 }
 
+/* -------- Start button in timeline title row -------- */
+.timeline-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.timeline-start-btn {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  background: var(--vermilion);
+  color: var(--warm-white);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+
+.timeline-start-btn:hover {
+  background: var(--vermilion-deep);
+}
+
+/* -------- Collapsed past steps during navigation -------- */
+.timeline-item.past {
+  opacity: 0.35;
+  filter: grayscale(60%);
+  pointer-events: none;
+}
+
+.timeline-item.past .timeline-start-btn {
+  display: none;
+}
+
 /* -------- Hotel stay timeline step -------- */
 .timeline-hotel {
   background: var(--surface-raised);
