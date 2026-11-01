@@ -12,6 +12,7 @@
     mapOverlay: null,
     pinElements: [],
     hotelPinElements: [],
+    stepPinElements: [],
     activeGuideId: null,
     selectedHotelIdx: -1,
     tripsDetailId: null,
@@ -808,6 +809,9 @@
     state.hotelPinElements.forEach(p => {
       positionPin(p.svg, p.lngLat);
     });
+    state.stepPinElements.forEach(p => {
+      positionPin(p.svg, p.lngLat);
+    });
     positionNavDot();
   }
 
@@ -850,6 +854,50 @@
       state.hotelPinElements.push({ svg, lngLat: [hotel.coordinates[1], hotel.coordinates[0]] });
       if (state.map) positionPin(svg, [hotel.coordinates[1], hotel.coordinates[0]]);
     });
+  }
+
+  // -------- Numbered step pins --------
+  function buildStepPin(number) {
+    const size = 30;
+    const svg = document.createElement('img');
+    const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 52">' +
+      '<path d="M20 0C9.06 0 0 8.78 0 19.6c0 13.58 20 32.4 20 32.4S40 33.18 40 19.6C40 8.78 30.94 0 20 0z" fill="#D32F2F" stroke="#fff" stroke-width="2"/>' +
+      '<text x="20" y="26" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="Inter,sans-serif">' + number + '</text>' +
+      '</svg>';
+    svg.src = 'data:image/svg+xml,' + svgMarkup;
+    svg.alt = 'Step ' + number;
+    svg.className = 'step-pin';
+    svg.style.position = 'absolute';
+    svg.style.width = size + 'px';
+    svg.style.height = (size * 52 / 40) + 'px';
+    svg.style.transform = 'translate(-' + (size / 2) + 'px, -' + (size * 52 / 40) + 'px)';
+    svg.style.pointerEvents = 'auto';
+    svg.style.cursor = 'pointer';
+    svg.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+    svg.style.zIndex = '15';
+    return svg;
+  }
+
+  function showStepPins(guide) {
+    clearStepPins();
+    if (!guide || !state.mapOverlay) return;
+    const stops = navStops(guide);
+    stops.forEach((stop, idx) => {
+      if (!Array.isArray(stop.mapPin)) return;
+      const pin = buildStepPin(idx + 1);
+      state.mapOverlay.appendChild(pin);
+      state.stepPinElements.push({ svg: pin, lngLat: [stop.mapPin[1], stop.mapPin[0]] });
+      if (state.map) positionPin(pin, [stop.mapPin[1], stop.mapPin[0]]);
+    });
+  }
+
+  function clearStepPins() {
+    state.stepPinElements.forEach(p => {
+      if (p.svg && p.svg.parentNode) p.svg.parentNode.removeChild(p.svg);
+    });
+    state.stepPinElements = [];
   }
 
   function selectHotelInGuide(guideId, hotelIdx) {
@@ -1412,6 +1460,7 @@
     $('#popular-sheet').classList.add('hidden');
     state.activeGuideId = guideId;
     renderNavPanel(guideId);
+    showStepPins(guide);
     // Collapse past steps after the nav panel HTML is in the DOM and painted.
     if (startStopIndex != null) {
       requestAnimationFrame(() => collapsePastSteps(guideId, startStopIndex));
@@ -1458,6 +1507,7 @@
     if (els.navBanner) els.navBanner.style.display = 'none';
     // Clear collapsed/past state when nav ends.
     document.querySelectorAll('.timeline-item.past').forEach(el => el.classList.remove('past'));
+    clearStepPins();
     if (!silent) showToast(t('toast.navEnd'), 'success');
   }
 
@@ -1738,6 +1788,7 @@
     document.body.style.overflow = '';
     state.activeGuideId = null;
     clearHotelPins();
+    clearStepPins();
   }
 
   // -------- Profile panel (local MVP — no backend yet) --------
@@ -3476,6 +3527,7 @@
     if (panel) panel.innerHTML = '';
     $('#guide-panel').setAttribute('aria-hidden', 'true');
     clearHotelPins();
+    clearStepPins();
     if (state.map) {
       try { state.map.resize(); } catch (e) {}
       setTimeout(() => { try { state.map.resize(); } catch (e) {} }, 350);
@@ -3585,6 +3637,7 @@
     $('#trips-page').classList.remove('open');
     $('#trips-page').setAttribute('aria-hidden', 'true');
     clearHotelPins();
+    clearStepPins();
     $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === 'explore'));
   }
 
