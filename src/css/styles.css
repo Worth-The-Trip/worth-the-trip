@@ -2331,6 +2331,63 @@ body {
   color: var(--text-primary);
 }
 
+/* -------- Hotel stay timeline step -------- */
+.timeline-hotel {
+  background: var(--surface-raised);
+  border: 1px solid var(--vermilion-deep);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) 40px;
+  margin: var(--space-sm) 0;
+  position: relative;
+}
+
+.timeline-dot-hotel {
+  background: var(--vermilion-deep);
+  font-size: 14px;
+  width: 16px;
+  height: 16px;
+  text-align: center;
+  line-height: 16px;
+  box-shadow: 0 0 0 2px var(--vermilion-deep);
+}
+
+.timeline-hotel .timeline-title {
+  color: var(--warm-white);
+}
+
+.timeline-hotel .timeline-thumb {
+  width: 90px;
+  height: 70px;
+  border-color: var(--vermilion-deep);
+}
+
+.hotel-affiliate-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.timeline-book-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: var(--vermilion);
+  color: var(--warm-white);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--duration-fast);
+}
+
+.timeline-book-btn:hover {
+  background: var(--vermilion-deep);
+}
+
 /* Sub-destinations grid */
 .sub-dest-grid {
   display: grid;

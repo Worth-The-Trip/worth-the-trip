@@ -191,7 +191,7 @@ const WTT_GUIDES = [
         "name": "Park Hyatt Tokyo",
         "address": "Shinjuku, Tokyo",
         "coordinates": [35.6895, 139.6917],
-        "image": "public/Guide Images/WTT - Tokyo City Explorer/cover-web.jpg",
+        "image": "public/Guide Images/WTT - Tokyo City Explorer/Cover-web.jpg",
         "checkIn": "2025-04-01",
         "checkOut": "2025-04-04",
         "guests": 2,
@@ -201,7 +201,13 @@ const WTT_GUIDES = [
         { "name": "Keio Plaza Hotel Tokyo", "stay22Link": "https://allez.stay22.com/hotel/keio-plaza-tokyo" },
         { "name": "Shinjuku Granbell Hotel", "stay22Link": "https://allez.stay22.com/hotel/shinjuku-granbell" },
         { "name": "Tokyo Marriott", "stay22Link": "https://allez.stay22.com/hotel/tokyo-marriott" }
-      ]
+      ],
+      "hotelStay": {
+        "afterIndex": 5,
+        "day": 1,
+        "time": "19:30",
+        "title": "Check in — Park Hyatt Tokyo"
+      }
     }
   },
   {

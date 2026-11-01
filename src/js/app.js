@@ -870,7 +870,7 @@
     const end = state.travelEnd || checkOut;
     if (start) url.searchParams.set('checkin', start);
     if (end) url.searchParams.set('checkout', end);
-    return url.toString().replace(window.location.origin, '');
+    return url.toString();
   }
 
   function updateHotelCard(guide, hotelIdx) {
@@ -1392,9 +1392,10 @@
       if (!group) { group = { day, indexes: [] }; days.push(group); }
       group.indexes.push(i);
     });
+    const hotel = guide.hotelRec && guide.hotelRec.hotelStay;
     return days.map(group => {
       const route = group.indexes.map(i => shortStopName(items[i]._tTitle)).filter(Boolean).join(' → ');
-      return `
+      let html = `
       <div class="timeline-day"><span class="timeline-day-num">${dayLabel(group.day)}</span><span class="timeline-day-route">${route}</span></div>
       ` + group.indexes.map(i => {
         const item = items[i];
@@ -1419,6 +1420,31 @@
           </div>
         </div>`;
       }).join('');
+
+      // Inject the hotel stay as a literal timeline step after the configured index.
+      if (hotel && group.indexes.includes(hotel.afterIndex)) {
+        const hr = guide.hotelRec;
+        const dates = hr.checkIn && hr.checkOut ? `<span>📅 ${hr.checkIn} → ${hr.checkOut} · ${hr.guests} ${t('hotelRec.guests').toLowerCase()}</span>` : '';
+        html += `
+        <div class="timeline-item timeline-hotel">
+          <div class="timeline-dot timeline-dot-hotel">🛏</div>
+          <span class="timeline-time">${hotel.time}</span>
+          <div class="timeline-row">
+            <div class="timeline-text">
+              <div class="timeline-title">${hotel.title}</div>
+              <div class="timeline-desc">${dates}</div>
+              <div class="timeline-meta">
+                <a class="timeline-meta-btn timeline-book-btn" href="${buildStay22Link(hr.recommended.stay22Link)}" target="_blank" rel="noopener noreferrer">
+                  ${t('hotelRec.book')}
+                </a>
+                ${t('hotelRec.affiliateNote') ? `<span class="hotel-affiliate-note">${t('hotelRec.affiliateNote')}</span>` : ''}
+              </div>
+            </div>
+            <img class="timeline-thumb" src="${hr.recommended.image}" alt="${hr.recommended.name}" loading="lazy" onerror="this.style.display='none'">
+          </div>
+        </div>`;
+      }
+      return html;
     }).join('');
   }
   function nearestTimelineIndex(subPin, timeline) {
@@ -1503,20 +1529,6 @@
     els.modalSubDests.style.display = 'none';
     els.modalSubDestGrid.style.display = 'none';
 
-    const creator = creatorById(guide.creatorId);
-    if (unlocked && creator) {
-      els.modalCreator.style.display = 'flex';
-      els.modalCreator.innerHTML = `
-        <img class="creator-avatar" src="${creator.avatar}" alt="${creator.name}" onerror="this.style.display='none'">
-        <div class="creator-info">
-          <div class="creator-name">${creator.name}</div>
-          <div class="creator-handle">${creatorText(creator, 'role')} · ${creator.handle}</div>
-        </div>
-      `;
-    } else {
-      els.modalCreator.style.display = 'none';
-    }
-
     if (unlocked && guide.youtubeRef) {
       els.modalYoutube.style.display = 'flex';
       els.modalYoutube.innerHTML = `
@@ -1534,17 +1546,22 @@
       els.modalYoutube.style.display = 'none';
     }
 
-    // Hotel recommendation block
-    const existingHotelBlock = $('#modal-hotel-block');
-    if (existingHotelBlock) existingHotelBlock.remove();
-    if (unlocked && guide.hotelRec) {
-      const hotelBlock = document.createElement('div');
-      hotelBlock.id = 'modal-hotel-block';
-      hotelBlock.innerHTML = hotelRecBlock(guide, guideId);
-      if (els.modalBody) {
-        els.modalBody.appendChild(hotelBlock);
-      }
+    // Creator signature box — always at the very bottom of the guide modal.
+    const creator = creatorById(guide.creatorId);
+    if (unlocked && creator) {
+      els.modalCreator.style.display = 'flex';
+      els.modalCreator.innerHTML = `
+        <img class="creator-avatar" src="${creator.avatar}" alt="${creator.name}" onerror="this.style.display='none'">
+        <div class="creator-info">
+          <div class="creator-name">${creator.name}</div>
+          <div class="creator-handle">${creatorText(creator, 'role')} · ${creator.handle}</div>
+        </div>
+      `;
+    } else {
+      els.modalCreator.style.display = 'none';
     }
+
+    // Hotel recommendation block is now rendered inside the timeline as a step.
 
     const isLocked = !unlocked;
     let lockedOverlay = els.modalHero.querySelector('.modal-locked-overlay');
@@ -3216,15 +3233,9 @@
       });
     });
 
-    // Hotel recommendation pills
-    const hotelSection = all.querySelector('.hotel-rec-section');
-    if (hotelSection) {
-      hotelSection.querySelectorAll('.hotel-rec-pill').forEach(pill => {
-        pill.addEventListener('click', () => {
-          const idx = parseInt(pill.dataset.hotelIdx, 10);
-          selectHotelInGuide(guideId, idx);
-        });
-      });
+    // Hotel recommendation pins (map markers) — still shown on map when guide is open.
+    if (guide.hotelRec && guide.hotelRec.recommended) {
+      showHotelPins(guideById(guideId) || guide, -1);
     }
   }
 
@@ -3278,12 +3289,25 @@
         <div class="timeline">${timelineHtml(guide)}</div>`;
     }
 
-    if (unlocked && guide.hotelRec) {
-      html += hotelRecBlock(guide, guideId);
-    }
+    // Hotel recommendation block is now rendered inside the timeline as a step.
 
     // Sub-destinations render inside the timeline as nearby strips (see above).
 
+    if (unlocked && guide.youtubeRef) {
+      html += `
+        <div class="section-label">${t('modal.youtube')}</div>
+        <a href="${guide.youtubeRef.url}" target="_blank" rel="noopener noreferrer" class="youtube-ref" style="display:flex">
+          <div class="youtube-icon">
+            <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          </div>
+          <div class="youtube-text">
+            <strong>${ytText(guide, 'title')}</strong>
+            ${ytText(guide, 'description')}
+          </div>
+        </a>`;
+    }
+
+    // Creator signature box — always at the very bottom of the guide detail.
     if (unlocked && creator) {
       html += `
         <div class="section-label">${t('modal.curatedBy')}</div>
@@ -3294,20 +3318,6 @@
             <div class="creator-handle">${creatorText(creator, 'role')} · ${creator.handle}</div>
           </div>
         </div>`;
-    }
-
-    if (unlocked && guide.youtubeRef) {
-      html += `
-        <div class="section-label">${t('modal.youtube')}</div>
-        <a href="${guide.youtubeRef.url}" target="_blank" rel="noopener noreferrer" class="youtube-ref" style="display:flex">
-          <div class="youtube-icon">
-            <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-          </div>
-          <div class="youtube-text">
-            <strong>${ytText(guide, 'title')}</strong>
-            ${ytText(guide, 'description')}
-          </div>
-        </a>`;
     }
 
     return html;
