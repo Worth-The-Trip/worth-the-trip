@@ -1054,22 +1054,9 @@
   }
 
   function collapsePastSteps(guideId, currentTidx) {
-    // Grey out and collapse timeline items before the current step.
-    // Scope to the nav panel body so we don't touch hidden modal timeline items.
+    // Scroll the current step to the top first, then fade out past steps.
     const body = $('#nav-panel-body');
     const container = body || document;
-    const items = container.querySelectorAll('.timeline-item');
-    items.forEach(el => {
-      const tidxAttr = el.querySelector('.timeline-start-btn')?.dataset.tidx;
-      const tidx = tidxAttr != null ? parseInt(tidxAttr, 10) : NaN;
-      if (!isNaN(tidx) && tidx < currentTidx) {
-        el.classList.add('past');
-      } else {
-        el.classList.remove('past');
-      }
-    });
-
-    // Scroll the current step to the top of the timeline view.
     const currentBtn = container.querySelector('.timeline-start-btn[data-tidx="' + currentTidx + '"]');
     if (currentBtn) {
       const timelineItem = currentBtn.closest('.timeline-item');
@@ -1077,6 +1064,20 @@
         timelineItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
+
+    // After the scroll settles, gently fade out past steps.
+    setTimeout(() => {
+      const items = container.querySelectorAll('.timeline-item');
+      items.forEach(el => {
+        const tidxAttr = el.querySelector('.timeline-start-btn')?.dataset.tidx;
+        const tidx = tidxAttr != null ? parseInt(tidxAttr, 10) : NaN;
+        if (!isNaN(tidx) && tidx < currentTidx) {
+          el.classList.add('past');
+        } else {
+          el.classList.remove('past');
+        }
+      });
+    }, 180);
   }
 
   function navTarget() {

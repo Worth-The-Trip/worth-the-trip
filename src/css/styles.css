@@ -1323,6 +1323,8 @@ body {
   padding-bottom: 2px;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  max-height: 60px;
+  transition: opacity 0.2s ease, max-height 0.25s ease;
 }
 
 .nearby-strip::-webkit-scrollbar {
@@ -2289,6 +2291,9 @@ body {
   border-radius: var(--radius-md);
   flex-shrink: 0;
   border: 1px solid var(--glass-border);
+  max-height: 120px;
+  transition: opacity 0.2s ease, max-height 0.25s ease;
+  overflow: hidden;
 }
 
 .timeline-title {
@@ -2301,6 +2306,9 @@ body {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.4;
+  max-height: 80px;
+  transition: opacity 0.2s ease, max-height 0.25s ease;
+  overflow: hidden;
 }
 
 .timeline-meta {
@@ -2309,6 +2317,9 @@ body {
   gap: var(--space-sm);
   font-size: 12px;
   color: var(--text-muted);
+  max-height: 30px;
+  transition: opacity 0.2s ease, max-height 0.25s ease;
+  overflow: hidden;
 }
 
 .timeline-meta-btn {
@@ -2367,13 +2378,20 @@ body {
   opacity: 0.35 !important;
   filter: grayscale(60%) !important;
   pointer-events: none;
+  transition: opacity 0.4s ease, filter 0.4s ease;
 }
 
 .nav-panel .timeline-item.past .timeline-desc,
 .nav-panel .timeline-item.past .timeline-meta,
 .nav-panel .timeline-item.past .timeline-thumb,
 .nav-panel .timeline-item.past .nearby-strip {
-  display: none !important;
+  opacity: 0;
+  max-height: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden;
 }
 
 .nav-panel .timeline-item.past .timeline-start-btn {
