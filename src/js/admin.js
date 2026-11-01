@@ -3,6 +3,9 @@
   const $ = (s) => document.querySelector(s);
   const TOAST_KEY = 'wtt_admin_token';
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let guidesCache = [];
+  let guideFilter = 'submitted';
+  let currentTab = 'users';
 
   function toast(msg) {
     const el = $('#toast');
