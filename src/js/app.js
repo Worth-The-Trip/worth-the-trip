@@ -1512,13 +1512,15 @@
       onNavError(e);
     }
 
-    // Center on user location when starting from a specific step; otherwise fly to first stop.
+    // Center between user location and target step when starting from a specific step.
     const stops = navStops(guide);
     const target = stops[state.nav.stopIndex];
     if (state.map) {
-      if (startStopIndex != null) {
+      if (startStopIndex != null && target) {
         if (state.nav.userLngLat) {
-          state.map.flyTo({ center: [state.nav.userLngLat[1], state.nav.userLngLat[0]], zoom: 15, duration: 1.2 });
+          const midLng = (state.nav.userLngLat[1] + target.mapPin[1]) / 2;
+          const midLat = (state.nav.userLngLat[0] + target.mapPin[0]) / 2;
+          state.map.flyTo({ center: [midLng, midLat], zoom: 14, duration: 1.2 });
         } else {
           showToast(t('nav.locating'), 'success');
         }
