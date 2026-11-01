@@ -191,16 +191,16 @@ const WTT_GUIDES = [
         "name": "Park Hyatt Tokyo",
         "address": "Shinjuku, Tokyo",
         "coordinates": [35.6895, 139.6917],
-        "image": "public/Guide Images/WTT - Tokyo City Explorer/Cover-web.jpg",
+        "image": "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&q=80",
         "checkIn": "2025-04-01",
         "checkOut": "2025-04-04",
         "guests": 2,
         "stay22Link": "https://booking.stay22.com/wtt/bx5aK8oQju"
       },
       "alternatives": [
-        { "name": "Keio Plaza Hotel Tokyo", "stay22Link": "https://allez.stay22.com/hotel/keio-plaza-tokyo" },
-        { "name": "Shinjuku Granbell Hotel", "stay22Link": "https://allez.stay22.com/hotel/shinjuku-granbell" },
-        { "name": "Tokyo Marriott", "stay22Link": "https://allez.stay22.com/hotel/tokyo-marriott" }
+        { "name": "Keio Plaza Hotel Tokyo", "image": "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400&q=80", "stay22Link": "https://allez.stay22.com/hotel/keio-plaza-tokyo" },
+        { "name": "Shinjuku Granbell Hotel", "image": "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=400&q=80", "stay22Link": "https://allez.stay22.com/hotel/shinjuku-granbell" },
+        { "name": "Tokyo Marriott", "image": "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400&q=80", "stay22Link": "https://allez.stay22.com/hotel/tokyo-marriott" }
       ],
       "hotelStay": {
         "afterIndex": 5,

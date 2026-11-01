@@ -2336,19 +2336,23 @@ body {
   background: var(--surface-raised);
   border: 1px solid var(--vermilion-deep);
   border-radius: var(--radius-md);
-  padding: var(--space-sm) var(--space-sm) var(--space-sm) 40px;
+  padding: var(--space-md);
   margin: var(--space-sm) 0;
   position: relative;
 }
 
 .timeline-dot-hotel {
+  position: static;
   background: var(--vermilion-deep);
-  font-size: 14px;
-  width: 16px;
-  height: 16px;
+  font-size: 18px;
+  width: auto;
+  height: auto;
   text-align: center;
-  line-height: 16px;
-  box-shadow: 0 0 0 2px var(--vermilion-deep);
+  line-height: 1;
+  box-shadow: none;
+  border-radius: 0;
+  margin-bottom: var(--space-xs);
+  display: block;
 }
 
 .timeline-hotel .timeline-title {

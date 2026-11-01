@@ -72,7 +72,9 @@
     },
 
     stripeUnlockAllCheckoutUrl: "https://checkout.stripe.com/c/pay/cs_live_a1LpyZxQnveqOGugbeX4bPtRfC2xuEocSgjnt1DZGTDWwtPmb8slbElsnw#fidnandhYHdWcXxpYCc%2FJ2FgY2RwaXEnKSd2cGd2ZndsdXFsamtQa2x0cGBrYHZ2QGtkZ2lgYSc%2FY2RpdmApJ2JzJz81KSdkdWxOYHwnPyd1blppbHNgWjA0UFVhSGtCaVJycTA8anQxZ3RNcEpvNzJVV2pVc01GZ3NtR0JmdG1jbV9AcXB8VVBzT1xvU1c3XUlif0J1ZmB0MHM2REF0VkhvdUpKcl9taWhzXHFhS3xiNTVHZjIybEhBUCcpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8ndmxrYmlgWmxxYGgnKSdga2RnaWBVaWRmYG1qaWFgd3YnP3F3cGB4JSUl",
-    unlockAllPriceId: "price_1UPk8UGlWwt59oq4nOxRuzT5",    postPaymentUrl: '/guide',
+    unlockAllPriceId: "price_1UPk8UGlWwt59oq4nOxRuzT5",
+    postPaymentUrl: '/guide',
+    googleMapsApiKey: '',
 
 
 
@@ -1159,6 +1161,23 @@
     if (state.nav.routeKey === key) return;
     state.nav.routeKey = key;
     const fallback = () => setRouteLine([[uLng, uLat], [tLng, tLat]]);
+
+    // Prefer Google Directions API for Japan (real road geometry).
+    if (CONFIG.googleMapsApiKey) {
+      const url = 'https://maps.googleapis.com/maps/api/directions/json?origin=' + uLat + ',' + uLng + '&destination=' + tLat + ',' + tLng + '&mode=walking&key=' + CONFIG.googleMapsApiKey;
+      fetch(url)
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => {
+          const route = data && data.routes && data.routes[0];
+          if (route && route.overview_path && route.overview_path.length > 1) {
+            const coords = route.overview_path.map(p => [p.lng, p.lat]);
+            setRouteLine(coords);
+          } else fallback();
+        })
+        .catch(fallback);
+      return;
+    }
+
     fetch('https://router.project-osrm.org/route/v1/foot/' + uLng + ',' + uLat + ';' + tLng + ',' + tLat + '?overview=full&geometries=geojson')
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
@@ -1427,11 +1446,10 @@
         const dates = hr.checkIn && hr.checkOut ? `<span>📅 ${hr.checkIn} → ${hr.checkOut} · ${hr.guests} ${t('hotelRec.guests').toLowerCase()}</span>` : '';
         html += `
         <div class="timeline-item timeline-hotel">
-          <div class="timeline-dot timeline-dot-hotel">🛏</div>
           <span class="timeline-time">${hotel.time}</span>
           <div class="timeline-row">
             <div class="timeline-text">
-              <div class="timeline-title">${hotel.title}</div>
+              <div class="timeline-title">🛏 ${hotel.title}</div>
               <div class="timeline-desc">${dates}</div>
               <div class="timeline-meta">
                 <a class="timeline-meta-btn timeline-book-btn" href="${buildStay22Link(hr.recommended.stay22Link)}" target="_blank" rel="noopener noreferrer">
