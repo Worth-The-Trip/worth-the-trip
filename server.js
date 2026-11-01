@@ -1032,7 +1032,7 @@ app.post('/api/users', rateLimitAuth, (req, res) => {
     const user = {
       id: genId(), email: userEmail.toLowerCase().trim(), name: (name || userEmail.split('@')[0]).trim(),
       passwordHash: hashPassword(password), phone: '', address: '', avatar: null, banned: false,
-      emailVerified: 0,
+      emailVerified: ON_SITEGROUND ? 1 : 0,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     const users = readUsers();
@@ -1129,7 +1129,7 @@ app.post('/api/login', rateLimitAuth, (req, res) => {
       return jsonError(res, 401, 'Email or password is incorrect');
     }
     if (user.banned) return jsonError(res, 403, 'This account has been banned.');
-    if (!user.emailVerified) return jsonError(res, 403, 'Please verify your email before logging in. Check your inbox for the verification link, or resend it.');
+    if (!user.emailVerified && !ON_SITEGROUND) return jsonError(res, 403, 'Please verify your email before logging in. Check your inbox for the verification link, or resend it.');
     const token = genToken();
     const session = { token, userId: user.id, kind: 'user', expiresAt: Date.now() + SESSION_TTL_MS };
     // Drop sessions past their expiry while we hold the write lock, so
