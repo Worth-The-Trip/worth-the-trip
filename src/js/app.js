@@ -74,6 +74,7 @@
     stripeUnlockAllCheckoutUrl: "https://checkout.stripe.com/c/pay/cs_live_a1LpyZxQnveqOGugbeX4bPtRfC2xuEocSgjnt1DZGTDWwtPmb8slbElsnw#fidnandhYHdWcXxpYCc%2FJ2FgY2RwaXEnKSd2cGd2ZndsdXFsamtQa2x0cGBrYHZ2QGtkZ2lgYSc%2FY2RpdmApJ2JzJz81KSdkdWxOYHwnPyd1blppbHNgWjA0UFVhSGtCaVJycTA8anQxZ3RNcEpvNzJVV2pVc01GZ3NtR0JmdG1jbV9AcXB8VVBzT1xvU1c3XUlif0J1ZmB0MHM2REF0VkhvdUpKcl9taWhzXHFhS3xiNTVHZjIybEhBUCcpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8ndmxrYmlgWmxxYGgnKSdga2RnaWBVaWRmYG1qaWFgd3YnP3F3cGB4JSUl",
     unlockAllPriceId: "price_1UPk8UGlWwt59oq4nOxRuzT5",
     postPaymentUrl: '/guide',
+    openRouteServiceKey: '',
 
 
 
@@ -1160,14 +1161,28 @@
     if (state.nav.routeKey === key) return;
     state.nav.routeKey = key;
     const fallback = () => setRouteLine([[uLng, uLat], [tLng, tLat]]);
+    const tryOrs = () => {
+      if (!CONFIG.openRouteServiceKey) return fallback();
+      fetch('https://api.openrouteservice.org/v2/directions/foot-walking?start=' + uLng + ',' + uLat + '&end=' + tLng + ',' + tLat, {
+        headers: { 'Authorization': CONFIG.openRouteServiceKey }
+      })
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => {
+          const coords = data && data.routes && data.routes[0] && data.routes[0].geometry && data.routes[0].geometry.coordinates;
+          if (coords && coords.length > 1) setRouteLine(coords);
+          else fallback();
+        })
+        .catch(fallback);
+    };
     fetch('https://router.project-osrm.org/route/v1/foot/' + uLng + ',' + uLat + ';' + tLng + ',' + tLat + '?overview=full&geometries=geojson')
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
         const coords = data && data.routes && data.routes[0] && data.routes[0].geometry && data.routes[0].geometry.coordinates;
-        if (coords && coords.length > 1) setRouteLine(coords);
-        else fallback();
+        // If OSRM returned only 2 points, it likely has no Japan road data — try ORS.
+        if (coords && coords.length > 2) setRouteLine(coords);
+        else tryOrs();
       })
-      .catch(fallback);
+      .catch(tryOrs);
   }
 
   function setSplitView(on) {
