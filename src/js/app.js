@@ -1058,9 +1058,11 @@
     const body = $('#nav-panel-body');
     const container = body || document;
     const items = container.querySelectorAll('.timeline-item');
+    console.log('[collapse] items found:', items.length, 'currentTidx:', currentTidx);
     items.forEach(el => {
       const tidxAttr = el.querySelector('.timeline-start-btn')?.dataset.tidx;
       const tidx = tidxAttr != null ? parseInt(tidxAttr, 10) : NaN;
+      console.log('[collapse] item tidx:', tidx, 'past?', !isNaN(tidx) && tidx < currentTidx);
       if (!isNaN(tidx) && tidx < currentTidx) {
         el.classList.add('past');
       } else {
@@ -1070,6 +1072,7 @@
 
     // Scroll the current step to the top of the timeline view.
     const currentBtn = container.querySelector('.timeline-start-btn[data-tidx="' + currentTidx + '"]');
+    console.log('[collapse] currentBtn found:', !!currentBtn);
     if (currentBtn) {
       const timelineItem = currentBtn.closest('.timeline-item');
       if (timelineItem) {

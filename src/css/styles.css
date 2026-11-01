@@ -2367,6 +2367,8 @@ body {
   opacity: 0.35 !important;
   filter: grayscale(60%) !important;
   pointer-events: none;
+  outline: 2px solid red !important; /* DEBUG: visible indicator */
+  background: rgba(255,0,0,0.1) !important; /* DEBUG: visible indicator */
 }
 
 .nav-panel .timeline-item.past .timeline-desc,
