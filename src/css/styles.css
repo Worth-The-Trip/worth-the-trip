@@ -782,9 +782,15 @@ body {
   border: 1px solid var(--vermilion);
   background: transparent;
   color: var(--vermilion);
-  font-size: 13px;
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+.sheet-close svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
 }
 
 .sheet-close:hover {
