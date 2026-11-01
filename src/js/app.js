@@ -823,6 +823,7 @@
     if (!guide.hotelRec || !state.mapOverlay) return;
     const hotels = [guide.hotelRec.recommended, ...guide.hotelRec.alternatives];
     hotels.forEach((hotel, idx) => {
+      if (!hotel.coordinates || !Array.isArray(hotel.coordinates)) return;
       const isAlt = idx > 0;
       const isSelected = selectedIdx === -1 ? idx === 0 : idx === selectedIdx;
       const size = isAlt ? 24 : 32;
@@ -1058,11 +1059,9 @@
     const body = $('#nav-panel-body');
     const container = body || document;
     const items = container.querySelectorAll('.timeline-item');
-    console.log('[collapse] items found:', items.length, 'currentTidx:', currentTidx);
     items.forEach(el => {
       const tidxAttr = el.querySelector('.timeline-start-btn')?.dataset.tidx;
       const tidx = tidxAttr != null ? parseInt(tidxAttr, 10) : NaN;
-      console.log('[collapse] item tidx:', tidx, 'past?', !isNaN(tidx) && tidx < currentTidx);
       if (!isNaN(tidx) && tidx < currentTidx) {
         el.classList.add('past');
       } else {
@@ -1072,7 +1071,6 @@
 
     // Scroll the current step to the top of the timeline view.
     const currentBtn = container.querySelector('.timeline-start-btn[data-tidx="' + currentTidx + '"]');
-    console.log('[collapse] currentBtn found:', !!currentBtn);
     if (currentBtn) {
       const timelineItem = currentBtn.closest('.timeline-item');
       if (timelineItem) {
@@ -1318,6 +1316,15 @@
         const pin = JSON.parse(btn.dataset.pin);
         if (state.map) state.map.flyTo({ center: [pin[1], pin[0]], zoom: 16, duration: 1.2 });
         retargetNavToStop(guide, parseInt(btn.dataset.tidx, 10));
+      });
+    });
+
+    // Start navigation from a specific timeline step in the nav panel.
+    body.querySelectorAll('.timeline-start-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tidx = parseInt(btn.dataset.tidx, 10);
+        startGuideNav(guideId, tidx);
       });
     });
   }
