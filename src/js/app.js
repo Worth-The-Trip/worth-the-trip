@@ -1334,6 +1334,16 @@
     }
     updateNavBanner();
     updateNavRoute();
+
+    // Auto-collapse past steps as user advances through the guide.
+    const guide = guideById(state.nav.guideId);
+    if (guide) {
+      const currentTarget = navTarget();
+      if (currentTarget) {
+        const tidx = guide.timeline.indexOf(currentTarget);
+        if (tidx >= 0) collapsePastSteps(guide.id, tidx);
+      }
+    }
   }
 
   function onNavError(err) {
@@ -1343,7 +1353,7 @@
     // Keep the guide open — do NOT stop navigation or close the split view.
   }
 
-  function startGuideNav(guideId) {
+  function startGuideNav(guideId, startStopIndex) {
     const guide = guideById(guideId);
     if (!guide || !isGuideUnlocked(guideId)) {
       showToast(t('toast.unlockFirst'), 'success');
@@ -1355,7 +1365,16 @@
     }
     stopGuideNav(true);
     state.nav.guideId = guideId;
-    state.nav.stopIndex = 0;
+
+    // Convert timeline index to nav stop index if provided.
+    if (startStopIndex != null && !isNaN(startStopIndex)) {
+      const item = (guide.timeline || [])[startStopIndex];
+      const stopIdx = navStops(guide).indexOf(item);
+      state.nav.stopIndex = stopIdx >= 0 ? stopIdx : 0;
+    } else {
+      state.nav.stopIndex = 0;
+    }
+
     closeModal();
     closeTripsPage();
     $('#popular-sheet').classList.add('hidden');
@@ -1374,10 +1393,25 @@
     } catch (e) {
       onNavError(e);
     }
-    // Center on the user once the first fix arrives; for now fly to stop 1
+
+    // Center on user location when starting from a specific step; otherwise fly to first stop.
     const stops = navStops(guide);
-    if (stops.length > 0 && state.map) {
-      state.map.flyTo({ center: [stops[0].mapPin[1], stops[0].mapPin[0]], zoom: 14, duration: 1.6 });
+    const target = stops[state.nav.stopIndex];
+    if (state.map) {
+      if (startStopIndex != null) {
+        if (state.nav.userLngLat) {
+          state.map.flyTo({ center: [state.nav.userLngLat[1], state.nav.userLngLat[0]], zoom: 15, duration: 1.2 });
+        } else {
+          showToast(t('nav.locating'), 'success');
+        }
+      } else if (stops.length > 0 && target) {
+        state.map.flyTo({ center: [target.mapPin[1], target.mapPin[0]], zoom: 14, duration: 1.6 });
+      }
+    }
+
+    // Collapse past steps after nav panel renders.
+    if (startStopIndex != null) {
+      setTimeout(() => collapsePastSteps(guideId, startStopIndex), 100);
     }
   }
 
@@ -1554,6 +1588,15 @@
           state.map.flyTo({ center: [pin[1], pin[0]], zoom: 16, duration: 1.2 });
           retargetNavToStop(guide, parseInt(btn.dataset.tidx, 10));
           toast(t('toast.flyingTo') + ' ' + btn.closest('.timeline-item').querySelector('.timeline-title').textContent);
+        });
+      });
+
+      // Start navigation from a specific timeline step in the modal.
+      els.modalTimelineContent.querySelectorAll('.timeline-start-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const tidx = parseInt(btn.dataset.tidx, 10);
+          startGuideNav(guideId, tidx);
         });
       });
     } else {
@@ -3272,19 +3315,12 @@
     all.querySelectorAll('.timeline-start-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const pin = JSON.parse(btn.dataset.pin);
         const tidx = parseInt(btn.dataset.tidx, 10);
         const guide = guideById(guideId);
         if (!guide) return;
 
-        // Center map on user location and start nav to this stop.
-        if (state.map && state.nav.userLngLat) {
-          state.map.flyTo({ center: [state.nav.userLngLat[1], state.nav.userLngLat[0]], zoom: 15, duration: 1.2 });
-        }
-        startGuideNav(guideId);
-        // After nav starts, retarget to the tapped stop.
-        setTimeout(() => retargetNavToStop(guide, tidx), 300);
-        collapsePastSteps(guideId, tidx);
+        // Start nav directly at this step; map centers on user if GPS available.
+        startGuideNav(guideId, tidx);
       });
     });
 
