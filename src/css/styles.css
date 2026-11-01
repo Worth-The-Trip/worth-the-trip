@@ -2911,6 +2911,7 @@ body.nav-split .nav-banner {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  flex: 1;
 }
 .creator-card-meta {
   justify-content: flex-start;
