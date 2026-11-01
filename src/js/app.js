@@ -860,9 +860,10 @@
   function buildStepPin(number) {
     const size = 30;
     const svg = document.createElement('img');
+    // URL-encode # as %23 for data URI safety.
     const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 52">' +
-      '<path d="M20 0C9.06 0 0 8.78 0 19.6c0 13.58 20 32.4 20 32.4S40 33.18 40 19.6C40 8.78 30.94 0 20 0z" fill="#D32F2F" stroke="#fff" stroke-width="2"/>' +
-      '<text x="20" y="26" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="Inter,sans-serif">' + number + '</text>' +
+      '<path d="M20 0C9.06 0 0 8.78 0 19.6c0 13.58 20 32.4 20 32.4S40 33.18 40 19.6C40 8.78 30.94 0 20 0z" fill="%23D32F2F" stroke="%23fff" stroke-width="2"/>' +
+      '<text x="20" y="27" text-anchor="middle" fill="%23fff" font-size="15" font-weight="700" font-family="Inter,sans-serif">' + number + '</text>' +
       '</svg>';
     svg.src = 'data:image/svg+xml,' + svgMarkup;
     svg.alt = 'Step ' + number;
@@ -1546,6 +1547,7 @@
       <div class="timeline-day"><span class="timeline-day-num">${dayLabel(group.day)}</span><span class="timeline-day-route">${route}</span></div>
       ` + group.indexes.map(i => {
         const item = items[i];
+        const stepNum = i + 1;
         return `
         <div class="timeline-item">
           <div class="timeline-dot"></div>
@@ -1553,6 +1555,7 @@
           <div class="timeline-row">
             <div class="timeline-text">
               <div class="timeline-title-row">
+                <span class="timeline-step-num">${stepNum}</span>
                 <div class="timeline-title">${item._tTitle}</div>
                 <button class="timeline-start-btn" data-pin='${JSON.stringify(item.mapPin)}' data-tidx="${i}" aria-label="Start navigation to ${item._tTitle}">
                   ${t('nav.startBtn')}
