@@ -2340,17 +2340,11 @@ body {
 }
 
 .timeline-start-btn {
-  flex-shrink: 0;
-  padding: 3px 10px;
-  background: var(--vermilion);
-  color: var(--warm-white);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  font-weight: 600;
-  font-family: var(--font-sans);
-  cursor: pointer;
-  transition: background var(--duration-fast);
+  display: none; /* hidden in guide preview; shown only during navigation */
+}
+
+.nav-panel .timeline-start-btn {
+  display: inline-flex; /* visible in nav panel during active navigation */
 }
 
 .timeline-start-btn:hover {
@@ -2358,20 +2352,20 @@ body {
 }
 
 /* -------- Collapsed past steps during navigation -------- */
-.timeline-item.past {
+.nav-panel .timeline-item.past {
   opacity: 0.35;
   filter: grayscale(60%);
   pointer-events: none;
 }
 
-.timeline-item.past .timeline-desc,
-.timeline-item.past .timeline-meta,
-.timeline-item.past .timeline-thumb,
-.timeline-item.past .nearby-strip {
+.nav-panel .timeline-item.past .timeline-desc,
+.nav-panel .timeline-item.past .timeline-meta,
+.nav-panel .timeline-item.past .timeline-thumb,
+.nav-panel .timeline-item.past .nearby-strip {
   display: none;
 }
 
-.timeline-item.past .timeline-start-btn {
+.nav-panel .timeline-item.past .timeline-start-btn {
   display: none;
 }
 
