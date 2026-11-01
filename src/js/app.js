@@ -11,7 +11,9 @@
     map: null,
     mapOverlay: null,
     pinElements: [],
+    hotelPinElements: [],
     activeGuideId: null,
+    selectedHotelIdx: -1,
     tripsDetailId: null,
     unlockedGuides: loadUnlocked(),
     savedGuides: loadSavedGuides(),
@@ -108,6 +110,7 @@
     modalSubDestGrid: $('#modal-sub-dest-grid'),
     modalCreator: $('#modal-creator'),
     modalYoutube: $('#modal-youtube'),
+    modalBody: document.querySelector('.modal-body'),
     toast: $('#toast'),
     brandLogo: $('#brand-logo'),
     modalStartBtn: $('#modal-start-btn'),
@@ -724,7 +727,150 @@
     state.pinElements.forEach(p => {
       positionPin(p.svg, p.lngLat);
     });
+    state.hotelPinElements.forEach(p => {
+      positionPin(p.svg, p.lngLat);
+    });
     positionNavDot();
+  }
+
+  function clearHotelPins() {
+    state.hotelPinElements.forEach(p => {
+      if (p.svg && p.svg.parentNode) p.svg.parentNode.removeChild(p.svg);
+    });
+    state.hotelPinElements = [];
+  }
+
+  function showHotelPins(guide, selectedIdx) {
+    clearHotelPins();
+    if (!guide.hotelRec || !state.mapOverlay) return;
+    const hotels = [guide.hotelRec.recommended, ...guide.hotelRec.alternatives];
+    hotels.forEach((hotel, idx) => {
+      const isAlt = idx > 0;
+      const isSelected = selectedIdx === -1 ? idx === 0 : idx === selectedIdx;
+      const size = isAlt ? 24 : 32;
+      const svg = document.createElement('img');
+      const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">' +
+        '<circle cx="20" cy="20" r="16" fill="' + (isAlt ? '%233A6B8C' : '%23D32F2F') + '" stroke="%23fff" stroke-width="2.5"/>' +
+        '<text x="20" y="26" text-anchor="middle" fill="%23fff" font-size="16" font-weight="bold" font-family="sans-serif">H</text>' +
+        '</svg>';
+      svg.src = 'data:image/svg+xml,' + svgMarkup;
+      svg.alt = hotel.name;
+      svg.style.position = 'absolute';
+      svg.style.width = size + 'px';
+      svg.style.height = size + 'px';
+      svg.style.transform = 'translate(-' + (size / 2) + 'px, -' + size + 'px)';
+      svg.style.pointerEvents = 'auto';
+      svg.style.cursor = 'pointer';
+      svg.style.opacity = isAlt && !isSelected ? '0.4' : '1';
+      if (isAlt) svg.style.filter = 'grayscale(20%)';
+      svg.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectHotelInGuide(guide.id, idx);
+      });
+      state.mapOverlay.appendChild(svg);
+      state.hotelPinElements.push({ svg, lngLat: [hotel.coordinates[1], hotel.coordinates[0]] });
+      if (state.map) positionPin(svg, [hotel.coordinates[1], hotel.coordinates[0]]);
+    });
+  }
+
+  function selectHotelInGuide(guideId, hotelIdx) {
+    const guide = guideById(guideId);
+    if (!guide || !guide.hotelRec) return;
+    state.selectedHotelIdx = hotelIdx;
+    const container = document.querySelector('.hotel-rec-section[data-guide-id="' + guideId + '"]');
+    if (container) {
+      container.querySelectorAll('.hotel-rec-pill').forEach((pill, i) => {
+        const activeIdx = hotelIdx === -1 ? 0 : hotelIdx + 1;
+        pill.classList.toggle('active', i === activeIdx);
+      });
+      updateHotelCard(guide, hotelIdx);
+    }
+    showHotelPins(guide, hotelIdx);
+  }
+
+  function updateHotelCard(guide, hotelIdx) {
+    const card = document.getElementById('hotel-rec-card-' + guide.id);
+    if (!card || !guide.hotelRec) return;
+    const hotel = hotelIdx === -1 ? guide.hotelRec.recommended : guide.hotelRec.alternatives[hotelIdx];
+    const rec = guide.hotelRec.recommended;
+    card.innerHTML =
+      '<img src="' + (hotel.image || rec.image) + '" alt="' + hotel.name + '" class="hotel-rec-img">' +
+      '<div class="hotel-rec-info">' +
+        '<div class="hotel-rec-name">' + hotel.name + '</div>' +
+        '<div class="hotel-rec-address">' + (hotel.address || rec.address) + '</div>' +
+        '<div class="hotel-rec-meta">' +
+          '<span>📅 ' + (hotel.checkIn || rec.checkIn) + ' → ' + (hotel.checkOut || rec.checkOut) + '</span>' +
+          '<span>👤 ' + (hotel.guests || rec.guests) + ' ' + t('hotelRec.guests') + '</span>' +
+        '</div>' +
+        '<a href="' + hotel.stay22Link + '" target="_blank" rel="noopener" class="btn-primary book-btn">' +
+          '<span class="btn-label">' + t('hotelRec.book') + '</span>' +
+          '<span class="btn-sub">' + t('hotelRec.affiliateNote') + '</span>' +
+        '</a>' +
+        '<button class="btn-ghost log-booking-btn" data-hotel-idx="' + hotelIdx + '">' +
+          '<span class="btn-label">' + t('hotelRec.logBooking') + '</span>' +
+        '</button>' +
+      '</div>';
+    const logBtn = card.querySelector('.log-booking-btn');
+    if (logBtn) {
+      logBtn.addEventListener('click', () => {
+        const idx = parseInt(logBtn.dataset.hotelIdx, 10);
+        logHotelBooking(guide.id, idx);
+      });
+    }
+  }
+
+  function logHotelBooking(guideId, hotelIdx) {
+    const guide = guideById(guideId);
+    if (!guide || !guide.hotelRec) return;
+    const hotel = hotelIdx === -1 ? guide.hotelRec.recommended : guide.hotelRec.alternatives[hotelIdx];
+    const rec = guide.hotelRec.recommended;
+    const booking = {
+      type: 'hotel',
+      title: hotel.name,
+      location: hotel.address || rec.address,
+      dateStart: hotel.checkIn || rec.checkIn,
+      dateEnd: hotel.checkOut || rec.checkOut,
+      reference: '',
+      image: hotel.image || rec.image,
+      notes: 'Booked via Worth The Trip',
+      url: hotel.stay22Link
+    };
+    saveUserBooking(booking);
+    showToast(t('hotelRec.logged'), 'success');
+  }
+
+  function hotelRecBlock(guide, guideId) {
+    const rec = guide.hotelRec.recommended;
+    const alts = guide.hotelRec.alternatives;
+    let html =
+      '<div class="section-label">' + t('hotelRec.title') + '</div>' +
+      '<div class="hotel-rec-section" data-guide-id="' + guideId + '">' +
+        '<div class="hotel-rec-pills">' +
+          '<button class="hotel-rec-pill active" data-hotel-idx="-1">' + rec.name + '</button>';
+    alts.forEach((alt, i) => {
+      html += '<button class="hotel-rec-pill" data-hotel-idx="' + i + '">' + alt.name + '</button>';
+    });
+    html += '</div>' +
+      '<div class="hotel-rec-card" id="hotel-rec-card-' + guideId + '">' +
+        '<img src="' + rec.image + '" alt="' + rec.name + '" class="hotel-rec-img">' +
+        '<div class="hotel-rec-info">' +
+          '<div class="hotel-rec-name">' + rec.name + '</div>' +
+          '<div class="hotel-rec-address">' + rec.address + '</div>' +
+          '<div class="hotel-rec-meta">' +
+            '<span>📅 ' + rec.checkIn + ' → ' + rec.checkOut + '</span>' +
+            '<span>👤 ' + rec.guests + ' ' + t('hotelRec.guests') + '</span>' +
+          '</div>' +
+          '<a href="' + rec.stay22Link + '" target="_blank" rel="noopener" class="btn-primary book-btn">' +
+            '<span class="btn-label">' + t('hotelRec.book') + '</span>' +
+            '<span class="btn-sub">' + t('hotelRec.affiliateNote') + '</span>' +
+          '</a>' +
+          '<button class="btn-ghost log-booking-btn" data-hotel-idx="-1">' +
+            '<span class="btn-label">' + t('hotelRec.logBooking') + '</span>' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+    return html;
   }
 
   // -------- Live navigation (GPS follow + check-in + Maps handoff) --------
@@ -1285,7 +1431,7 @@
       els.modalYoutube.innerHTML = `
         <a href="${guide.youtubeRef.url}" target="_blank" rel="noopener noreferrer" class="youtube-ref">
           <div class="youtube-icon">
-            <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
           </div>
           <div class="youtube-text">
             <strong>${ytText(guide, 'title')}</strong>
@@ -1295,6 +1441,18 @@
       `;
     } else {
       els.modalYoutube.style.display = 'none';
+    }
+
+    // Hotel recommendation block
+    const existingHotelBlock = $('#modal-hotel-block');
+    if (existingHotelBlock) existingHotelBlock.remove();
+    if (unlocked && guide.hotelRec) {
+      const hotelBlock = document.createElement('div');
+      hotelBlock.id = 'modal-hotel-block';
+      hotelBlock.innerHTML = hotelRecBlock(guide, guideId);
+      if (els.modalBody) {
+        els.modalBody.appendChild(hotelBlock);
+      }
     }
 
     const isLocked = !unlocked;
@@ -1349,6 +1507,7 @@
     els.modalOverlay.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
     refreshSaveHearts();
+    if (guide.hotelRec) showHotelPins(guide, -1);
   }
 
   function closeModal() {
@@ -1356,6 +1515,7 @@
     els.modalOverlay.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
     state.activeGuideId = null;
+    clearHotelPins();
   }
 
   // -------- Profile panel (local MVP — no backend yet) --------
@@ -2924,6 +3084,17 @@
         showToast(t('toast.flyingTo') + ' ' + (titleEl ? titleEl.textContent : 'location'), 'success');
       });
     });
+
+    // Hotel recommendation pills
+    const hotelSection = all.querySelector('.hotel-rec-section');
+    if (hotelSection) {
+      hotelSection.querySelectorAll('.hotel-rec-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+          const idx = parseInt(pill.dataset.hotelIdx, 10);
+          selectHotelInGuide(guideId, idx);
+        });
+      });
+    }
   }
 
   // Same detail markup as the Trips view, reusable in the nav side panel
@@ -2976,6 +3147,10 @@
         <div class="timeline">${timelineHtml(guide)}</div>`;
     }
 
+    if (unlocked && guide.hotelRec) {
+      html += hotelRecBlock(guide, guideId);
+    }
+
     // Sub-destinations render inside the timeline as nearby strips (see above).
 
     if (unlocked && creator) {
@@ -3023,6 +3198,7 @@
       try { state.map.resize(); } catch (e) {}
       setTimeout(() => { try { state.map.resize(); } catch (e) {} }, 350);
     }
+    if (guide.hotelRec) showHotelPins(guide, -1);
   }
 
   function closeGuidePanel() {
@@ -3031,6 +3207,7 @@
     const panel = $('#guide-panel-content');
     if (panel) panel.innerHTML = '';
     $('#guide-panel').setAttribute('aria-hidden', 'true');
+    clearHotelPins();
     if (state.map) {
       try { state.map.resize(); } catch (e) {}
       setTimeout(() => { try { state.map.resize(); } catch (e) {} }, 350);
@@ -3139,6 +3316,7 @@
     state.tripsDetailId = null;
     $('#trips-page').classList.remove('open');
     $('#trips-page').setAttribute('aria-hidden', 'true');
+    clearHotelPins();
     $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === 'explore'));
   }
 
