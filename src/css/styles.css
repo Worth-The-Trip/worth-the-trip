@@ -2847,6 +2847,7 @@ body.nav-split .nav-banner {
   padding: 0 var(--space-lg);
   padding-bottom: calc(56px + var(--space-lg));
   align-items: stretch;
+  align-content: start;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
