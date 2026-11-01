@@ -27,6 +27,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '127.0.0.1';
 const DATA_DIR = __dirname;
@@ -887,6 +888,11 @@ app.use((req, res, next) => {
   res.set('X-Frame-Options', 'DENY');
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+  if (process.env.NODE_ENV === 'production' || (process.env.WTT_BASE_URL && process.env.WTT_BASE_URL.startsWith('https://'))) {
+    res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  // Content Security Policy - restrictive but allows required third-party resources
+  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.stripe.com https://checkout.stripe.com https://www.googleapis.com https://id.twitch.tv https://api.twitch.tv; frame-src 'self' https://checkout.stripe.com https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self'");
   next();
 });
 
