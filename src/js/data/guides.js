@@ -195,7 +195,7 @@ const WTT_GUIDES = [
         "checkIn": "2025-04-01",
         "checkOut": "2025-04-04",
         "guests": 2,
-        "stay22Link": "https://allez.stay22.com/hotel/park-hyatt-tokyo"
+        "stay22Link": "https://booking.stay22.com/wtt/bx5aK8oQju"
       },
       "alternatives": [
         { "name": "Keio Plaza Hotel Tokyo", "stay22Link": "https://allez.stay22.com/hotel/keio-plaza-tokyo" },
