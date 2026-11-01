@@ -1054,7 +1054,10 @@
 
   function collapsePastSteps(guideId, currentTidx) {
     // Grey out and collapse timeline items before the current step.
-    const items = document.querySelectorAll('.timeline-item');
+    // Scope to the nav panel body so we don't touch hidden modal timeline items.
+    const body = $('#nav-panel-body');
+    const container = body || document;
+    const items = container.querySelectorAll('.timeline-item');
     items.forEach(el => {
       const tidxAttr = el.querySelector('.timeline-start-btn')?.dataset.tidx;
       const tidx = tidxAttr != null ? parseInt(tidxAttr, 10) : NaN;
@@ -1066,7 +1069,7 @@
     });
 
     // Scroll the current step to the top of the timeline view.
-    const currentBtn = document.querySelector('.timeline-start-btn[data-tidx="' + currentTidx + '"]');
+    const currentBtn = container.querySelector('.timeline-start-btn[data-tidx="' + currentTidx + '"]');
     if (currentBtn) {
       const timelineItem = currentBtn.closest('.timeline-item');
       if (timelineItem) {
@@ -1389,6 +1392,10 @@
     $('#popular-sheet').classList.add('hidden');
     state.activeGuideId = guideId;
     renderNavPanel(guideId);
+    // Collapse past steps immediately after the nav panel HTML is in the DOM.
+    if (startStopIndex != null) {
+      collapsePastSteps(guideId, startStopIndex);
+    }
     setSplitView(true);
     els.navBanner.style.display = 'flex';
     updateNavBanner();
@@ -1416,11 +1423,6 @@
       } else if (stops.length > 0 && target) {
         state.map.flyTo({ center: [target.mapPin[1], target.mapPin[0]], zoom: 14, duration: 1.6 });
       }
-    }
-
-    // Collapse past steps after nav panel renders.
-    if (startStopIndex != null) {
-      setTimeout(() => collapsePastSteps(guideId, startStopIndex), 100);
     }
   }
 
