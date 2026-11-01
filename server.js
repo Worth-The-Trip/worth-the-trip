@@ -1138,7 +1138,7 @@ app.post('/api/login', rateLimitAuth, (req, res) => {
     const sessions = pruneSessions();
     sessions.push(session);
     writeLines(SESSIONS_FILE, sessions);
-    res.setHeader('Set-Cookie', [`wtt_session=${token}; HttpOnly; Path=/; SameSite=lax; Max-Age=${SESSION_TTL_MS / 1000}`]);
+    setSessionCookie(res, token);
     res.json({ ok: true, token, user: { id: user.id, email: user.email, name: user.name } });
   } catch (e) { jsonError(res, 500, e.message); }
   });
@@ -1152,7 +1152,7 @@ app.post('/api/logout', (req, res) => {
     const sessions = readSessions().filter((s) => s.token !== token);
     writeLines(SESSIONS_FILE, sessions);
   }
-  res.setHeader('Set-Cookie', [`wtt_session=; HttpOnly; Path=/; SameSite=lax; Max-Age=0`]);
+  clearSessionCookie(res);
   res.json({ ok: true });
   });
 });
@@ -1676,7 +1676,7 @@ app.post('/api/admin/login', rateLimitAuth, (req, res) => {
   const sessions = readSessions();
   sessions.push(session);
   writeLines(SESSIONS_FILE, sessions);
-  res.setHeader('Set-Cookie', [`wtt_session=${token}; HttpOnly; Path=/; SameSite=lax; Max-Age=${SESSION_TTL_MS / 1000}`]);
+  setSessionCookie(res, token);
   res.json({ ok: true, token });
   });
 });
@@ -1688,7 +1688,7 @@ app.post('/api/admin/logout', (req, res) => {
     const sessions = readSessions().filter((s) => s.token !== token);
     writeLines(SESSIONS_FILE, sessions);
   }
-  res.setHeader('Set-Cookie', [`wtt_session=; HttpOnly; Path=/; SameSite=lax; Max-Age=0`]);
+  clearSessionCookie(res);
   res.json({ ok: true });
   });
 });

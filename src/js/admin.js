@@ -46,7 +46,11 @@
   async function login(password) {
     const res = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password }) });
     localStorage.setItem(TOAST_KEY, res.token);
-    loadAll();
+    try {
+      await loadAll();
+    } catch (e) {
+      toast('Admin load failed: ' + (e.message || 'unknown error'));
+    }
   }
 
   async function logout() {
@@ -511,6 +515,7 @@
     } catch (e) {
       localStorage.removeItem(TOAST_KEY);
       show([$('#login-view'), $('#admin-view')], [$('#admin-view')]);
+      toast('Session expired or invalid — please log in again.');
     }
   }
 
