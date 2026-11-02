@@ -1699,7 +1699,7 @@ app.post('/api/admin/logout', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, users: readUsers().length, purchases: readPurchases().length, creators: readCreators().length });
+  res.json({ ok: true, users: readUsers().length, purchases: readPurchases().length, creators: readCreators().length, dataDir: RUNTIME_DIR, dbPath: DB_PATH });
 });
 
 // ------------------------------------------------------------------ helpers
