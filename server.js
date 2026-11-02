@@ -725,9 +725,6 @@ function writeArray(file, arr) {
   if (file === CREATORS_FILE) {
     // Keep the runtime JSON file in sync so ensureDataFiles() never treats
     // runtime creator records as missing and overwrites SQLite with seed data.
-    console.log('[WTT writeArray] creators count=' + arr.length + ' emails=' + arr.map((c) => c.email).join(','));
-    console.log('[WTT writeArray] stack:\n' + new Error().stack.split('\n').slice(2, 6).join('\n'));
-    globalThis.__lastCreatorWrite = { time: new Date().toISOString(), count: arr.length, emails: arr.map((c) => c.email) };
     try {
       const tmp = file + '.tmp';
       fs.writeFileSync(tmp, JSON.stringify(arr, null, 2));
@@ -1765,13 +1762,6 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, users: readUsers().length, purchases: readPurchases().length, creators: readCreators().length, dataDir: RUNTIME_DIR, dbPath: DB_PATH });
 });
 
-app.get('/api/debug/creators', (req, res) => {
-  res.json({ 
-    creators: readCreators().map((c) => ({ id: c.id, email: c.email, name: c.name, status: c.status })),
-    lastWrite: globalThis.__lastCreatorWrite || null
-  });
-});
-
 // ------------------------------------------------------------------ helpers
 function saveAvatar(userId, dataUrl) {
   try {
@@ -1872,7 +1862,6 @@ app.get('/api/creator/me', (req, res) => {
     });
   }
   if (info.kind !== 'user') return jsonError(res, 401, 'Not signed in');
-  console.log('[WTT debug] creator/me user=' + info.user.email + ' rec=' + JSON.stringify(info.creator));
   const rec = info.creator;
   res.json({
     user: { id: info.user.id, name: info.user.name, email: info.user.email, avatar: info.user.avatar },
