@@ -45,10 +45,10 @@ const ON_SITEGROUND = DATA_DIR.split(path.sep).indexOf('.nodeapp') !== -1;
 function pickRuntimeDir() {
   const candidates = [];
   if (process.env.WTT_DATA_DIR) candidates.push(path.resolve(process.env.WTT_DATA_DIR));
-  if (ON_SITEGROUND) {
-    if (process.env.HOME) candidates.push(path.join(process.env.HOME, 'wtt-data'));
-    candidates.push(path.resolve(DATA_DIR, '..', '..', '..', 'wtt-data'));
-  }
+  if (process.env.HOME) candidates.push(path.join(process.env.HOME, 'wtt-data'));
+  // Always try a sibling wtt-data directory first; it survives app deploys
+  // even when the app dir itself is a git checkout that gets reset.
+  candidates.push(path.resolve(DATA_DIR, '..', '..', '..', 'wtt-data'));
   candidates.push(DATA_DIR);
   for (const dir of candidates) {
     try {
