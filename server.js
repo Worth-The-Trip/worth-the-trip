@@ -1820,7 +1820,7 @@ app.post('/api/creator/apply', requireUser, (req, res) => {
     const idx = creators.findIndex((c) => String(c.email || '').toLowerCase() === req.user.email);
     const existing = idx >= 0 ? creators[idx] : null;
     if (existing && existing.status === 'accepted') return jsonError(res, 409, 'You are already a creator');
-    const isStaging = (process.env.WTT_BASE_URL && process.env.WTT_BASE_URL.includes('sg-host.com')) || (req.hostname && req.hostname.includes('sg-host.com'));
+    const isStaging = ON_SITEGROUND || (process.env.WTT_BASE_URL && process.env.WTT_BASE_URL.includes('sg-host.com')) || (req.hostname && req.hostname.includes('sg-host.com'));
     const record = {
       id: existing ? existing.id : genId(),
       name: name, handle: handle,
