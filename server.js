@@ -723,6 +723,9 @@ function writeLines(file, arr) {
 function writeArray(file, arr) {
   const d = db();
   if (file === CREATORS_FILE) {
+    // Keep the runtime JSON file in sync so ensureDataFiles() never treats
+    // runtime creator records as missing and overwrites SQLite with seed data.
+    try { legacyWrite(file, arr); } catch (e) { /* never block a SQLite write on a JSON sync issue */ }
     return replaceRows(d, 'creators', null, arr, insertCreator);
   }
   return legacyWrite(file, arr);
@@ -801,7 +804,20 @@ function guideDescription(g) {
 function findGuide(id) { return readGuides().find((g) => g.id === id); }
 function findCreatorRecord(email) {
   const e = String(email || '').toLowerCase();
-  return readCreators().find((c) => String(c.email || '').toLowerCase() === e);
+  let rec = readCreators().find((c) => String(c.email || '').toLowerCase() === e);
+  if (!rec) {
+    // Fallback: the runtime JSON file may have records that SQLite lost
+    // (e.g. a bad replaceRows or a DB reset). Rehydrate SQLite from JSON.
+    try {
+      const jsonRecs = loadArray(CREATORS_FILE) || [];
+      rec = jsonRecs.find((c) => String(c.email || '').toLowerCase() === e) || null;
+      if (rec && jsonRecs.length) {
+        console.log('[WTT] creator record missing from SQLite but found in JSON for ' + e + ' — rehydrating');
+        writeArray(CREATORS_FILE, jsonRecs);
+      }
+    } catch (x) { /* ignore */ }
+  }
+  return rec;
 }
 function isApprovedCreator(email) {
   const rec = findCreatorRecord(email);
@@ -1640,6 +1656,7 @@ app.post('/api/creator/apply-pending', requireUser, (req, res) => {
     if (existing && existing.status === 'accepted') {
       return res.json({ ok: true, submitted: false, reason: 'already_accepted' });
     }
+    const isStaging = ON_SITEGROUND || (process.env.WTT_BASE_URL && process.env.WTT_BASE_URL.includes('sg-host.com')) || (req.hostname && req.hostname.includes('sg-host.com'));
     const record = {
       id: existing ? existing.id : genId(),
       name, handle,
@@ -1649,7 +1666,7 @@ app.post('/api/creator/apply-pending', requireUser, (req, res) => {
       youtubeUrl: clip(data.youtube || '', 300).trim(),
       instagramUrl: clip(data.instagram || '', 300).trim(),
       tiktokUrl: '',
-      status: ON_SITEGROUND ? 'accepted' : 'pending',
+      status: isStaging ? 'accepted' : 'pending',
       guides: existing && Array.isArray(existing.guides) ? existing.guides : [],
       appliedAt: new Date().toISOString(),
       reviewNote: null,
@@ -1755,9 +1772,13 @@ function requireCreator(req, res, next) {
   if (!s || s.kind !== 'user') return jsonError(res, 401, 'Please sign in');
   const u = findUserById(s.userId);
   if (!u) return jsonError(res, 401, 'User no longer exists');
-  if (!isApprovedCreator(u.email)) return jsonError(res, 403, 'Creator access required');
+  const creator = findCreatorRecord(u.email);
+  if (!creator || creator.status !== 'accepted') {
+    console.log('[WTT] creator access denied for ' + (u && u.email) + ' creator=' + (creator ? creator.status : 'null'));
+    return jsonError(res, 403, 'Creator access required');
+  }
   req.user = u;
-  req.creator = findCreatorRecord(u.email);
+  req.creator = creator;
   next();
 }
 
@@ -1784,6 +1805,7 @@ function requireGuideEditor(req, res, next) {
     req.editor = { kind: 'creator', user: info.user, creator: info.creator };
     return next();
   }
+  console.log('[WTT] guide editor access denied kind=' + info.kind + ' creatorStatus=' + (info.creator ? info.creator.status : 'null'));
   return jsonError(res, 403, 'Creator access required');
 }
 
