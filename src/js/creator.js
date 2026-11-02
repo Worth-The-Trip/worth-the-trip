@@ -49,8 +49,13 @@
       pricing: 'Price', priceHint: 'Between ¥100 and ¥2,000. This is what the traveller pays.',
       explorePin: 'Explore map pin', pinHint: 'Click the map to drop the pin travellers will see on the Explore page. Drag to fine-tune.',
       pinZoom: 'Zoom level', pinSet: 'Pin set', pinNotSet: 'No pin yet',
-      locations: 'Locations & route', addStop: 'Add location',
+      locations: 'Locations & route', addStop: 'Add location', addHotel: 'Add hotel',
       locHint: 'Paste a Google Maps link and the pin is found for you — short share links work too.',
+      hotelHint: 'Add hotels your guide recommends. Stay22 affiliate links are generated automatically.',
+      hotelName: 'Hotel name', hotelAddress: 'Address / area', hotelCity: 'City',
+      hotelProvider: 'Provider (e.g. booking.com, airbnb)', hotelGuests: 'Guests',
+      hotelCheckIn: 'Check-in', hotelCheckOut: 'Check-out',
+      noHotels: 'No hotels added yet.', remove: 'Remove',
       stopTitle: 'Location name', stopDesc: 'What happens here', day: 'Day', time: 'Time',
       mapsLink: 'Google Maps link', findPin: 'Find & fill', finding: 'Finding…', pinFound: 'Pin found',
       pinMissing: 'No pin yet — paste a Maps link and press Find & fill', clearPin: 'Clear',
@@ -96,8 +101,13 @@
       pricing: '価格', priceHint: '¥100〜¥2,000の範囲です。旅行者が支払う金額です。',
       explorePin: '探索マップのピン', pinHint: '地図をクリックして、探索ページに表示されるピンを配置します。ドラッグで微調整できます。',
       pinZoom: 'ズームレベル', pinSet: 'ピン設定済み', pinNotSet: 'ピン未設定',
-      locations: 'スポットとルート', addStop: 'スポットを追加',
+      locations: 'スポットとルート', addStop: 'スポットを追加', addHotel: 'ホテルを追加',
       locHint: 'Googleマップのリンクを貼ると、ピンを自動で見つけます。短縮リンクも使えます。',
+      hotelHint: 'おすすめのホテルを追加します。Stay22のアフィリエイトリンクが自動生成されます。',
+      hotelName: 'ホテル名', hotelAddress: '住所・エリア', hotelCity: '都市',
+      hotelProvider: '提供元（例：booking.com、airbnb）', hotelGuests: '人数',
+      hotelCheckIn: 'チェックイン', hotelCheckOut: 'チェックアウト',
+      noHotels: 'ホテルがまだ追加されていません。', remove: '削除',
       stopTitle: 'スポット名', stopDesc: 'ここでの内容', day: '日', time: '時刻',
       mapsLink: 'Googleマップのリンク', findPin: '検索して入力', finding: '検索中…', pinFound: 'ピンが見つかりました',
       pinMissing: 'ピン未設定 — リンクを貼って「検索して入力」を押してください', clearPin: 'クリア',
@@ -383,7 +393,13 @@
       '<div class="card"><div class="section-title">' + esc(t('locations')) + '</div>' +
       '<p class="hint" style="margin-top:-6px;margin-bottom:14px">' + esc(t('locHint')) + '</p>' +
       '<div id="stops"></div>' +
-      '<div class="btn-row"><button class="btn btn-ghost btn-sm" id="add-stop">+ ' + esc(t('addStop')) + '</button></div>' +
+      '<div class="btn-row"><button class="btn btn-ghost btn-sm" id="add-stop">+ ' + esc(t('addStop')) + '</button>' +
+      '<button class="btn btn-ghost btn-sm" id="add-hotel">+ ' + esc(t('addHotel')) + '</button></div>' +
+      '</div>' +
+
+      '<div class="card" id="hotels-card" style="display:none">' +
+      '<div class="section-title">' + esc(t('hotelHint')) + '</div>' +
+      '<div id="hotels-list"></div>' +
       '</div>' +
 
       '<div class="card"><div class="section-title">' + esc(t('video')) + '</div>' +
@@ -408,6 +424,7 @@
     showView('editor');
     wireEditor();
     renderStops();
+    renderHotels();
     renderProblems();
     initPinMap();
   }
@@ -477,6 +494,7 @@
         '<div class="btn-row" style="margin-top:8px"><button class="btn btn-ghost btn-sm" data-pickstop="' + i + '">' + esc(s.image ? t('replacing') : t('chooseImage')) + '</button></div>' +
         '</div></div>';
     }).join('');
+    renderHotels();
   }
 
   function syncStopsFromDOM() {
@@ -519,7 +537,8 @@
         handle: ($('#f-video-handle') || {}).value || ''
       },
       includes: collectInputs('.inc-input'),
-      timeline: state.guide.timeline || []
+      timeline: state.guide.timeline || [],
+      hotels: state.guide.hotels || []
     };
   }
 
@@ -696,6 +715,18 @@
       renderStops(); markDirty();
     });
 
+    $('#add-hotel').addEventListener('click', function () { addHotel(); });
+
+    $('#hotels-list').addEventListener('click', function (e) {
+      var btn = e.target.closest('button');
+      if (!btn) return;
+      var rm = btn.getAttribute('data-rmhotel');
+      if (rm !== null) {
+        state.guide.hotels = (state.guide.hotels || []).filter(function (_, idx) { return idx !== Number(rm); });
+        renderHotels(); markDirty();
+      }
+    });
+
     $('#add-inc').addEventListener('click', function () { $('#incs').insertAdjacentHTML('beforeend', incRow('', 'inc-input')); markDirty(); });
 
     var view = $('#editor-view');
@@ -796,6 +827,53 @@
           .then(function () { btn.disabled = false; btn.textContent = t('findPin'); });
       }
     });
+  }
+
+  // ---- hotels ----
+  function renderHotels() {
+    var hotels = state.guide.hotels || [];
+    var card = $('#hotels-card');
+    var list = $('#hotels-list');
+    if (!card || !list) return;
+    if (!hotels.length) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    list.innerHTML = hotels.map(function (h, i) {
+      return '<div class="hotel-row" data-hotel="' + i + '">' +
+        '<div class="hotel-name">' + esc(h.name || '(' + t('hotelName') + ')') + '</div>' +
+        '<div class="hotel-meta">' + esc([h.address, h.city, h.provider].filter(Boolean).join(' · ')) + '</div>' +
+        '<div class="btn-row" style="margin-top:6px">' +
+        '<a href="' + esc(h.stay22Link) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Stay22 link</a>' +
+        '<button class="btn btn-ghost btn-sm" data-rmhotel="' + i + '">' + esc(t('remove')) + '</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function syncHotelsFromDOM() {
+    // hotels are edited via a simple prompt-based flow for now
+  }
+
+  function buildStay22Link(name, city) {
+    var aid = '6ae6fed2c21651647046f81f';
+    var address = encodeURIComponent([name, city].filter(Boolean).join(', '));
+    return 'https://www.stay22.com/allez?aid=' + aid + '&address=' + address + '&campaign=wtt-' + (state.guide.id || '');
+  }
+
+  function addHotel() {
+    var name = prompt(t('hotelName'));
+    if (!name || !name.trim()) return;
+    var address = prompt(t('hotelAddress')) || '';
+    var city = prompt(t('hotelCity')) || '';
+    var provider = prompt(t('hotelProvider')) || '';
+    var guests = prompt(t('hotelGuests')) || '2';
+    var checkIn = prompt(t('hotelCheckIn')) || '';
+    var checkOut = prompt(t('hotelCheckOut')) || '';
+    var link = buildStay22Link(name.trim(), city.trim());
+    state.guide.hotels = (state.guide.hotels || []).concat([{
+      name: name.trim(), address: address.trim(), city: city.trim(), provider: provider.trim(),
+      stay22Link: link, image: '', checkIn: checkIn.trim(), checkOut: checkOut.trim(),
+      guests: Math.max(1, Number(guests) || 2),
+    }]);
+    renderHotels(); markDirty();
   }
 
   // ---- preview ----

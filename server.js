@@ -1952,7 +1952,7 @@ app.post('/api/creator/guides', requireCreator, (req, res) => {
       duration: '', price: PRICE_MIN, heroImage: '',
       coordinates: null, zoomLevel: 10,
       video: { platform: 'youtube', url: '', handle: req.creator.handle || '' },
-      includes: [], timeline: [], ja: {},
+      includes: [], timeline: [], hotels: [], ja: {},
       createdAt: now, updatedAt: now,
     };
     guides.push(guide);
@@ -2018,6 +2018,21 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
       };
     }
     if (b.includes !== undefined) g.includes = (Array.isArray(b.includes) ? b.includes : []).slice(0, 20).map((s) => clip(s, 160));
+    if (b.hotels !== undefined) {
+      g.hotels = (Array.isArray(b.hotels) ? b.hotels : []).slice(0, 20).map(function (h) {
+        return {
+          name: clip(h.name, 120).trim(),
+          address: clip(h.address, 300).trim(),
+          city: clip(h.city, 80).trim(),
+          provider: clip(h.provider, 40).trim(),
+          stay22Link: clip(h.stay22Link, 500).trim(),
+          image: clip(h.image, 400).trim(),
+          checkIn: clip(h.checkIn, 20).trim(),
+          checkOut: clip(h.checkOut, 20).trim(),
+          guests: Math.max(1, Number(h.guests) || 2),
+        };
+      });
+    }
     if (b.timeline !== undefined) {
       const list = Array.isArray(b.timeline) ? b.timeline.slice(0, 40) : [];
       const out = [];
