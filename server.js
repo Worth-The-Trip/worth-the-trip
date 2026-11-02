@@ -2418,9 +2418,8 @@ app.get('/creator', (req, res) => {
   if (s && s.kind === 'user') {
     const u = findUserById(s.userId);
     if (u && isApprovedCreator(u.email)) return res.sendFile('creator.html', { root: DATA_DIR, cacheControl: false });
-    return res.redirect('/');
   }
-  res.sendFile('creator.html', { root: DATA_DIR, cacheControl: false });
+  return res.redirect('/');
 });
 
 // ------------------------------------------------------------------ start
