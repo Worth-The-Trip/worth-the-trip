@@ -56,9 +56,15 @@
   function loadCreatorAccess() {
     api('/api/creator/me')
       .then((me) => {
-        if (me && me.isCreator) $('#creator-card').style.display = 'block';
+        console.log('[account] creator/me', me);
+        if (me && me.isCreator) {
+          console.log('[account] showing creator card');
+          $('#creator-card').style.display = 'block';
+        } else {
+          console.log('[account] not creator', me);
+        }
       })
-      .catch(() => {});
+      .catch((e) => { console.log('[account] creator/me error', e); });
   }
 
   function showAuth() {
