@@ -54,6 +54,7 @@
       hotelHint: 'Add hotels your guide recommends. Stay22 affiliate links are generated automatically.',
       hotelName: 'Hotel name', hotelAddress: 'Address / area', hotelCity: 'City',
       hotelMapsLink: 'Google Maps link (optional)', hotelBookBtn: 'Check availability',
+      hotelManualHint: 'Name is filled from the link — please complete address and city manually.',
       noHotels: 'No hotels added yet.', remove: 'Remove',
       stopTitle: 'Location name', stopDesc: 'What happens here', day: 'Day', time: 'Time',
       mapsLink: 'Google Maps link', findPin: 'Find & fill', finding: 'Finding…', pinFound: 'Pin found',
@@ -105,6 +106,7 @@
       hotelHint: 'おすすめのホテルを追加します。Stay22のアフィリエイトリンクが自動生成されます。',
       hotelName: 'ホテル名', hotelAddress: '住所・エリア', hotelCity: '都市',
       hotelMapsLink: 'Googleマップリンク（任意）', hotelBookBtn: '空室を確認',
+      hotelManualHint: 'リンクから名前を入力しました。住所と都市は手動で入力してください。',
       noHotels: 'ホテルがまだ追加されていません。', remove: '削除',
       stopTitle: 'スポット名', stopDesc: 'ここでの内容', day: '日', time: '時刻',
       mapsLink: 'Googleマップのリンク', findPin: '検索して入力', finding: '検索中…', pinFound: 'ピンが見つかりました',
@@ -875,10 +877,11 @@
     list.innerHTML = hotels.map(function (h, i) {
       return '<div class="hotel-row" data-hotel="' + i + '">' +
         '<div class="field"><label>' + esc(t('hotelMapsLink')) + '</label>' +
-        '<div class="link-row"><input data-hf="googleMapsUrl" value="' + esc(h.googleMapsUrl || '') + '" placeholder="https://maps.google.com/…">' +
+        '<div class="link-row"><input data-hf="googleMapsUrl" value="' + esc(h.googleMapsUrl || '') + '" placeholder="https://maps.google.com/… or short link">' +
         '<button class="btn btn-primary btn-sm" data-findhotel="' + i + '">' + esc(t('findPin')) + '</button></div>' +
         '<div class="coords-readout" data-hotelreadout="' + i + '">' + (h.stay22Link ? esc(h.stay22Link) : '') + '</div>' +
         '</div>' +
+        '<p class="hint" style="margin-top:4px;margin-bottom:10px">' + esc(t('hotelManualHint')) + '</p>' +
         '<div class="row3">' +
         '<div class="field"><label>' + esc(t('hotelName')) + '</label><input data-hf="name" value="' + esc(h.name || '') + '"></div>' +
         '<div class="field"><label>' + esc(t('hotelAddress')) + '</label><input data-hf="address" value="' + esc(h.address || '') + '"></div>' +

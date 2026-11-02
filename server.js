@@ -2173,7 +2173,7 @@ function extractPlaceInfo(html, finalUrl) {
   out.coordinates = extractLatLng(finalUrl) || extractLatLng(html);
 
   let name = '';
-  const placePath = /\/maps\/place\/([^/]+)\//.exec(finalUrl);
+  const placePath = /\/maps\/place\/([^/@]+)/.exec(finalUrl);
   if (placePath) name = decodeName(placePath[1]);
   if (!name) {
     const og = /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i.exec(html)
@@ -2187,10 +2187,18 @@ function extractPlaceInfo(html, finalUrl) {
     .replace(/\s*[–—-]\s*Google\s*マップ\s*$/i, '')
     .trim();
 
-  // Address is best effort — the page rarely exposes it as plain text.
+  // Address is best effort — try multiple patterns Google uses in the page.
   const addr = /data-item-id=["']address["'][^>]*aria-label=["']([^"']+)["']/i.exec(html)
-            || /data-item-id=["']address["'][^>]*>([^<]{8,})</i.exec(html);
+            || /data-item-id=["']address["'][^>]*>([^<]{8,})</i.exec(html)
+            || /"address"\s*:\s*"([^"]+)"/i.exec(html)
+            || /<meta[^>]+property=["']og:street_address["'][^>]+content=["']([^"']+)["']/i.exec(html);
   if (addr) out.address = addr[1].replace(/\s+/g, ' ').trim();
+
+  // If the final URL has a /maps/place/NAME/ADDRESS pattern, extract it.
+  if (!out.address) {
+    const addrPath = /\/maps\/place\/[^/]+\/([^/@]+)/.exec(finalUrl);
+    if (addrPath) out.address = decodeName(addrPath[1]);
+  }
   return out;
 }
 
