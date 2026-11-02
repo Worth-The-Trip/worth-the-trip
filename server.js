@@ -1758,6 +1758,10 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, users: readUsers().length, purchases: readPurchases().length, creators: readCreators().length, dataDir: RUNTIME_DIR, dbPath: DB_PATH });
 });
 
+app.get('/api/debug/creators', (req, res) => {
+  res.json({ creators: readCreators().map((c) => ({ id: c.id, email: c.email, name: c.name, status: c.status })) });
+});
+
 // ------------------------------------------------------------------ helpers
 function saveAvatar(userId, dataUrl) {
   try {
