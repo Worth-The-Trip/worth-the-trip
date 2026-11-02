@@ -475,7 +475,7 @@
       '<div class="row3">' +
       '<div class="field"><label>' + esc(t('city')) + '</label><input id="f-city" value="' + esc(g.city || '') + '"></div>' +
       '<div class="field"><label>' + esc(t('prefecture')) + '</label><input id="f-prefecture" value="' + esc(g.prefecture || '') + '"></div>' +
-      '<div class="field"><label>' + esc(t('duration')) + '</label><input id="f-duration" value="' + esc(g.duration || '') + '"></div>' +
+      '<div class="field"><label>' + esc(t('duration')) + '</label><input id="f-duration" type="number" min="1" max="31" value="' + esc(g.duration || '') + '"></div>' +
       '</div>' +
       '<div class="field"><label>' + esc(t('category')) + '</label><select id="f-category">' +
       '<option value="">—</option>' + CATEGORIES.map(function (c) {
@@ -632,7 +632,7 @@
       city: ($('#f-city') || {}).value || '',
       prefecture: ($('#f-prefecture') || {}).value || '',
       category: ($('#f-category') || {}).value || '',
-      duration: ($('#f-duration') || {}).value || '',
+      duration: (function () { var v = Number(($('#f-duration') || {}).value); if (!Number.isFinite(v) || !($('#f-duration') || {}).value.trim()) return ''; return String(Math.max(1, Math.min(31, Math.round(v)))); })(),
       season: Array.prototype.filter.call(document.querySelectorAll('input[name=season]'), function (c) { return c.checked; }).map(function (c) { return c.value; }),
       price: Number(($('#f-price') || {}).value || 100),
       zoomLevel: Number(($('#f-zoom') || {}).value || 11),

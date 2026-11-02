@@ -1716,7 +1716,8 @@ function guideProblems(g) {
   if (!clip(g.tagline, 999).trim()) p.push('Tagline');
   if (!clip(g.city, 999).trim()) p.push('City');
   if (!CATEGORIES.includes(g.category)) p.push('Category');
-  if (!clip(g.duration, 999).trim()) p.push('Duration');
+  const dur = Number(g.duration);
+  if (!clip(g.duration, 999).trim() || !Number.isFinite(dur) || dur < 1 || dur > 31) p.push('Duration (1–31 days)');
   if (!(Number(g.price) >= PRICE_MIN && Number(g.price) <= PRICE_MAX)) p.push('Price (¥' + PRICE_MIN + '–¥' + PRICE_MAX + ')');
   if (!g.heroImage) p.push('Cover image');
   if (!isLatLng(g.coordinates)) p.push('Explore map pin');
@@ -1919,7 +1920,10 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
     if (b.prefecture !== undefined) g.prefecture = clip(b.prefecture, 60).trim();
     if (b.category !== undefined && CATEGORIES.includes(b.category)) g.category = b.category;
     if (b.season !== undefined) g.season = (Array.isArray(b.season) ? b.season : []).slice(0, 12).map((s) => clip(s, 20));
-    if (b.duration !== undefined) g.duration = clip(b.duration, 40).trim();
+    if (b.duration !== undefined) {
+      const d = Number(b.duration);
+      g.duration = (Number.isFinite(d) && d >= 1 && d <= 31) ? String(Math.round(d)) : g.duration;
+    }
     if (b.price !== undefined) {
       const p = clampPrice(b.price);
       if (p === null) return jsonError(res, 400, 'Price must be a number');
@@ -2339,7 +2343,10 @@ app.patch('/api/admin/guides/:id', requireAdmin, async (req, res) => {
     if (b.title !== undefined && clip(b.title, 120).trim()) draft.title = clip(b.title, 120).trim();
     if (b.city !== undefined) draft.city = clip(b.city, 80).trim();
     if (b.prefecture !== undefined) draft.prefecture = clip(b.prefecture, 80).trim();
-    if (b.duration !== undefined) draft.duration = clip(b.duration, 80).trim();
+    if (b.duration !== undefined) {
+      const d = Number(b.duration);
+      draft.duration = (Number.isFinite(d) && d >= 1 && d <= 31) ? String(Math.round(d)) : draft.duration;
+    }
     if (b.tagline !== undefined) draft.tagline = clip(b.tagline, 200).trim();
     draft.status = 'published';
     const problems = guideProblems(draft);
@@ -2370,7 +2377,10 @@ app.patch('/api/admin/guides/:id', requireAdmin, async (req, res) => {
       if (b.title !== undefined && clip(b.title, 120).trim()) g.title = clip(b.title, 120).trim();
       if (b.city !== undefined) g.city = clip(b.city, 80).trim();
       if (b.prefecture !== undefined) g.prefecture = clip(b.prefecture, 80).trim();
-      if (b.duration !== undefined) g.duration = clip(b.duration, 80).trim();
+      if (b.duration !== undefined) {
+        const d = Number(b.duration);
+        g.duration = (Number.isFinite(d) && d >= 1 && d <= 31) ? String(Math.round(d)) : g.duration;
+      }
       if (b.tagline !== undefined) g.tagline = clip(b.tagline, 200).trim();
       if (translated) {
         // Creators write English only — the Japanese version is produced here.
