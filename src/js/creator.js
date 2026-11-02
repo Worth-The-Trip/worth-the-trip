@@ -393,10 +393,6 @@
       '<div id="stops"></div>' +
       '<div class="btn-row"><button class="btn btn-ghost btn-sm" id="add-stop">+ ' + esc(t('addStop')) + '</button>' +
       '<button class="btn btn-ghost btn-sm" id="add-hotel">+ ' + esc(t('addHotel')) + '</button></div>' +
-      '</div>' +
-
-      '<div class="card" id="hotels-card" style="display:none">' +
-      '<div class="section-title">' + esc(t('hotelHint')) + '</div>' +
       '<div id="hotels-list"></div>' +
       '</div>' +
 
@@ -515,6 +511,7 @@
 
   function collect() {
     syncStopsFromDOM();
+    syncHotelsFromDOM();
     return {
       title: ($('#f-title') || {}).value || '',
       tagline: ($('#f-tagline') || {}).value || '',
@@ -536,7 +533,21 @@
       },
       includes: collectInputs('.inc-input'),
       timeline: state.guide.timeline || [],
-      hotels: state.guide.hotels || []
+      hotels: (state.guide.hotels || []).map(function (h) {
+        var out = {
+          name: (h.name || '').trim(),
+          address: (h.address || '').trim(),
+          city: (h.city || '').trim(),
+          googleMapsUrl: (h.googleMapsUrl || '').trim(),
+          image: (h.image || '').trim(),
+        };
+        if (out.name || out.city) {
+          out.stay22Link = buildStay22Link(out.name, out.city, state.guide.id);
+        } else if (h.stay22Link) {
+          out.stay22Link = h.stay22Link;
+        }
+        return out;
+      })
     };
   }
 
@@ -824,35 +835,75 @@
           })
           .then(function () { btn.disabled = false; btn.textContent = t('findPin'); });
       }
+      var fh = btn.getAttribute('data-findhotel');
+      if (fh !== null) { findHotelPin(Number(fh)); return; }
+      var pickH = btn.getAttribute('data-pickhotel');
+      if (pickH !== null) {
+        var inp2 = document.createElement('input');
+        inp2.type = 'file'; inp2.accept = 'image/*';
+        inp2.addEventListener('change', function () {
+          var f2 = inp2.files[0]; if (!f2) return;
+          toast(lang === 'ja' ? 'アップロード中…' : 'Uploading…');
+          uploadImage(f2, 1400).then(function (path) {
+            syncHotelsFromDOM();
+            state.guide.hotels[Number(pickH)].image = path;
+            renderHotels(); markDirty();
+            toast(t('saved'));
+          }).catch(function (err) { toast(err.message, true); });
+        });
+        inp2.click();
+        return;
+      }
+      var rmH = btn.getAttribute('data-rmhotel');
+      if (rmH !== null) {
+        state.guide.hotels = (state.guide.hotels || []).filter(function (_, idx) { return idx !== Number(rmH); });
+        renderHotels(); markDirty();
+        return;
+      }
     });
   }
 
   // ---- hotels ----
-  // A hotel is a recommendation the creator adds to the guide. The creator
-  // supplies the basics; the Stay22 affiliate link is generated automatically.
-  // When a traveller views the guide, their own travel dates are appended to
-  // the link so the booking goes through WTT's affiliate account.
+  // Creator-added hotel recommendations. The creator supplies the basics;
+  // the Stay22 affiliate link is generated on save/submit so it always
+  // reflects the current guide id and the traveller's dates.
   function renderHotels() {
     var hotels = state.guide.hotels || [];
-    var card = $('#hotels-card');
     var list = $('#hotels-list');
-    if (!card || !list) return;
-    if (!hotels.length) { card.style.display = 'none'; return; }
-    card.style.display = '';
+    if (!list) return;
+    if (!hotels.length) { list.innerHTML = ''; return; }
     list.innerHTML = hotels.map(function (h, i) {
       return '<div class="hotel-row" data-hotel="' + i + '">' +
-        '<div class="hotel-name">' + esc(h.name || '(' + t('hotelName') + ')') + '</div>' +
-        '<div class="hotel-meta">' + esc([h.address, h.city].filter(Boolean).join(' · ')) + '</div>' +
-        '<div class="hotel-meta" style="margin-top:2px">' + esc(h.stay22Link) + '</div>' +
-        '<div class="btn-row" style="margin-top:6px">' +
-        '<a href="' + esc(h.stay22Link) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">' + esc(t('hotelBookBtn')) + '</a>' +
-        '<button class="btn btn-ghost btn-sm" data-rmhotel="' + i + '">' + esc(t('remove')) + '</button>' +
-        '</div></div>';
+        '<div class="field"><label>' + esc(t('hotelMapsLink')) + '</label>' +
+        '<div class="link-row"><input data-hf="googleMapsUrl" value="' + esc(h.googleMapsUrl || '') + '" placeholder="https://maps.google.com/…">' +
+        '<button class="btn btn-primary btn-sm" data-findhotel="' + i + '">' + esc(t('findPin')) + '</button></div>' +
+        '<div class="coords-readout" data-hotelreadout="' + i + '">' + (h.stay22Link ? esc(h.stay22Link) : '') + '</div>' +
+        '</div>' +
+        '<div class="row3">' +
+        '<div class="field"><label>' + esc(t('hotelName')) + '</label><input data-hf="name" value="' + esc(h.name || '') + '"></div>' +
+        '<div class="field"><label>' + esc(t('hotelAddress')) + '</label><input data-hf="address" value="' + esc(h.address || '') + '"></div>' +
+        '<div class="field"><label>' + esc(t('hotelCity')) + '</label><input data-hf="city" value="' + esc(h.city || '') + '"></div>' +
+        '</div>' +
+        '<div class="field"><label>' + esc(t('stopPhoto')) + '</label>' +
+        '<div data-hotelphoto="' + i + '">' + (h.image ? '<img class="thumb" src="' + esc(h.image) + '" alt="">' : '<div class="thumb-empty">' + esc(t('stopPhoto')) + '</div>') + '</div>' +
+        '<div class="btn-row" style="margin-top:8px"><button class="btn btn-ghost btn-sm" data-pickhotel="' + i + '">' + esc(h.image ? t('replacing') : t('chooseImage')) + '</button></div>' +
+        '</div>' +
+        '<div class="btn-row" style="margin-top:6px"><button class="btn btn-danger btn-sm" data-rmhotel="' + i + '">' + esc(t('remove')) + '</button></div>' +
+        '</div>';
     }).join('');
   }
 
   function syncHotelsFromDOM() {
-    // hotels are edited via the prompt-based addHotel flow
+    var hotels = state.guide.hotels || [];
+    Array.prototype.forEach.call(document.querySelectorAll('#hotels-list .hotel-row'), function (box) {
+      var i = Number(box.getAttribute('data-hotel'));
+      if (!hotels[i]) return;
+      Array.prototype.forEach.call(box.querySelectorAll('[data-hf]'), function (inp) {
+        var f = inp.getAttribute('data-hf');
+        if (f === 'googleMapsUrl') hotels[i].googleMapsUrl = inp.value.trim();
+        else hotels[i][f] = inp.value.trim();
+      });
+    });
   }
 
   function buildStay22Link(name, city, guideId) {
@@ -862,17 +913,33 @@
   }
 
   function addHotel() {
-    var name = prompt(t('hotelName'));
-    if (!name || !name.trim()) return;
-    var address = prompt(t('hotelAddress')) || '';
-    var city = prompt(t('hotelCity')) || '';
-    var mapsLink = prompt(t('hotelMapsLink')) || '';
-    var link = buildStay22Link(name.trim(), city.trim(), state.guide.id);
-    state.guide.hotels = (state.guide.hotels || []).concat([{
-      name: name.trim(), address: address.trim(), city: city.trim(),
-      googleMapsUrl: mapsLink.trim(), stay22Link: link, image: '',
-    }]);
+    state.guide.hotels = (state.guide.hotels || []).concat([{ name: '', address: '', city: '', googleMapsUrl: '', stay22Link: '', image: '' }]);
     renderHotels(); markDirty();
+  }
+
+  function findHotelPin(idx) {
+    var box = document.querySelector('#hotels-list .hotel-row[data-hotel="' + idx + '"]');
+    var url = box ? box.querySelector('[data-hf="googleMapsUrl"]').value.trim() : '';
+    var out = document.querySelector('[data-hotelreadout="' + idx + '"]');
+    if (!url) { toast(t('pinMissing'), true); return; }
+    var btn = box ? box.querySelector('[data-findhotel]') : null;
+    if (btn) { btn.disabled = true; btn.textContent = t('finding'); }
+    api('/api/creator/resolve-step', { method: 'POST', body: JSON.stringify({ url: url, fromPin: null }) })
+      .then(function (res) {
+        syncHotelsFromDOM();
+        var h = state.guide.hotels[idx] || {};
+        if (!h.name && res.name) h.name = res.name;
+        if (res.coordinates) h.mapPin = res.coordinates;
+        h.googleMapsUrl = url;
+        state.guide.hotels[idx] = h;
+        renderHotels(); markDirty();
+        toast(t('pinFound') + ' · ' + (res.name || ''));
+      })
+      .catch(function (err) {
+        if (out) out.textContent = err.message;
+        toast(err.message, true);
+      })
+      .then(function () { if (btn) { btn.disabled = false; btn.textContent = t('findPin'); } });
   }
 
   // ---- preview ----
