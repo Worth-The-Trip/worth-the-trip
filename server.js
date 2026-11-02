@@ -507,6 +507,8 @@ function db() {
   }
   fs.mkdirSync(RUNTIME_DIR, { recursive: true });
   _db = new DatabaseSync(DB_PATH);
+  console.log('[WTT] data dir: ' + RUNTIME_DIR);
+  console.log('[WTT] db path:   ' + DB_PATH);
   // WAL lets readers run alongside the writer; busy_timeout makes a competing
   // writer wait instead of failing.
   _db.exec('PRAGMA journal_mode=WAL');
