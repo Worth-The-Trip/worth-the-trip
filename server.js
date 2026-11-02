@@ -726,6 +726,7 @@ function writeArray(file, arr) {
     // Keep the runtime JSON file in sync so ensureDataFiles() never treats
     // runtime creator records as missing and overwrites SQLite with seed data.
     console.log('[WTT writeArray] creators count=' + arr.length + ' emails=' + arr.map((c) => c.email).join(','));
+    globalThis.__lastCreatorWrite = { time: new Date().toISOString(), count: arr.length, emails: arr.map((c) => c.email) };
     try { legacyWrite(file, arr); } catch (e) { /* never block a SQLite write on a JSON sync issue */ }
     return replaceRows(d, 'creators', null, arr, insertCreator);
   }
@@ -1760,7 +1761,10 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/debug/creators', (req, res) => {
-  res.json({ creators: readCreators().map((c) => ({ id: c.id, email: c.email, name: c.name, status: c.status })) });
+  res.json({ 
+    creators: readCreators().map((c) => ({ id: c.id, email: c.email, name: c.name, status: c.status })),
+    lastWrite: globalThis.__lastCreatorWrite || null
+  });
 });
 
 // ------------------------------------------------------------------ helpers
