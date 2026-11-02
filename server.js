@@ -892,7 +892,7 @@ app.use((req, res, next) => {
     res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
   // Content Security Policy - restrictive but allows required third-party resources
-  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://basemaps.cartocdn.com https://tiles.basemaps.cartocdn.com https://api.stripe.com https://checkout.stripe.com https://js.stripe.com https://www.googleapis.com https://id.twitch.tv https://api.twitch.tv https://router.project-osrm.org; frame-src 'self' https://checkout.stripe.com https://js.stripe.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'");
+  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://basemaps.cartocdn.com https://tiles.basemaps.cartocdn.com https://api.stripe.com https://checkout.stripe.com https://js.stripe.com https://www.googleapis.com https://id.twitch.tv https://api.twitch.tv https://router.project-osrm.org; frame-src 'self' https://checkout.stripe.com https://js.stripe.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'");
   next();
 });
 
