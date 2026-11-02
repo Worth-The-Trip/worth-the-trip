@@ -168,10 +168,10 @@
     $('#um-address').value = u.address || '';
     $('#um-password').value = '';
     $('#user-modal-title').textContent = 'Edit ' + (u.name || u.email);
-    $('#user-modal').style.display = 'flex';
+    $('#user-modal').classList.add('active');
   }
 
-  function closeUserModal() { $('#user-modal').style.display = 'none'; }
+  function closeUserModal() { $('#user-modal').classList.remove('active'); }
 
   $('#um-promote-creator').addEventListener('click', async () => {
     const id = $('#um-id').value;
