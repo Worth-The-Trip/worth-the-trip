@@ -2601,7 +2601,13 @@
     });
     $$('.menu-item').forEach(item => {
       item.addEventListener('click', () => {
-        if (item.dataset.page === 'creator-studio') { location.href = '/creator'; return; }
+        if (item.dataset.page === 'creator-studio') {
+          fetch('/api/creator/me').then(r => r.ok ? r.json() : null).then(me => {
+            if (me && me.isCreator) { location.href = '/creator'; }
+            else { openMenuPage('creator'); }
+          }).catch(() => { openMenuPage('creator'); });
+          return;
+        }
         openMenuPage(item.dataset.page);
       });
     });

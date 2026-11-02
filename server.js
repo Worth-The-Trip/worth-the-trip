@@ -2412,7 +2412,16 @@ app.delete('/api/admin/guides/:id', requireAdmin, (req, res) => {
 // `send` treat SiteGround's hidden ".nodeapp" dir as a dotfile and 404.
 app.get('/account', (req, res) => res.sendFile('account.html', { root: DATA_DIR, cacheControl: false }));
 app.get('/admin', (req, res) => res.sendFile('admin.html', { root: DATA_DIR, cacheControl: false }));
-app.get('/creator', (req, res) => res.sendFile('creator.html', { root: DATA_DIR, cacheControl: false }));
+app.get('/creator', (req, res) => {
+  const token = readCookie(req);
+  const s = token ? getSession(token) : null;
+  if (s && s.kind === 'user') {
+    const u = findUserById(s.userId);
+    if (u && isApprovedCreator(u.email)) return res.sendFile('creator.html', { root: DATA_DIR, cacheControl: false });
+    return res.redirect('/');
+  }
+  res.sendFile('creator.html', { root: DATA_DIR, cacheControl: false });
+});
 
 // ------------------------------------------------------------------ start
 // One-time data cleanups. Idempotent, so safe to leave in: each runs only when

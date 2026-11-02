@@ -206,174 +206,47 @@
   }
 
   // ---- gate ----
+  // The standalone /creator page is studio-only. The application form lives
+  // in the sidebar menu popup (menuPageContent('creator') in app.js). If a
+  // visitor lands here without creator access, send them back to the app.
   function renderGate() {
     var m = state.me;
-    var app = m.application;
-    var html = '';
-    if (!m.signedIn) {
-      // Applying is how you join — the form creates the account as part of the
-      // application, so there is no "apply without an account" path.
-      html += '<div class="card">' +
-        '<h1>' + esc(t('applyTitle')) + '</h1><p class="sub">' + esc(t('applySub')) + '</p>' +
+    if (!m || !m.signedIn) {
+      $('#gate-view').innerHTML = '<div class="card"><h1>Sign in required</h1><p class="sub">Please sign in to access the creator studio.</p>' +
         '<div class="error" id="gate-error"></div>' +
-        applyForm(true) +
-        '<div class="section-title" style="margin-top:22px">' + esc(t('signin')) + '</div>' +
         '<form id="signin-form"><div class="field"><label>' + esc(t('email')) + '</label><input id="si-email" type="email" required autocomplete="email"></div>' +
         '<div class="field"><label>' + esc(t('password')) + '</label><input id="si-password" type="password" required autocomplete="current-password"></div>' +
-        '<div class="btn-row"><button class="btn btn-primary" type="submit">' + esc(t('signin')) + '</button></div></form>' +
-        '<p class="hint" style="margin-top:14px">' + esc(t('applyAccountNote')) + '</p></div>';
-    } else if (!app || app.status === 'pending') {
-      var pending = !!app;
-      html += '<div class="card"><h1>' + esc(pending ? t('pendingTitle') : t('applyTitle')) + '</h1>' +
-        '<p class="sub">' + esc(pending ? t('pendingSub') : t('applySub')) + '</p>' +
-        '<div class="error" id="gate-error"></div>' +
-        (pending ? '<p class="sub">' + esc(t('applying')) + ' · ' + esc(m.user.email) + '</p>' : applyForm()) + '</div>';
-    } else if (app.status === 'rejected') {
-      html += '<div class="card"><h1>' + esc(t('rejectedTitle')) + '</h1><p class="sub">' + esc(t('rejectedSub')) + '</p>' +
-        (app.reviewNote ? '<div class="problems"><strong>' + esc(t('reviewNote')) + '</strong><div style="margin-top:6px">' + esc(app.reviewNote) + '</div></div>' : '') +
-        '<div class="error" id="gate-error" style="margin-top:14px"></div>' +
-        '<div class="section-title" style="margin-top:18px">' + esc(t('reapply')) + '</div>' + applyForm() + '</div>';
+        '<div class="btn-row"><button class="btn btn-primary" type="submit">' + esc(t('signin')) + '</button></div></form></div>';
+      showView('gate');
+      wireSigninOnly();
+      return;
     }
+    if (m.isCreator) {
+      loadGuides();
+      return;
+    }
+    var app = m.application;
+    var status = app ? app.status : 'none';
+    var html = '<div class="card"><h1>Creator studio</h1><p class="sub">Your application is ' + esc(status) + '.</p>';
+    if (status === 'pending') {
+      html += '<p class="sub">We review applications by hand. You will see the studio here once you are approved.</p>';
+    } else if (status === 'rejected') {
+      html += '<p class="sub">' + (app.reviewNote ? esc(app.reviewNote) + '<br>' : '') + 'You can reapply from the <strong>Become a Creator</strong> option in the sidebar menu.</p>';
+    } else {
+      html += '<p class="sub">Apply from the <strong>Become a Creator</strong> option in the sidebar menu to request access.</p>';
+    }
+    html += '<div class="btn-row" style="margin-top:14px"><button class="btn btn-ghost" onclick="location.href=\'/\'">Back to Worth The Trip</button></div></div>';
     $('#gate-view').innerHTML = html;
     showView('gate');
-    wireGate();
   }
 
-  function applyForm(withAccount) {
-    var a = (state.me.application || {});
-    // When signed out the form also collects the account details, so applying
-    // creates the account in the same step — there is no way to apply without
-    // being a registered user.
-    var accountFields = withAccount
-      ? '<div class="field"><label>' + esc(t('email')) + '</label><input id="ap-email" type="email" required autocomplete="email"></div>' +
-        '<div class="field"><label>' + esc(t('password6')) + '</label><input id="ap-password" type="password" required minlength="6" autocomplete="new-password"></div>'
-      : '';
-    var fallbackName = a.name || (state.me.user && state.me.user.name) || '';
-    // A social handle is optional — pre-fill a sensible one so an empty field
-    // can never silently block the application.
-    var fallbackHandle = '@' + fallbackName.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24);
-    return '<form id="apply-form">' + accountFields +
-      '<div class="row2">' +
-      '<div class="field"><label>' + esc(t('name')) + '</label><input id="ap-name" required value="' + esc(fallbackName) + '"></div>' +
-      '<div class="field"><label>' + esc(t('handle')) + ' <span class="hint">— ' + esc(t('optional')) + '</span></label><input id="ap-handle" maxlength="80" value="' + esc(a.handle || fallbackHandle) + '" placeholder="@yourname"></div>' +
-      '</div>' +
-      '<div class="field"><label>' + esc(t('area')) + '</label><input id="ap-area" value="' + esc(a.area || '') + '"></div>' +
-      '<div class="field"><label>' + esc(t('bio')) + '</label><textarea id="ap-bio">' + esc(a.bio || '') + '</textarea></div>' +
-      '<div class="row2">' +
-      '<div class="field"><label>' + esc(t('youtube')) + '</label><input id="ap-youtube" value="' + esc(a.youtubeUrl || '') + '"></div>' +
-      '<div class="field"><label>' + esc(t('instagram')) + '</label><input id="ap-instagram" value="' + esc(a.instagramUrl || '') + '"></div>' +
-      '</div>' +
-      '<div class="btn-row"><button class="btn btn-primary" type="submit">' + esc(t('apply')) + '</button></div></form>';
-  }
-
-  // Email verification popup.
-  var verifyPopup = $('#verify-popup');
-  var verifyPopupEmail = null;
-
-  function showVerifyPopup(email) {
-    verifyPopupEmail = email;
-    verifyPopup.style.display = 'flex';
-    verifyPopup.classList.add('open');
-    $('#verify-popup-title').textContent = t('verify.popupTitle');
-    $('#verify-popup-body').textContent = t('verify.popupBody').replace(/{email}/g, email || '');
-    $('#verify-popup-resend').style.display = 'inline-flex';
-    $('#verify-popup-resend').textContent = t('verify.popupResend');
-    $('#verify-popup-hint').textContent = '';
-  }
-
-  function hideVerifyPopup() {
-    verifyPopup.style.display = 'none';
-    verifyPopup.classList.remove('open');
-  }
-
-  function resendVerification() {
-    var email = verifyPopupEmail;
-    if (!email) return;
-    $('#verify-popup-resend').disabled = true;
-    $('#verify-popup-hint').textContent = 'Sending…';
-    api('/api/resend-verification', { method: 'POST', body: JSON.stringify({ email }) })
-      .then(function () {
-        $('#verify-popup-hint').textContent = t('verify.sentTitle') + ' ' + t('verify.sentBody').replace(/{email}/g, email);
-      })
-      .catch(function () {
-        $('#verify-popup-hint').textContent = t('verify.popupResendError');
-      })
-      .finally(function () { $('#verify-popup-resend').disabled = false; });
-  }
-
-  $('#verify-popup-resend').addEventListener('click', resendVerification);
-  $('#verify-popup-close').addEventListener('click', hideVerifyPopup);
-  $('#verify-popup').addEventListener('click', function (e) {
-    if (e.target.id === 'verify-popup') hideVerifyPopup();
-  });
-
-  function wireGate() {
+  function wireSigninOnly() {
     var sf = $('#signin-form');
     if (sf) sf.addEventListener('submit', function (e) {
       e.preventDefault();
       api('/api/login', { method: 'POST', body: JSON.stringify({ email: $('#si-email').value.trim(), password: $('#si-password').value }) })
         .then(function (res) { try { localStorage.setItem(AUTH_KEY, res.token); } catch (x) {} return loadMe(); })
         .then(route).catch(function (err) { $('#gate-error').textContent = err.message; });
-    });
-    var uf = $('#signup-form');
-    if (uf) uf.addEventListener('submit', function (e) {
-      e.preventDefault();
-      api('/api/users', { method: 'POST', body: JSON.stringify({ email: $('#su-email').value.trim(), password: $('#su-password').value, name: $('#su-name').value.trim() }) })
-        .then(function (res) {
-          if (res && res.requiresVerification) {
-            // Account created but unverified: the signup gate does not force a
-            // session. Show the verification popup and let the user confirm from
-            // their email. The apply form is shown only after signing in.
-            showVerifyPopup(res.user.email);
-            return;
-          }
-          try { localStorage.setItem(AUTH_KEY, res.token); } catch (x) {}
-          return loadMe();
-        })
-        .then(route).catch(function (err) { $('#gate-error').textContent = err.message; });
-    });
-    var af = $('#apply-form');
-    if (af) af.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var payload = {
-        name: $('#ap-name').value, handle: $('#ap-handle').value, area: $('#ap-area').value,
-        bio: $('#ap-bio').value, youtubeUrl: $('#ap-youtube').value, instagramUrl: $('#ap-instagram').value
-      };
-      // No account yet? Create one from the same form, then apply as that user.
-      var email = $('#ap-email');
-      var step = (email && email.value)
-        ? api('/api/users', {
-            method: 'POST',
-            body: JSON.stringify({ email: email.value.trim(), password: $('#ap-password').value, name: payload.name })
-          })
-        : Promise.resolve();
-      var applying = false;
-      step
-        .then(function (res) {
-          if (res && res.requiresVerification) {
-            // Account created (unverified): mark signed-in so the apply steps
-            // forward, but do not apply yet. /api/creator/apply requires a
-            // session cookie, minted only after the user clicks the verification
-            // link.
-            state.me = { signedIn: true, user: res.user };
-            showVerifyPopup(res.user.email);
-            applying = true;
-            return;
-          }
-          return loadMe().then(function (me) {
-            state.me = me;
-            return api('/api/creator/apply', { method: 'POST', body: JSON.stringify(payload) });
-          });
-        })
-        .then(function (res) {
-          if (applying) return;
-          if (res && res.requiresVerification) {
-            showVerifyPopup(state.me.user.email);
-            return;
-          }
-          return loadMe().then(route);
-        })
-        .catch(function (err) { $('#gate-error').textContent = err.message; });
     });
   }
 
