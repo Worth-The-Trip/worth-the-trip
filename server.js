@@ -726,6 +726,7 @@ function writeArray(file, arr) {
     // Keep the runtime JSON file in sync so ensureDataFiles() never treats
     // runtime creator records as missing and overwrites SQLite with seed data.
     console.log('[WTT writeArray] creators count=' + arr.length + ' emails=' + arr.map((c) => c.email).join(','));
+    console.log('[WTT writeArray] stack:\n' + new Error().stack.split('\n').slice(2, 6).join('\n'));
     globalThis.__lastCreatorWrite = { time: new Date().toISOString(), count: arr.length, emails: arr.map((c) => c.email) };
     try { legacyWrite(file, arr); } catch (e) { /* never block a SQLite write on a JSON sync issue */ }
     return replaceRows(d, 'creators', null, arr, insertCreator);
