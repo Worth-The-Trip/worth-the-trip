@@ -1352,10 +1352,49 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
   });
 });
 
-app.delete('/api/users/:id', requireAdmin, (req, res) => {
+app.post('/api/admin/users/:id/promote-creator', requireAdmin, (req, res) => {
   mutate(() => {
+  try {
     const u = findUserById(req.params.id);
     if (!u) return jsonError(res, 404, 'User not found');
+    const creators = readCreators();
+    const idx = creators.findIndex((c) => String(c.email || '').toLowerCase() === String(u.email || '').toLowerCase());
+    const now = new Date().toISOString();
+    if (idx >= 0) {
+      const c = creators[idx];
+      c.status = 'accepted';
+      c.name = c.name || u.name || '';
+      c.email = c.email || u.email;
+      creators[idx] = c;
+    } else {
+      creators.push({
+        id: genId(),
+        name: u.name || '',
+        handle: '@' + (u.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24) || ('user-' + u.id.slice(0, 8)),
+        area: '',
+        email: u.email,
+        bio: '',
+        youtubeUrl: '',
+        instagramUrl: '',
+        tiktokUrl: '',
+        twitchUrl: '',
+        status: 'accepted',
+        guides: [],
+        appliedAt: now,
+        reviewNote: null,
+        profileUpdatedAt: now,
+      });
+    }
+    writeArray(CREATORS_FILE, creators);
+    res.json({ ok: true, promoted: true, email: u.email });
+  } catch (e) { jsonError(res, 500, e.message); }
+  });
+});
+
+app.delete('/api/users/:id', requireAdmin, (req, res) => {
+  mutate(() => {
+  const u = findUserById(req.params.id);
+  if (!u) return jsonError(res, 404, 'User not found');
     const sessions = readSessions().filter((s) => !(s.userId === u.id && s.kind === 'user'));
     writeLines(SESSIONS_FILE, sessions);
     const purchases = readPurchases().filter((p) => p.buyerEmail !== u.email);

@@ -173,6 +173,18 @@
 
   function closeUserModal() { $('#user-modal').style.display = 'none'; }
 
+  $('#um-promote-creator').addEventListener('click', async () => {
+    const id = $('#um-id').value;
+    if (!id) return;
+    if (!confirm('Promote this user to Creator? They will get immediate access to the creator studio.')) return;
+    try {
+      await api('/api/admin/users/' + id + '/promote-creator', { method: 'POST' });
+      toast('User promoted to Creator');
+      closeUserModal();
+      loadAll();
+    } catch (e) { toast(e.message); }
+  });
+
   $('#user-edit-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = $('#um-id').value;
