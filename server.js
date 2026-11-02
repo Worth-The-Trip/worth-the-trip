@@ -1858,6 +1858,7 @@ app.get('/api/creator/me', (req, res) => {
     });
   }
   if (info.kind !== 'user') return jsonError(res, 401, 'Not signed in');
+  console.log('[WTT debug] creator/me user=' + info.user.email + ' rec=' + JSON.stringify(info.creator));
   const rec = info.creator;
   res.json({
     user: { id: info.user.id, name: info.user.name, email: info.user.email, avatar: info.user.avatar },
