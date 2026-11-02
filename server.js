@@ -1819,6 +1819,7 @@ app.post('/api/creator/apply', requireUser, (req, res) => {
     const idx = creators.findIndex((c) => String(c.email || '').toLowerCase() === req.user.email);
     const existing = idx >= 0 ? creators[idx] : null;
     if (existing && existing.status === 'accepted') return jsonError(res, 409, 'You are already a creator');
+    const isStaging = process.env.WTT_BASE_URL && process.env.WTT_BASE_URL.includes('sg-host.com');
     const record = {
       id: existing ? existing.id : genId(),
       name: name, handle: handle,
@@ -1828,7 +1829,7 @@ app.post('/api/creator/apply', requireUser, (req, res) => {
       youtubeUrl: clip(b.youtubeUrl, 300).trim(),
       instagramUrl: clip(b.instagramUrl, 300).trim(),
       tiktokUrl: clip(b.tiktokUrl, 300).trim(),
-      status: ON_SITEGROUND ? 'accepted' : 'pending',
+      status: (ON_SITEGROUND || isStaging) ? 'accepted' : 'pending',
       guides: existing && Array.isArray(existing.guides) ? existing.guides : [],
       appliedAt: new Date().toISOString(),
       reviewNote: null,
