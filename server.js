@@ -2024,12 +2024,9 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
           name: clip(h.name, 120).trim(),
           address: clip(h.address, 300).trim(),
           city: clip(h.city, 80).trim(),
-          provider: clip(h.provider, 40).trim(),
+          googleMapsUrl: clip(h.googleMapsUrl, 500).trim(),
           stay22Link: clip(h.stay22Link, 500).trim(),
           image: clip(h.image, 400).trim(),
-          checkIn: clip(h.checkIn, 20).trim(),
-          checkOut: clip(h.checkOut, 20).trim(),
-          guests: Math.max(1, Number(h.guests) || 2),
         };
       });
     }

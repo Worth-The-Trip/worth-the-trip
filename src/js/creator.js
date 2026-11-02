@@ -53,8 +53,7 @@
       locHint: 'Paste a Google Maps link and the pin is found for you — short share links work too.',
       hotelHint: 'Add hotels your guide recommends. Stay22 affiliate links are generated automatically.',
       hotelName: 'Hotel name', hotelAddress: 'Address / area', hotelCity: 'City',
-      hotelProvider: 'Provider (e.g. booking.com, airbnb)', hotelGuests: 'Guests',
-      hotelCheckIn: 'Check-in', hotelCheckOut: 'Check-out',
+      hotelMapsLink: 'Google Maps link (optional)', hotelBookBtn: 'Check availability',
       noHotels: 'No hotels added yet.', remove: 'Remove',
       stopTitle: 'Location name', stopDesc: 'What happens here', day: 'Day', time: 'Time',
       mapsLink: 'Google Maps link', findPin: 'Find & fill', finding: 'Finding…', pinFound: 'Pin found',
@@ -105,8 +104,7 @@
       locHint: 'Googleマップのリンクを貼ると、ピンを自動で見つけます。短縮リンクも使えます。',
       hotelHint: 'おすすめのホテルを追加します。Stay22のアフィリエイトリンクが自動生成されます。',
       hotelName: 'ホテル名', hotelAddress: '住所・エリア', hotelCity: '都市',
-      hotelProvider: '提供元（例：booking.com、airbnb）', hotelGuests: '人数',
-      hotelCheckIn: 'チェックイン', hotelCheckOut: 'チェックアウト',
+      hotelMapsLink: 'Googleマップリンク（任意）', hotelBookBtn: '空室を確認',
       noHotels: 'ホテルがまだ追加されていません。', remove: '削除',
       stopTitle: 'スポット名', stopDesc: 'ここでの内容', day: '日', time: '時刻',
       mapsLink: 'Googleマップのリンク', findPin: '検索して入力', finding: '検索中…', pinFound: 'ピンが見つかりました',
@@ -830,6 +828,10 @@
   }
 
   // ---- hotels ----
+  // A hotel is a recommendation the creator adds to the guide. The creator
+  // supplies the basics; the Stay22 affiliate link is generated automatically.
+  // When a traveller views the guide, their own travel dates are appended to
+  // the link so the booking goes through WTT's affiliate account.
   function renderHotels() {
     var hotels = state.guide.hotels || [];
     var card = $('#hotels-card');
@@ -840,22 +842,23 @@
     list.innerHTML = hotels.map(function (h, i) {
       return '<div class="hotel-row" data-hotel="' + i + '">' +
         '<div class="hotel-name">' + esc(h.name || '(' + t('hotelName') + ')') + '</div>' +
-        '<div class="hotel-meta">' + esc([h.address, h.city, h.provider].filter(Boolean).join(' · ')) + '</div>' +
+        '<div class="hotel-meta">' + esc([h.address, h.city].filter(Boolean).join(' · ')) + '</div>' +
+        '<div class="hotel-meta" style="margin-top:2px">' + esc(h.stay22Link) + '</div>' +
         '<div class="btn-row" style="margin-top:6px">' +
-        '<a href="' + esc(h.stay22Link) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Stay22 link</a>' +
+        '<a href="' + esc(h.stay22Link) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">' + esc(t('hotelBookBtn')) + '</a>' +
         '<button class="btn btn-ghost btn-sm" data-rmhotel="' + i + '">' + esc(t('remove')) + '</button>' +
         '</div></div>';
     }).join('');
   }
 
   function syncHotelsFromDOM() {
-    // hotels are edited via a simple prompt-based flow for now
+    // hotels are edited via the prompt-based addHotel flow
   }
 
-  function buildStay22Link(name, city) {
+  function buildStay22Link(name, city, guideId) {
     var aid = '6ae6fed2c21651647046f81f';
     var address = encodeURIComponent([name, city].filter(Boolean).join(', '));
-    return 'https://www.stay22.com/allez?aid=' + aid + '&address=' + address + '&campaign=wtt-' + (state.guide.id || '');
+    return 'https://www.stay22.com/allez?aid=' + aid + '&address=' + address + '&campaign=wtt-' + (guideId || '');
   }
 
   function addHotel() {
@@ -863,15 +866,11 @@
     if (!name || !name.trim()) return;
     var address = prompt(t('hotelAddress')) || '';
     var city = prompt(t('hotelCity')) || '';
-    var provider = prompt(t('hotelProvider')) || '';
-    var guests = prompt(t('hotelGuests')) || '2';
-    var checkIn = prompt(t('hotelCheckIn')) || '';
-    var checkOut = prompt(t('hotelCheckOut')) || '';
-    var link = buildStay22Link(name.trim(), city.trim());
+    var mapsLink = prompt(t('hotelMapsLink')) || '';
+    var link = buildStay22Link(name.trim(), city.trim(), state.guide.id);
     state.guide.hotels = (state.guide.hotels || []).concat([{
-      name: name.trim(), address: address.trim(), city: city.trim(), provider: provider.trim(),
-      stay22Link: link, image: '', checkIn: checkIn.trim(), checkOut: checkOut.trim(),
-      guests: Math.max(1, Number(guests) || 2),
+      name: name.trim(), address: address.trim(), city: city.trim(),
+      googleMapsUrl: mapsLink.trim(), stay22Link: link, image: '',
     }]);
     renderHotels(); markDirty();
   }

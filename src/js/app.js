@@ -111,6 +111,8 @@
     modalIncludes: $('#modal-includes'),
     modalTimeline: $('#modal-timeline'),
     modalTimelineContent: $('#modal-timeline-content'),
+    modalHotelsLabel: $('#hotels-label'),
+    modalHotels: $('#modal-hotels'),
     modalSubDests: $('#subdest-label'),
     modalSubDestGrid: $('#modal-sub-dest-grid'),
     modalCreator: $('#modal-creator'),
@@ -1719,6 +1721,34 @@
       });
     } else {
       els.modalTimeline.style.display = 'none';
+    }
+
+    // Creator-added hotel recommendations — shown after the timeline.
+    const hotels = guide.hotels || [];
+    if (unlocked && hotels.length) {
+      els.modalHotelsLabel.style.display = '';
+      els.modalHotels.style.display = '';
+      const checkIn = state.travelStart || '';
+      const checkOut = state.travelEnd || '';
+      els.modalHotels.innerHTML = hotels.map((h, i) => {
+        const link = buildStay22Link(h.stay22Link, checkIn, checkOut);
+        return '<div class="timeline-hotel">' +
+          '<div class="timeline-dot-hotel">🏨</div>' +
+          '<div class="timeline-row">' +
+            '<div class="timeline-text">' +
+              '<div class="timeline-title">' + esc(h.name) + '</div>' +
+              '<div class="timeline-desc">' + esc([h.address, h.city].filter(Boolean).join(' · ')) + '</div>' +
+              '<div class="timeline-meta">' +
+                '<a class="timeline-meta-btn timeline-book-btn" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">' + t('hotelRec.checkAvailability') + '</a>' +
+              '</div>' +
+            '</div>' +
+            (h.image ? '<img class="timeline-thumb" src="' + esc(h.image) + '" alt="' + esc(h.name) + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
+          '</div>' +
+        '</div>';
+      }).join('');
+    } else {
+      els.modalHotelsLabel.style.display = 'none';
+      els.modalHotels.style.display = 'none';
     }
 
     // Sub-destinations render inside the timeline as nearby strips.
