@@ -1555,6 +1555,9 @@ app.post('/api/checkout/unlock-all', async (req, res) => {
 });
 
 // ---- Admin: creators ----
+app.get('/api/debug/paths', requireAdmin, (req, res) => {
+  res.json({ dataDir: RUNTIME_DIR, dbPath: DB_PATH });
+});
 app.get('/api/creators', requireAdmin, (req, res) => {
   const creators = readCreators().map((c) => ({
     id: c.id, name: c.name, handle: c.handle, area: c.area, email: c.email,
