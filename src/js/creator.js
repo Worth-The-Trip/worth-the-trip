@@ -876,6 +876,10 @@
     if (!hotels.length) { list.innerHTML = ''; return; }
     list.innerHTML = hotels.map(function (h, i) {
       return '<div class="hotel-row" data-hotel="' + i + '">' +
+        '<div class="stop-head"><div class="stop-num hotel-num">' + (i + 1) + '</div>' +
+        '<div class="stop-name">' + esc(h.name || '(' + t('hotelName') + ')') + '</div>' +
+        '<button class="btn btn-danger btn-sm" data-rmhotel="' + i + '" title="' + esc(t('remove')) + '">✕</button>' +
+        '</div>' +
         '<div class="field"><label>' + esc(t('hotelMapsLink')) + '</label>' +
         '<div class="link-row"><input data-hf="googleMapsUrl" value="' + esc(h.googleMapsUrl || '') + '" placeholder="https://maps.google.com/… or short link">' +
         '<button class="btn btn-primary btn-sm" data-findhotel="' + i + '">' + esc(t('findPin')) + '</button></div>' +
