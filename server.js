@@ -1849,7 +1849,7 @@ app.post('/api/creator/apply', requireUser, (req, res) => {
       baseUrl: process.env.WTT_BASE_URL || 'https://worththetripapp.com'
     }).catch(() => { /* SMTP not configured yet — never block the apply */ });
 
-    res.json({ ok: true, status: 'pending', requiresVerification: true });
+    res.json({ ok: true, status: record.status, requiresVerification: !(ON_SITEGROUND || isStaging) });
   } catch (e) { jsonError(res, 500, e.message); }
   });
 });
