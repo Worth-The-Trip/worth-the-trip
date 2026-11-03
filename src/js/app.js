@@ -1613,26 +1613,44 @@
         const hr = guide.hotelRec;
         const dates = hr.checkIn && hr.checkOut ? `<span>📅 ${hr.checkIn} → ${hr.checkOut} · ${hr.guests} ${t('hotelRec.guests').toLowerCase()}</span>` : '';
         html += `
+          <div class="timeline-item timeline-hotel">
+            <span class="timeline-time">${hotel.time}</span>
+            <div class="timeline-row">
+              <div class="timeline-text">
+                <div class="timeline-title">🛏 ${hotel.title}</div>
+                <div class="timeline-desc">${dates}</div>
+                <div class="timeline-meta">
+                  <a class="timeline-meta-btn timeline-book-btn" href="${buildStay22Link(hr.recommended.stay22Link)}" target="_blank" rel="noopener noreferrer">
+                    ${t('hotelRec.book')}
+                  </a>
+                  ${t('hotelRec.affiliateNote') ? `<span class="hotel-affiliate-note">${t('hotelRec.affiliateNote')}</span>` : ''}
+                </div>
+              </div>
+              <img class="timeline-thumb" src="${hr.recommended.image}" alt="${hr.recommended.name}" loading="lazy" onerror="this.style.display='none'">
+            </div>
+          </div>`;
+        }
+        return html;
+      }).join('') +
+      // Append creator-added hotels as timeline steps after all days.
+      (guide.hotels || []).map((h, i) => {
+        const link = buildStay22Link(h.stay22Link);
+        return `
         <div class="timeline-item timeline-hotel">
-          <span class="timeline-time">${hotel.time}</span>
+          <span class="timeline-time"></span>
           <div class="timeline-row">
             <div class="timeline-text">
-              <div class="timeline-title">🛏 ${hotel.title}</div>
-              <div class="timeline-desc">${dates}</div>
+              <div class="timeline-title">🏨 ${esc(h.name)}</div>
+              <div class="timeline-desc">${esc([h.address, h.city].filter(Boolean).join(' · '))}</div>
               <div class="timeline-meta">
-                <a class="timeline-meta-btn timeline-book-btn" href="${buildStay22Link(hr.recommended.stay22Link)}" target="_blank" rel="noopener noreferrer">
-                  ${t('hotelRec.book')}
-                </a>
-                ${t('hotelRec.affiliateNote') ? `<span class="hotel-affiliate-note">${t('hotelRec.affiliateNote')}</span>` : ''}
+                <a class="timeline-meta-btn timeline-book-btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${t('hotelRec.checkAvailability')}</a>
               </div>
             </div>
-            <img class="timeline-thumb" src="${hr.recommended.image}" alt="${hr.recommended.name}" loading="lazy" onerror="this.style.display='none'">
+            ${h.image ? `<img class="timeline-thumb" src="${esc(h.image)}" alt="${esc(h.name)}" loading="lazy" onerror="this.style.display='none'">` : ''}
           </div>
         </div>`;
+      }).join('');
       }
-      return html;
-    }).join('');
-  }
   function nearestTimelineIndex(subPin, timeline) {
     let best = -1, bestD = Infinity;
     (timeline || []).forEach((t, i) => {
@@ -3538,32 +3556,6 @@
       html += `
         <div class="section-label">${t('modal.timeline')}</div>
         <div class="timeline">${timelineHtml(guide)}</div>`;
-    }
-
-    // Creator-added hotel recommendations — shown after the timeline.
-    const hotels = guide.hotels || [];
-    if (unlocked && hotels.length) {
-      const checkIn = state.travelStart || '';
-      const checkOut = state.travelEnd || '';
-      html += `
-        <div class="section-label">${t('modal.hotels') || 'Where to stay'}</div>
-        <div class="timeline">${hotels.map((h, i) => {
-          const link = buildStay22Link(h.stay22Link, checkIn, checkOut);
-          return `
-          <div class="timeline-item timeline-hotel">
-            <div class="timeline-dot-hotel">🏨</div>
-            <div class="timeline-row">
-              <div class="timeline-text">
-                <div class="timeline-title">${esc(h.name)}</div>
-                <div class="timeline-desc">${esc([h.address, h.city].filter(Boolean).join(' · '))}</div>
-                <div class="timeline-meta">
-                  <a class="timeline-meta-btn timeline-book-btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${t('hotelRec.checkAvailability')}</a>
-                </div>
-              </div>
-              ${h.image ? `<img class="timeline-thumb" src="${esc(h.image)}" alt="${esc(h.name)}" loading="lazy" onerror="this.style.display='none'">` : ''}
-            </div>
-          </div>`;
-        }).join('')}</div>`;
     }
 
     // Sub-destinations render inside the timeline as nearby strips (see above).
