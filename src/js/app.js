@@ -1862,8 +1862,12 @@
 
     // Per-guide: Unlock Guide button (guideId is in scope here — openGuideModal).
     els.modalUnlockBtn.addEventListener('click', () => {
-      if (attemptUnlock(guideId)) {
+      console.log('[WTT] modal unlock btn clicked for:', guideId);
+      const result = attemptUnlock(guideId);
+      console.log('[WTT] attemptUnlock returned:', result);
+      if (result === true) {
         // Free unlock succeeded — refresh the modal to show the unlocked guide.
+        console.log('[WTT] Refreshing modal after free unlock');
         openGuideModal(guideId);
       }
     });
@@ -2189,8 +2193,12 @@
   }
 
   function attemptUnlock(guideId, unlockAll) {
+    console.log('[WTT] attemptUnlock:', guideId, 'unlockAll:', unlockAll, 'freeUnlocked:', state.freeUnlocked, 'alreadyHas:', state.unlockedGuides.has(guideId));
     const guide = guideById(guideId);
-    if (!guide) return;
+    if (!guide) {
+      console.warn('[WTT] attemptUnlock abort: guide not found for', guideId);
+      return;
+    }
 
     if (unlockAll) {
       if (state.unlockedGuides.size === WTT_GUIDES.length) {
@@ -2202,6 +2210,7 @@
     }
 
     if (!state.freeUnlocked) {
+      console.log('[WTT] Free unlock for:', guideId);
       state.unlockedGuides.add(guideId);
       persistUnlocked();
       persistFreeUnlocked();
@@ -2219,6 +2228,7 @@
     }
 
     if (state.unlockedGuides.has(guideId)) {
+      console.log('[WTT] Guide already unlocked:', guideId);
       showToast(t('toast.alreadyUnlocked'), 'success');
       return;
     }
@@ -3480,7 +3490,10 @@
     if (unlockBtn) unlockBtn.addEventListener('click', () => attemptUnlock(guideId));
     const unlockFreeBtn = all.querySelector('.trip-detail-unlock-free');
     if (unlockFreeBtn) unlockFreeBtn.addEventListener('click', () => {
-      if (attemptUnlock(guideId)) {
+      console.log('[WTT] trips page free unlock btn clicked for:', guideId);
+      const result = attemptUnlock(guideId);
+      console.log('[WTT] attemptUnlock returned:', result);
+      if (result === true) {
         all.innerHTML = tripDetailHtml(guideById(guideId), guideId, undefined);
         bindTripDetail(all, guideId);
       }
