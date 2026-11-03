@@ -919,7 +919,7 @@
   function buildStay22Link(name, city, guideId) {
     var aid = '6ae6fed2c21651647046f81f';
     var address = encodeURIComponent([name, city].filter(Boolean).join(', '));
-    return 'https://www.stay22.com/allez?aid=' + aid + '&address=' + address + '&campaign=wtt-' + (guideId || '');
+    return 'https://www.stay22.com/allez/roam?aid=' + aid + '&address=' + address + '&campaign=wtt-' + (guideId || '');
   }
 
   function addHotel() {
