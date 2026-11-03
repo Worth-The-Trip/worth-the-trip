@@ -70,6 +70,7 @@
       heroImage: String(g.heroImage || '').replace(/^\//, ''),
       includes: g.includes || [],
       timeline: stops,
+      hotels: g.hotels || [],
       subDestinations: [],
       // The app reads guide.youtubeRef for the "Watch the original trip" block.
       youtubeRef: (g.video && g.video.url) ? {
