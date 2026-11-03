@@ -774,7 +774,7 @@ function canonicalizeGuide(g) {
     duration: g.duration, price: g.price, priceTier: g.priceTier, stay: g.stay,
     season: g.season || ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'],
     coordinates: g.coordinates, zoomLevel: g.zoomLevel, heroImage: g.heroImage,
-    video: video, includes: g.includes, timeline: g.timeline, ja: ja,
+    video: video, includes: g.includes, timeline: g.timeline, hotels: g.hotels || [], ja: ja,
     jaSourceHash: g.jaSourceHash || hashJa(ja),
     createdAt: g.createdAt || new Date().toISOString(),
     updatedAt: g.updatedAt || new Date().toISOString(),
