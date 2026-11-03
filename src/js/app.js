@@ -952,6 +952,16 @@
     return url.toString();
   }
 
+  function buildStay22SearchLink(name, city, guideId) {
+    const aid = '6ae6fed2c21651647046f81f';
+    const address = encodeURIComponent([name, city].filter(Boolean).join(', '));
+    const base = 'https://www.stay22.com/allez/roam?aid=' + aid + '&address=' + address + '&campaign=wtt-' + (guideId || '');
+    const url = new URL(base, window.location.origin);
+    if (state.travelStart) url.searchParams.set('checkin', state.travelStart);
+    if (state.travelEnd) url.searchParams.set('checkout', state.travelEnd);
+    return url.toString();
+  }
+
   function updateHotelCard(guide, hotelIdx) {
     const card = document.getElementById('hotel-rec-card-' + guide.id);
     if (!card || !guide.hotelRec) return;
@@ -1645,7 +1655,9 @@
       }).join('') +
       // Append creator-added hotels as timeline steps after all days.
       (guide.hotels || []).map((h, i) => {
-        const link = buildStay22Link(h.stay22Link);
+        const link = h.directBookingUrl
+          ? buildStay22Link(h.stay22Link)
+          : buildStay22Link(h.stay22Link);
         return `
         <div class="timeline-item timeline-hotel">
           <span class="timeline-time"></span>
@@ -1660,7 +1672,16 @@
             ${h.image ? `<img class="timeline-thumb" src="${esc(h.image)}" alt="${esc(h.name)}" loading="lazy" onerror="this.style.display='none'">` : ''}
           </div>
         </div>`;
-      }).join('');
+      }).join('') +
+      (guide.hotels && guide.hotels.length ? `
+        <div class="timeline-item">
+          <span class="timeline-time"></span>
+          <div class="timeline-row">
+            <div class="timeline-text">
+              <a class="timeline-meta-btn timeline-search-btn" href="${esc(buildStay22SearchLink((guide.hotels[0] && guide.hotels[0].name) || '', (guide.hotels[0] && guide.hotels[0].city) || '', guideId))}" target="_blank" rel="noopener noreferrer">${esc(t('hotelRec.searchNearby'))}</a>
+            </div>
+          </div>
+        </div>` : '');
       }
   function nearestTimelineIndex(subPin, timeline) {
     let best = -1, bestD = Infinity;

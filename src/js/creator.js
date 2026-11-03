@@ -53,6 +53,7 @@
       locHint: 'Paste a Google Maps link and the pin is found for you — short share links work too.',
       hotelHint: 'Add hotels your guide recommends. Stay22 affiliate links are generated automatically.',
       hotelName: 'Hotel name', hotelAddress: 'Address / area', hotelCity: 'City',
+      hotelDirectBooking: 'Direct booking URL (Booking.com, Expedia, etc.)',
       hotelMapsLink: 'Google Maps link (optional)', hotelBookBtn: 'Check availability',
       hotelManualHint: 'Name is filled from the link — please complete address and city manually.',
       noHotels: 'No hotels added yet.', remove: 'Remove',
@@ -105,6 +106,7 @@
       locHint: 'Googleマップのリンクを貼ると、ピンを自動で見つけます。短縮リンクも使えます。',
       hotelHint: 'おすすめのホテルを追加します。Stay22のアフィリエイトリンクが自動生成されます。',
       hotelName: 'ホテル名', hotelAddress: '住所・エリア', hotelCity: '都市',
+      hotelDirectBooking: '直接予約URL（Booking.com、Expediaなど）',
       hotelMapsLink: 'Googleマップリンク（任意）', hotelBookBtn: '空室を確認',
       hotelManualHint: 'リンクから名前を入力しました。住所と都市は手動で入力してください。',
       noHotels: 'ホテルがまだ追加されていません。', remove: '削除',
@@ -544,10 +546,11 @@
           address: (h.address || '').trim(),
           city: (h.city || '').trim(),
           googleMapsUrl: (h.googleMapsUrl || '').trim(),
+          directBookingUrl: (h.directBookingUrl || '').trim(),
           image: (h.image || '').trim(),
         };
         if (out.name || out.city) {
-          out.stay22Link = buildStay22Link(out.name, out.city, state.guide.id);
+          out.stay22Link = buildStay22Link(out.name, out.city, state.guide.id, out.directBookingUrl);
         } else if (h.stay22Link) {
           out.stay22Link = h.stay22Link;
         }
@@ -883,6 +886,9 @@
         '<div class="stop-name">' + esc(h.name || '(' + t('hotelName') + ')') + '</div>' +
         '<button class="btn btn-danger btn-sm" data-rmhotel="' + i + '" title="' + esc(t('remove')) + '">✕</button>' +
         '</div>' +
+        '<div class="field"><label>' + esc(t('hotelDirectBooking')) + '</label>' +
+        '<input data-hf="directBookingUrl" value="' + esc(h.directBookingUrl || '') + '" placeholder="https://www.booking.com/hotel/… or Expedia, etc.">' +
+        '</div>' +
         '<div class="field"><label>' + esc(t('hotelMapsLink')) + '</label>' +
         '<div class="link-row"><input data-hf="googleMapsUrl" value="' + esc(h.googleMapsUrl || '') + '" placeholder="https://maps.google.com/… or short link">' +
         '<button class="btn btn-primary btn-sm" data-findhotel="' + i + '">' + esc(t('findPin')) + '</button></div>' +
@@ -916,7 +922,18 @@
     });
   }
 
-  function buildStay22Link(name, city, guideId) {
+  function buildStay22Link(name, city, guideId, directUrl) {
+    var aid = '6ae6fed2c21651647046f81f';
+    var campaign = 'wtt-' + (guideId || '');
+    if (directUrl) {
+      var encoded = encodeURIComponent(directUrl.trim());
+      return 'https://www.stay22.com/allez/roam?aid=' + aid + '&link=' + encoded + '&campaign=' + campaign;
+    }
+    var address = encodeURIComponent([name, city].filter(Boolean).join(', '));
+    return 'https://www.stay22.com/allez/roam?aid=' + aid + '&address=' + address + '&campaign=' + campaign;
+  }
+
+  function buildStay22SearchLink(name, city, guideId) {
     var aid = '6ae6fed2c21651647046f81f';
     var address = encodeURIComponent([name, city].filter(Boolean).join(', '));
     return 'https://www.stay22.com/allez/roam?aid=' + aid + '&address=' + address + '&campaign=wtt-' + (guideId || '');

@@ -2475,6 +2475,28 @@ body {
   background: var(--vermilion-deep);
 }
 
+.timeline-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--muted-foreground);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.timeline-search-btn:hover {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
 /* Sub-destinations grid */
 .sub-dest-grid {
   display: grid;
