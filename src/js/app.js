@@ -347,6 +347,12 @@
     return g.location;
   }
 
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
   // Static HTML: elements carry data-i18n="key" (text) or data-i18n-ph="key" (placeholder)
   function applyStaticI18n() {
     document.querySelectorAll('[data-i18n]').forEach(el => {
