@@ -3455,6 +3455,7 @@
   }
 
   function bindTripDetail(all, guideId, onBack, closePageOnPin) {
+    const guide = guideById(guideId);
     const backBtn = all.querySelector('.trips-back');
     if (backBtn && onBack) backBtn.addEventListener('click', onBack);
 
