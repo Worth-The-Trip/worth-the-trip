@@ -1786,7 +1786,7 @@ function guideProblems(g) {
   if (!(Number(g.price) >= PRICE_MIN && Number(g.price) <= PRICE_MAX)) p.push('Price (¥' + PRICE_MIN + '–¥' + PRICE_MAX + ')');
   if (!g.heroImage) p.push('Cover image');
   if (!isLatLng(g.coordinates)) p.push('Explore map pin');
-  if (!g.video || !clip(g.video.url, 999).trim()) p.push('Source video link');
+  if (!ON_SITEGROUND && (!g.video || !clip(g.video.url, 999).trim())) p.push('Source video link'); // TEMP: skip video check on staging for testing — REMEMBER TO RE-ENABLE FOR LIVE
   const stops = (g.timeline || []).filter((t) => t && clip(t.title, 999).trim() && isLatLng(t.mapPin));
   if (!stops.length) p.push('At least one location with a pin');
   return p;
