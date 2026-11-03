@@ -781,7 +781,10 @@ function canonicalizeGuide(g) {
     submittedAt: g.submittedAt || new Date().toISOString(),
     publishedAt: g.publishedAt || new Date().toISOString(),
     reviewedAt: g.reviewedAt || new Date().toISOString(),
-    reviewNote: g.reviewNote || null, location: g.location
+    reviewNote: g.reviewNote || null, location: g.location,
+    creatorName: g.creatorName || (g.creatorId === 'wtt' ? 'Worth The Trip' : ''),
+    creatorHandle: g.creatorHandle || (g.creatorId === 'wtt' ? '@worththetripapp' : ''),
+    creatorEmail: g.creatorEmail || (g.creatorId === 'wtt' ? 'team@worththetripapp.com' : '')
   };
 }
 function hashJa(ja) {
