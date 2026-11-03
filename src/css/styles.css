@@ -2480,9 +2480,9 @@ body {
   align-items: center;
   gap: 4px;
   padding: 5px 12px;
-  background: transparent;
-  color: var(--muted-foreground);
-  border: 1px solid var(--glass-border);
+  background: #9ca3af;
+  color: #ffffff;
+  border: none;
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
@@ -2490,11 +2490,11 @@ body {
   cursor: pointer;
   text-decoration: none;
   transition: background var(--duration-fast), color var(--duration-fast);
+  margin-top: 6px;
 }
 
 .timeline-search-btn:hover {
-  background: var(--surface-raised);
-  color: var(--text-primary);
+  background: #6b7280;
 }
 
 /* Sub-destinations grid */

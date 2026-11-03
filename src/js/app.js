@@ -1656,7 +1656,9 @@
       // Append creator-added hotels as timeline steps after all days.
       (guide.hotels || []).map((h, i) => {
         const link = h.directBookingUrl
-          ? buildStay22Link(h.stay22Link)
+          ? buildStay22Link(
+              'https://www.stay22.com/allez/roam?aid=6ae6fed2c21651647046f81f&link=' + encodeURIComponent(h.directBookingUrl) + '&campaign=wtt-' + guideId
+            )
           : buildStay22Link(h.stay22Link);
         return `
         <div class="timeline-item timeline-hotel">
@@ -1667,22 +1669,15 @@
               <div class="timeline-desc">${esc([h.address, h.city].filter(Boolean).join(' · '))}</div>
               <div class="timeline-meta">
                 <a class="timeline-meta-btn timeline-book-btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${t('hotelRec.checkAvailability')}</a>
+                <a class="timeline-meta-btn timeline-search-btn" href="${esc(buildStay22SearchLink(h.name, h.city, guideId))}" target="_blank" rel="noopener noreferrer">${esc(t('hotelRec.searchNearby'))}</a>
               </div>
             </div>
             ${h.image ? `<img class="timeline-thumb" src="${esc(h.image)}" alt="${esc(h.name)}" loading="lazy" onerror="this.style.display='none'">` : ''}
           </div>
         </div>`;
-      }).join('') +
-      (guide.hotels && guide.hotels.length ? `
-        <div class="timeline-item">
-          <span class="timeline-time"></span>
-          <div class="timeline-row">
-            <div class="timeline-text">
-              <a class="timeline-meta-btn timeline-search-btn" href="${esc(buildStay22SearchLink((guide.hotels[0] && guide.hotels[0].name) || '', (guide.hotels[0] && guide.hotels[0].city) || '', guideId))}" target="_blank" rel="noopener noreferrer">${esc(t('hotelRec.searchNearby'))}</a>
-            </div>
-          </div>
-        </div>` : '');
-      }
+      }).join('');
+  }
+
   function nearestTimelineIndex(subPin, timeline) {
     let best = -1, bestD = Infinity;
     (timeline || []).forEach((t, i) => {
