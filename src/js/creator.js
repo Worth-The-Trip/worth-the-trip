@@ -1046,12 +1046,13 @@
 
   function route() {
     if (!state.me || !state.me.signedIn) return renderGate();
+    var want = guideIdFromUrl();
     if (state.me.isAdmin) {
-      var want = guideIdFromUrl();
       if (want) return openGuide(want);
       return renderAdminList();
     }
     if (!state.me.isCreator) return renderGate();
+    if (want) return openGuide(want);
     return loadGuides();
   }
   function boot() {

@@ -2028,6 +2028,7 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
           address: clip(h.address, 300).trim(),
           city: clip(h.city, 80).trim(),
           googleMapsUrl: clip(h.googleMapsUrl, 500).trim(),
+          directBookingUrl: clip(h.directBookingUrl, 500).trim(),
           stay22Link: clip(h.stay22Link, 500).trim(),
           image: clip(h.image, 400).trim(),
         };
@@ -2508,9 +2509,12 @@ app.get('/admin', (req, res) => res.sendFile('admin.html', { root: DATA_DIR, cac
 app.get('/creator', (req, res) => {
   const token = readCookie(req);
   const s = token ? getSession(token) : null;
-  if (s && s.kind === 'user') {
-    const u = findUserById(s.userId);
-    if (u && isApprovedCreator(u.email)) return res.sendFile('creator.html', { root: DATA_DIR, cacheControl: false });
+  if (s && (s.kind === 'user' || s.kind === 'admin')) {
+    if (s.kind === 'user') {
+      const u = findUserById(s.userId);
+      if (u && !isApprovedCreator(u.email)) return res.redirect('/');
+    }
+    return res.sendFile('creator.html', { root: DATA_DIR, cacheControl: false });
   }
   return res.redirect('/');
 });
