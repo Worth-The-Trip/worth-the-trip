@@ -377,7 +377,11 @@
   }
 
   function guideById(id) {
-    return WTT_GUIDES.find(g => g.id === id);
+    const found = WTT_GUIDES.find(g => g.id === id);
+    if (!found) {
+      console.warn('[WTT] guideById miss:', id, 'WTT_GUIDES length:', WTT_GUIDES.length, 'ids:', WTT_GUIDES.map(g => g.id));
+    }
+    return found;
   }
 
   function creatorById(id) {
@@ -772,6 +776,7 @@
       positionPin(svg, [guide.coordinates[1], guide.coordinates[0]]);
 
       svg.addEventListener('click', (e) => {
+        console.log('[WTT] pin clicked:', guide.id, guide.title);
         e.stopPropagation();
         if (state.map) {
           state.map.flyTo({
@@ -1676,8 +1681,12 @@
 
   // -------- Modal: open guide --------
   function openGuideModal(guideId) {
+    console.log('[WTT] openGuideModal called with:', guideId);
     const guide = guideById(guideId);
-    if (!guide) return;
+    if (!guide) {
+      console.warn('[WTT] openGuideModal abort: guide not found for', guideId);
+      return;
+    }
 
     // Clear any collapsed/past state from previous navigation.
     document.querySelectorAll('.timeline-item.past').forEach(el => el.classList.remove('past'));
@@ -3456,6 +3465,7 @@
 
   function bindTripDetail(all, guideId, onBack, closePageOnPin) {
     const guide = guideById(guideId);
+    console.log('[WTT] bindTripDetail:', guideId, 'found:', !!guide, 'title:', guide ? guide.title : 'N/A');
     const backBtn = all.querySelector('.trips-back');
     if (backBtn && onBack) backBtn.addEventListener('click', onBack);
 
