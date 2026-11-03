@@ -423,6 +423,9 @@
     renderHotels();
     renderProblems();
     initPinMap();
+    // Hard-number-only inputs: block letters/symbols at the DOM level
+    var numEl = $('#f-duration');
+    if (numEl) numEl.addEventListener('input', function () { this.value = this.value.replace(/[^\d]/g, ''); });
   }
 
   function incRow(v, cls) {
