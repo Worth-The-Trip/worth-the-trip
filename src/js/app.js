@@ -3448,9 +3448,13 @@
 
   // -------- Trip detail, rendered inline (Trips page or guide side panel) --------
   function openTripDetail(guideId, containerSel, backLabel, onBack, closePageOnPin) {
+    console.log('[WTT] openTripDetail called with:', guideId);
     containerSel = containerSel || '#trips-all';
     const guide = guideById(guideId);
-    if (!guide) return;
+    if (!guide) {
+      console.warn('[WTT] openTripDetail abort: guide not found for', guideId);
+      return;
+    }
     state.activeGuideId = guideId;
     state.tripsDetailId = guideId;
     const all = $(containerSel);
