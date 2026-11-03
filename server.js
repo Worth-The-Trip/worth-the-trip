@@ -2523,17 +2523,18 @@ function migrateData() {
     const d = db();
     const done = [];
 
-    // Every guide belongs to the Worth The Trip account — there are no other
-    // creators yet. This covers guides made in the studio while test creators
-    // existed (including the leftover test draft).
+    // Only reassign guides whose creatorId does not belong to any existing user.
+    // This preserves attribution for real creators while cleaning up orphaned
+    // records from deleted demo/test accounts.
+    const validUserIds = new Set(readUsers().map((u) => u.id));
     const guides = readCreatorGuides();
-    const stray = guides.filter((g) => g && g.creatorId && g.creatorId !== 'wtt');
+    const stray = guides.filter((g) => g && g.creatorId && !validUserIds.has(g.creatorId));
     if (stray.length) {
       const fixed = guides.map((g) => (
-        g && g.creatorId && g.creatorId !== 'wtt' ? Object.assign({}, g, { creatorId: 'wtt' }) : g
+        g && g.creatorId && !validUserIds.has(g.creatorId) ? Object.assign({}, g, { creatorId: 'wtt' }) : g
       ));
       replaceRows(d, 'creator_guides', null, fixed, insertCreatorGuide);
-      done.push('reassigned ' + stray.length + ' guide(s) to wtt');
+      done.push('reassigned ' + stray.length + ' orphaned guide(s) to wtt');
     }
 
     // The demo creator was test data (jake@wtt.local). It is no longer in the
