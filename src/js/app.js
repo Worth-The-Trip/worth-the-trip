@@ -1360,7 +1360,7 @@
     if (unlocked && guide.timeline) {
       html += `
         <div class="section-label">${t('modal.timeline')}</div>
-        <div class="timeline">${timelineHtml(guide)}</div>`;
+        <div class="timeline">${timelineHtml(guide, guideId)}</div>`;
     }
     if (unlocked && creator) {
       html += `
@@ -1585,7 +1585,7 @@
   }
 
   // Full day-by-day itinerary markup, shared by popup + Trips detail
-  function timelineHtml(guide) {
+  function timelineHtml(guide, guideId) {
     const items = (guide.timeline || []).map((item, i) => Object.assign({}, item, {
       _tTitle: tlText(guide, i, 'title'),
       _tDesc: tlText(guide, i, 'desc'),
@@ -1753,7 +1753,7 @@
 
     if (unlocked && guide.timeline) {
       els.modalTimeline.style.display = 'block';
-      els.modalTimelineContent.innerHTML = timelineHtml(guide);
+      els.modalTimelineContent.innerHTML = timelineHtml(guide, guideId);
 
       els.modalTimelineContent.querySelectorAll('[data-pin]').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -3582,7 +3582,7 @@
     if (unlocked && guide.timeline) {
       html += `
         <div class="section-label">${t('modal.timeline')}</div>
-        <div class="timeline">${timelineHtml(guide)}</div>`;
+        <div class="timeline">${timelineHtml(guide, guideId)}</div>`;
     }
 
     // Sub-destinations render inside the timeline as nearby strips (see above).
