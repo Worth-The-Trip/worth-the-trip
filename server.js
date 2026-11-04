@@ -1359,6 +1359,44 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
   });
 });
 
+app.post('/api/admin/users/:id/assign-guide', requireAdmin, (req, res) => {
+  mutate(() => {
+  try {
+    const userId = req.params.id;
+    const guideId = String((req.body || {}).guideId || '').trim();
+    if (!guideId) return jsonError(res, 400, 'guideId is required');
+
+    const u = findUserById(userId);
+    if (!u) return jsonError(res, 404, 'User not found');
+
+    const guide = readGuides().find((g) => g.id === guideId);
+    if (!guide) return jsonError(res, 404, 'Guide not found');
+
+    // Prevent duplicate assignment
+    const existing = readPurchases().find((p) => p.buyerEmail === u.email && p.guideId === guideId);
+    if (existing) return jsonError(res, 409, 'User already owns this guide');
+
+    const purchase = {
+      id: 'admin-gift-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      sessionId: null,
+      type: 'admin_gift',
+      guideId: guide.id,
+      guideTitle: guide.title || 'Untitled guide',
+      buyerEmail: u.email,
+      stripeCustomerId: null,
+      amount: 0,
+      currency: null,
+      purchasedAt: Date.now(),
+    };
+    const purchases = readPurchases();
+    purchases.push(purchase);
+    writeLines(PURCHASES_FILE, purchases);
+
+    res.json({ ok: true, assigned: true, guideId: guide.id, guideTitle: guide.title, email: u.email });
+  } catch (e) { jsonError(res, 500, e.message); }
+  });
+});
+
 app.post('/api/admin/users/:id/promote-creator', requireAdmin, (req, res) => {
   mutate(() => {
   try {
@@ -1395,21 +1433,6 @@ app.post('/api/admin/users/:id/promote-creator', requireAdmin, (req, res) => {
     writeArray(CREATORS_FILE, creators);
     res.json({ ok: true, promoted: true, email: u.email });
   } catch (e) { jsonError(res, 500, e.message); }
-  });
-});
-
-app.delete('/api/users/:id', requireAdmin, (req, res) => {
-  mutate(() => {
-  const u = findUserById(req.params.id);
-  if (!u) return jsonError(res, 404, 'User not found');
-    const sessions = readSessions().filter((s) => !(s.userId === u.id && s.kind === 'user'));
-    writeLines(SESSIONS_FILE, sessions);
-    const purchases = readPurchases().filter((p) => p.buyerEmail !== u.email);
-    writeLines(PURCHASES_FILE, purchases);
-    try { fs.unlinkSync(path.join(AVATAR_DIR, u.id + '.png')); } catch (e) {}
-    const users = readUsers().filter((x) => x.id !== u.id);
-    writeLines(AUTH_FILE, users);
-    res.json({ ok: true });
   });
 });
 

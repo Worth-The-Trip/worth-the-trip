@@ -167,8 +167,22 @@
     $('#um-phone').value = u.phone || '';
     $('#um-address').value = u.address || '';
     $('#um-password').value = '';
+    $('#um-guide-assign').value = '';
     $('#user-modal-title').textContent = 'Edit ' + (u.name || u.email);
+    await populateGuideDatalist();
     $('#user-modal').classList.add('active');
+  }
+
+  async function populateGuideDatalist() {
+    const dl = $('#guide-options');
+    if (!dl) return;
+    if (!guidesCache || !guidesCache.length) {
+      try {
+        const r = await api('/api/admin/guides');
+        guidesCache = r.guides || [];
+      } catch (e) { guidesCache = []; }
+    }
+    dl.innerHTML = guidesCache.map((g) => '<option value="' + esc(g.title || g.id) + '">').join('');
   }
 
   function closeUserModal() { $('#user-modal').classList.remove('active'); }
@@ -180,6 +194,27 @@
     try {
       await api('/api/admin/users/' + id + '/promote-creator', { method: 'POST' });
       toast('User promoted to Creator');
+      closeUserModal();
+      loadAll();
+    } catch (e) { toast(e.message); }
+  });
+
+  $('#um-assign-guide').addEventListener('click', async () => {
+    const id = $('#um-id').value;
+    if (!id) return;
+    const guideInput = $('#um-guide-assign');
+    const guideTitle = guideInput.value.trim();
+    if (!guideTitle) { toast('Select a guide first'); return; }
+    // Find guide by title from cached list
+    const guide = (guidesCache || []).find((g) => g.title === guideTitle);
+    if (!guide) { toast('Guide not found — try selecting from the dropdown'); return; }
+    if (!confirm('Assign "' + guide.title + '" to this user for free?')) return;
+    try {
+      await api('/api/admin/users/' + id + '/assign-guide', {
+        method: 'POST',
+        body: JSON.stringify({ guideId: guide.id }),
+      });
+      toast('Guide assigned');
       closeUserModal();
       loadAll();
     } catch (e) { toast(e.message); }

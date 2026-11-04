@@ -152,9 +152,15 @@
           <label for="um-password">New password <span class="hint">— leave blank to keep the current one</span></label>
           <input id="um-password" type="password" autocomplete="new-password">
         </div>
+        <div class="field">
+          <label for="um-guide-assign">Assign guide (searchable)</label>
+          <input id="um-guide-assign" list="guide-options" placeholder="Start typing a guide title...">
+          <datalist id="guide-options"></datalist>
+        </div>
         <div class="btn-row">
           <button class="btn btn-primary" type="submit">Save changes</button>
           <button class="btn btn-ghost" type="button" id="um-promote-creator">Promote to Creator</button>
+          <button class="btn btn-ghost" type="button" id="um-assign-guide">Assign Guide</button>
           <button class="btn btn-ghost" type="button" id="um-cancel">Cancel</button>
         </div>
       </form>
@@ -163,6 +169,6 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="src/js/admin.js?v=4"></script>
+  <script src="src/js/admin.js?v=5"></script>
 </body>
 </html>
