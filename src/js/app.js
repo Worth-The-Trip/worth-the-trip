@@ -606,6 +606,20 @@
       svg.style.boxShadow = 'none';
     });
 
+    // Forward wheel events to the map container so scroll zoom works
+    // even when the cursor is hovering over a pin.
+    svg.addEventListener('wheel', function (e) {
+      if (!state.map) return;
+      e.stopPropagation();
+      try {
+        var evt = new WheelEvent('wheel', {
+          deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode,
+          bubbles: true, cancelable: true
+        });
+        state.map.getContainer().dispatchEvent(evt);
+      } catch (err) { /* WheelEvent not supported — ignore */ }
+    });
+
     return svg;
   }
 
@@ -878,6 +892,17 @@
         e.stopPropagation();
         selectHotelInGuide(guide.id, idx);
       });
+      svg.addEventListener('wheel', function (e) {
+        if (!state.map) return;
+        e.stopPropagation();
+        try {
+          var evt = new WheelEvent('wheel', {
+            deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode,
+            bubbles: true, cancelable: true
+          });
+          state.map.getContainer().dispatchEvent(evt);
+        } catch (err) {}
+      });
       state.mapOverlay.appendChild(svg);
       state.hotelPinElements.push({ svg, lngLat: [hotel.coordinates[1], hotel.coordinates[0]] });
       if (state.map) positionPin(svg, [hotel.coordinates[1], hotel.coordinates[0]]);
@@ -904,6 +929,17 @@
     svg.style.zIndex = '15';
     svg.addEventListener('click', (e) => {
       e.stopPropagation();
+    });
+    svg.addEventListener('wheel', function (e) {
+      if (!state.map) return;
+      e.stopPropagation();
+      try {
+        var evt = new WheelEvent('wheel', {
+          deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode,
+          bubbles: true, cancelable: true
+        });
+        state.map.getContainer().dispatchEvent(evt);
+      } catch (err) {}
     });
     return svg;
   }
