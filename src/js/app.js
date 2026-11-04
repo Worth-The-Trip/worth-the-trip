@@ -669,6 +669,15 @@
     overlay.style.pointerEvents = 'none';
     overlay.style.zIndex = '10';
     overlay.style.overflow = 'hidden';
+    overlay.addEventListener('wheel', function (e) {
+      if (!state.map) return;
+      e.stopPropagation();
+      try {
+        var delta = e.deltaY > 0 ? -0.15 : 0.15;
+        if (e.deltaMode === 1) delta *= 40;
+        state.map.zoomBy(delta);
+      } catch (err) {}
+    });
     container.appendChild(overlay);
     state.mapOverlay = overlay;
     console.log('[WTT Overlay] Created overlay div — appended to ' + container.tagName + ', overlay size: ' + overlay.clientWidth + 'x' + overlay.clientHeight + 'px');
