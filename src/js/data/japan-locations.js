@@ -2,13 +2,7 @@
 // Prefectures + major cities. Extend `cities` as needed.
 window.WTT_LOCATIONS = {
   prefectures: [
-    "Aichi","Akita","Aomori","Chiba","Ehime","Fukui","Fukuoka","Fukushima",
-    "Gifu","Gunma","Hiroshima","Hokkaido","Hyogo","Ibaraki","Ishikawa",
-    "Kagawa","Kagoshima","Kanagawa","Kochi","Kumamoto","Kyoto","Mie",
-    "Miyagi","Miyazaki","Nagano","Nagasaki","Nara","Niigata","Oita",
-    "Okayama","Okinawa","Osaka","Saga","Saitama","Shiga","Shimane",
-    "Shizuoka","Saga","Tochigi","Tokushima","Tokyo","Tottori","Toyama",
-    "Wakayama","Yamagata","Yamaguchi","Yamanashi"
+    "Aichi", "Akita", "Aomori", "Chiba", "Ehime", "Fukui", "Fukuoka", "Fukushima", "Gifu", "Gunma", "Hiroshima", "Hokkaido", "Hyogo", "Ibaraki", "Ishikawa", "Iwate", "Kagawa", "Kagoshima", "Kanagawa", "Kochi", "Kumamoto", "Kyoto", "Mie", "Miyagi", "Miyazaki", "Nagano", "Nagasaki", "Nara", "Niigata", "Oita", "Okayama", "Okinawa", "Osaka", "Saga", "Saitama", "Shiga", "Shimane", "Shizuoka", "Tochigi", "Tokushima", "Tokyo", "Tottori", "Toyama", "Wakayama", "Yamagata", "Yamaguchi", "Yamanashi"
   ],
   cities: [
     // Hokkaido
@@ -17,161 +11,188 @@ window.WTT_LOCATIONS = {
     { name: "Hakodate", prefecture: "Hokkaido" },
     { name: "Otaru", prefecture: "Hokkaido" },
     { name: "Niseko", prefecture: "Hokkaido" },
-    // Tohoku
+    // Miyagi
     { name: "Sendai", prefecture: "Miyagi" },
+    // Aomori
     { name: "Aomori", prefecture: "Aomori" },
+    // Iwate
     { name: "Morioka", prefecture: "Iwate" },
+    // Akita
     { name: "Akita", prefecture: "Akita" },
+    // Yamagata
     { name: "Yamagata", prefecture: "Yamagata" },
+    // Fukushima
     { name: "Koriyama", prefecture: "Fukushima" },
     { name: "Fukushima", prefecture: "Fukushima" },
     { name: "Aizu-Wakamatsu", prefecture: "Fukushima" },
-    // Kanto
+    // Tokyo
     { name: "Tokyo", prefecture: "Tokyo" },
+    // Kanagawa
     { name: "Yokohama", prefecture: "Kanagawa" },
     { name: "Kawasaki", prefecture: "Kanagawa" },
     { name: "Sagamihara", prefecture: "Kanagawa" },
+    // Chiba
     { name: "Chiba", prefecture: "Chiba" },
+    // Saitama
     { name: "Saitama", prefecture: "Saitama" },
     { name: "Kawaguchi", prefecture: "Saitama" },
+    // Tochigi
     { name: "Utsunomiya", prefecture: "Tochigi" },
+    // Ibaraki
     { name: "Mito", prefecture: "Ibaraki" },
     { name: "Tsukuba", prefecture: "Ibaraki" },
+    // Gunma
     { name: "Maebashi", prefecture: "Gunma" },
     { name: "Takasaki", prefecture: "Gunma" },
-    // Chubu
+    // Aichi
     { name: "Nagoya", prefecture: "Aichi" },
     { name: "Toyota", prefecture: "Aichi" },
     { name: "Okazaki", prefecture: "Aichi" },
+    // Shizuoka
     { name: "Shizuoka", prefecture: "Shizuoka" },
     { name: "Hamamatsu", prefecture: "Shizuoka" },
+    // Niigata
     { name: "Niigata", prefecture: "Niigata" },
     { name: "Nagaoka", prefecture: "Niigata" },
+    // Ishikawa
     { name: "Kanazawa", prefecture: "Ishikawa" },
+    // Fukui
     { name: "Fukui", prefecture: "Fukui" },
+    // Toyama
     { name: "Toyama", prefecture: "Toyama" },
+    // Nagano
     { name: "Nagano", prefecture: "Nagano" },
     { name: "Matsumoto", prefecture: "Nagano" },
+    // Yamanashi
     { name: "Kofu", prefecture: "Yamanashi" },
+    // Gifu
     { name: "Gifu", prefecture: "Gifu" },
     { name: "Tajimi", prefecture: "Gifu" },
-    // Kansai
+    // Osaka
     { name: "Osaka", prefecture: "Osaka" },
     { name: "Sakai", prefecture: "Osaka" },
+    // Hyogo
     { name: "Kobe", prefecture: "Hyogo" },
     { name: "Himeji", prefecture: "Hyogo" },
     { name: "Amagasaki", prefecture: "Hyogo" },
+    // Kyoto
     { name: "Kyoto", prefecture: "Kyoto" },
     { name: "Uji", prefecture: "Kyoto" },
+    // Nara
     { name: "Nara", prefecture: "Nara" },
+    // Wakayama
     { name: "Wakayama", prefecture: "Wakayama" },
+    // Shiga
     { name: "Otsu", prefecture: "Shiga" },
     { name: "Hikone", prefecture: "Shiga" },
-    // Chugoku
+    // Hiroshima
     { name: "Hiroshima", prefecture: "Hiroshima" },
     { name: "Kure", prefecture: "Hiroshima" },
     { name: "Mihara", prefecture: "Hiroshima" },
+    // Okayama
     { name: "Okayama", prefecture: "Okayama" },
     { name: "Kurashiki", prefecture: "Okayama" },
+    // Yamaguchi
     { name: "Yamaguchi", prefecture: "Yamaguchi" },
     { name: "Shimonoseki", prefecture: "Yamaguchi" },
+    // Shimane
     { name: "Matsue", prefecture: "Shimane" },
     { name: "Izumo", prefecture: "Shimane" },
+    // Tottori
     { name: "Tottori", prefecture: "Tottori" },
-    // Shikoku
+    // Kagawa
     { name: "Takamatsu", prefecture: "Kagawa" },
+    // Ehime
     { name: "Matsuyama", prefecture: "Ehime" },
+    // Kochi
     { name: "Kochi", prefecture: "Kochi" },
+    // Tokushima
     { name: "Tokushima", prefecture: "Tokushima" },
-    // Kyushu
+    // Fukuoka
     { name: "Fukuoka", prefecture: "Fukuoka" },
     { name: "Kitakyushu", prefecture: "Fukuoka" },
+    // Kumamoto
     { name: "Kumamoto", prefecture: "Kumamoto" },
-    { name: "Kumamoto", prefecture: "Kumamoto" },
+    // Nagasaki
     { name: "Nagasaki", prefecture: "Nagasaki" },
     { name: "Sasebo", prefecture: "Nagasaki" },
+    // Oita
     { name: "Oita", prefecture: "Oita" },
+    // Saga
     { name: "Saga", prefecture: "Saga" },
     { name: "Karagasaki", prefecture: "Saga" },
+    // Miyazaki
     { name: "Miyazaki", prefecture: "Miyazaki" },
+    // Kagoshima
     { name: "Kagoshima", prefecture: "Kagoshima" },
+    // Okinawa
     { name: "Naha", prefecture: "Okinawa" },
     { name: "Okinawa", prefecture: "Okinawa" },
-    { name: "Naha", prefecture: "Okinawa" },
-    // Additional major cities
+    // Aichi
     { name: "Inuyama", prefecture: "Aichi" },
+    // Mie
     { name: "Ise", prefecture: "Mie" },
     { name: "Tsu", prefecture: "Mie" },
     { name: "Kumano", prefecture: "Mie" },
     { name: "Yokkaichi", prefecture: "Mie" },
-    { name: "Kobe", prefecture: "Hyogo" },
-    { name: "Nara", prefecture: "Nara" },
-    { name: "Hikone", prefecture: "Shiga" },
-    { name: "Otsu", prefecture: "Shiga" },
+    // Hiroshima
     { name: "Fukuyama", prefecture: "Hiroshima" },
     { name: "Onomichi", prefecture: "Hiroshima" },
-    { name: "Kurashiki", prefecture: "Okayama" },
+    // Okayama
     { name: "Tsuyama", prefecture: "Okayama" },
+    // Tottori
     { name: "Yonago", prefecture: "Tottori" },
-    { name: "Kofu", prefecture: "Yamanashi" },
+    // Yamanashi
     { name: "Fujiyoshida", prefecture: "Yamanashi" },
+    // Nagano
     { name: "Karuizawa", prefecture: "Nagano" },
     { name: "Shinano", prefecture: "Nagano" },
     { name: "Iida", prefecture: "Nagano" },
     { name: "Suwa", prefecture: "Nagano" },
-    { name: "Matsumoto", prefecture: "Nagano" },
-    { name: "Nagano", prefecture: "Nagano" },
     { name: "Ueda", prefecture: "Nagano" },
+    // Niigata
     { name: "Joetsu", prefecture: "Niigata" },
-    { name: "Nagaoka", prefecture: "Niigata" },
-    { name: "Niigata", prefecture: "Niigata" },
     { name: "Sado", prefecture: "Niigata" },
     { name: "Tsubame", prefecture: "Niigata" },
     { name: "Kashiwazaki", prefecture: "Niigata" },
+    // Fukushima
     { name: "Aizu", prefecture: "Fukushima" },
-    { name: "Koriyama", prefecture: "Fukushima" },
-    { name: "Fukushima", prefecture: "Fukushima" },
     { name: "Iwaki", prefecture: "Fukushima" },
-    { name: "Sendai", prefecture: "Miyagi" },
+    // Miyagi
     { name: "Ishinomaki", prefecture: "Miyagi" },
     { name: "Shiogama", prefecture: "Miyagi" },
     { name: "Miyagi", prefecture: "Miyagi" },
     { name: "Rifu", prefecture: "Miyagi" },
-    { name: "Aomori", prefecture: "Aomori" },
+    // Aomori
     { name: "Hirosaki", prefecture: "Aomori" },
     { name: "Hachinohe", prefecture: "Aomori" },
     { name: "Towada", prefecture: "Aomori" },
     { name: "Kuroishi", prefecture: "Aomori" },
-    { name: "Morioka", prefecture: "Iwate" },
+    // Iwate
     { name: "Hanamaki", prefecture: "Iwate" },
     { name: "Kamaishi", prefecture: "Iwate" },
     { name: "Ofunato", prefecture: "Iwate" },
-    { name: "Akita", prefecture: "Akita" },
+    // Akita
     { name: "Yokote", prefecture: "Akita" },
     { name: "Odate", prefecture: "Akita" },
     { name: "Semboku", prefecture: "Akita" },
-    { name: "Yamagata", prefecture: "Yamagata" },
+    // Yamagata
     { name: "Yonezawa", prefecture: "Yamagata" },
     { name: "Shinjo", prefecture: "Yamagata" },
     { name: "Sakata", prefecture: "Yamagata" },
     { name: "Tsuruoka", prefecture: "Yamagata" },
     { name: "Kaminoyama", prefecture: "Yamagata" },
-    { name: "Sapporo", prefecture: "Hokkaido" },
-    { name: "Asahikawa", prefecture: "Hokkaido" },
-    { name: "Hakodate", prefecture: "Hokkaido" },
-    { name: "Otaru", prefecture: "Hokkaido" },
+    // Hokkaido
     { name: "Tomakomai", prefecture: "Hokkaido" },
     { name: "Obihiro", prefecture: "Hokkaido" },
     { name: "Kushiro", prefecture: "Hokkaido" },
-    { name: "Niseko", prefecture: "Hokkaido" },
     { name: "Furano", prefecture: "Hokkaido" },
     { name: "Shiraoi", prefecture: "Hokkaido" },
     { name: "Muroran", prefecture: "Hokkaido" },
     { name: "Iwamizawa", prefecture: "Hokkaido" },
     { name: "Abashiri", prefecture: "Hokkaido" },
     { name: "Wakkanai", prefecture: "Hokkaido" },
-    { name: "Sapporo", prefecture: "Hokkaido" },
-    // Kanto additional
+    // Tokyo
     { name: "Hachioji", prefecture: "Tokyo" },
     { name: "Machida", prefecture: "Tokyo" },
     { name: "Chofu", prefecture: "Tokyo" },
@@ -192,24 +213,18 @@ window.WTT_LOCATIONS = {
     { name: "Inagi", prefecture: "Tokyo" },
     { name: "Tama", prefecture: "Tokyo" },
     { name: "Akishima", prefecture: "Tokyo" },
-    { name: "Hachioji", prefecture: "Tokyo" },
     { name: "Oshima", prefecture: "Tokyo" },
     { name: "Niijima", prefecture: "Tokyo" },
     { name: "Hachijo", prefecture: "Tokyo" },
-    // Chubu additional
-    { name: "Nagoya", prefecture: "Aichi" },
-    { name: "Toyota", prefecture: "Aichi" },
-    { name: "Okazaki", prefecture: "Aichi" },
+    // Aichi
     { name: "Ichinomiya", prefecture: "Aichi" },
     { name: "Seto", prefecture: "Aichi" },
     { name: "Toyokawa", prefecture: "Aichi" },
     { name: "Kasugai", prefecture: "Aichi" },
     { name: "Nishio", prefecture: "Aichi" },
     { name: "Gamagori", prefecture: "Aichi" },
-    { name: "Inuyama", prefecture: "Aichi" },
     { name: "Toyohashi", prefecture: "Aichi" },
-    { name: "Shizuoka", prefecture: "Shizuoka" },
-    { name: "Hamamatsu", prefecture: "Shizuoka" },
+    // Shizuoka
     { name: "Numazu", prefecture: "Shizuoka" },
     { name: "Fuji", prefecture: "Shizuoka" },
     { name: "Fujinomiya", prefecture: "Shizuoka" },
@@ -222,12 +237,9 @@ window.WTT_LOCATIONS = {
     { name: "Atami", prefecture: "Shizuoka" },
     { name: "Itō", prefecture: "Shizuoka" },
     { name: "Shimoda", prefecture: "Shizuoka" },
-    { name: "Hamamatsu", prefecture: "Shizuoka" },
     { name: "Iwata", prefecture: "Shizuoka" },
     { name: "Yaizu", prefecture: "Shizuoka" },
-    // Kansai additional
-    { name: "Osaka", prefecture: "Osaka" },
-    { name: "Sakai", prefecture: "Osaka" },
+    // Osaka
     { name: "Higashiosaka", prefecture: "Osaka" },
     { name: "Toyonaka", prefecture: "Osaka" },
     { name: "Suita", prefecture: "Osaka" },
@@ -237,9 +249,7 @@ window.WTT_LOCATIONS = {
     { name: "Neyagawa", prefecture: "Osaka" },
     { name: "Kadoma", prefecture: "Osaka" },
     { name: "Moriguchi", prefecture: "Osaka" },
-    { name: "Kobe", prefecture: "Hyogo" },
-    { name: "Himeji", prefecture: "Hyogo" },
-    { name: "Amagasaki", prefecture: "Hyogo" },
+    // Hyogo
     { name: "Nishinomiya", prefecture: "Hyogo" },
     { name: "Akashi", prefecture: "Hyogo" },
     { name: "Kakogawa", prefecture: "Hyogo" },
@@ -247,13 +257,10 @@ window.WTT_LOCATIONS = {
     { name: "Sanda", prefecture: "Hyogo" },
     { name: "Miki", prefecture: "Hyogo" },
     { name: "Takasago", prefecture: "Hyogo" },
-    { name: "Kobe", prefecture: "Hyogo" },
     { name: "Nada", prefecture: "Hyogo" },
     { name: "Ashiya", prefecture: "Hyogo" },
     { name: "Awaji", prefecture: "Hyogo" },
     // Kyoto
-    { name: "Kyoto", prefecture: "Kyoto" },
-    { name: "Uji", prefecture: "Kyoto" },
     { name: "Kameoka", prefecture: "Kyoto" },
     { name: "Maizuru", prefecture: "Kyoto" },
     { name: "Joyo", prefecture: "Kyoto" },
@@ -262,52 +269,33 @@ window.WTT_LOCATIONS = {
     { name: "Nagaokakyo", prefecture: "Kyoto" },
     { name: "Yawata", prefecture: "Kyoto" },
     // Nara
-    { name: "Nara", prefecture: "Nara" },
     { name: "Yamatotakada", prefecture: "Nara" },
     { name: "Yamatokoriyama", prefecture: "Nara" },
     { name: "Kashihara", prefecture: "Nara" },
     { name: "Tenri", prefecture: "Nara" },
     { name: "Ikoma", prefecture: "Nara" },
     // Wakayama
-    { name: "Wakayama", prefecture: "Wakayama" },
     { name: "Tanabe", prefecture: "Wakayama" },
     { name: "Kainan", prefecture: "Wakayama" },
     { name: "Hashimoto", prefecture: "Wakayama" },
     { name: "Shingu", prefecture: "Wakayama" },
     // Shiga
-    { name: "Otsu", prefecture: "Shiga" },
-    { name: "Hikone", prefecture: "Shiga" },
     { name: "Kusatsu", prefecture: "Shiga" },
     { name: "Higashiomi", prefecture: "Shiga" },
     { name: "Maibara", prefecture: "Shiga" },
-    // Chugoku additional
-    { name: "Hiroshima", prefecture: "Hiroshima" },
-    { name: "Kure", prefecture: "Hiroshima" },
-    { name: "Mihara", prefecture: "Hiroshima" },
-    { name: "Onomichi", prefecture: "Hiroshima" },
-    { name: "Fukuyama", prefecture: "Hiroshima" },
-    { name: "Okayama", prefecture: "Okayama" },
-    { name: "Kurashiki", prefecture: "Okayama" },
-    { name: "Tsuyama", prefecture: "Okayama" },
-    { name: "Takamatsu", prefecture: "Kagawa" },
+    // Kagawa
     { name: "Marugame", prefecture: "Kagawa" },
-    { name: "Matsuyama", prefecture: "Ehime" },
+    // Ehime
     { name: "Niihama", prefecture: "Ehime" },
     { name: "Imabari", prefecture: "Ehime" },
-    { name: "Kochi", prefecture: "Kochi" },
-    { name: "Tokushima", prefecture: "Tokushima" },
-    { name: "Yamaguchi", prefecture: "Yamaguchi" },
-    { name: "Shimonoseki", prefecture: "Yamaguchi" },
+    // Yamaguchi
     { name: "Ube", prefecture: "Yamaguchi" },
     { name: "Hagi", prefecture: "Yamaguchi" },
-    { name: "Matsue", prefecture: "Shimane" },
-    { name: "Izumo", prefecture: "Shimane" },
+    // Shimane
     { name: "Hamada", prefecture: "Shimane" },
-    { name: "Tottori", prefecture: "Tottori" },
+    // Tottori
     { name: "Kurayoshi", prefecture: "Tottori" },
-    // Kyushu additional
-    { name: "Fukuoka", prefecture: "Fukuoka" },
-    { name: "Kitakyushu", prefecture: "Fukuoka" },
+    // Fukuoka
     { name: "Kurume", prefecture: "Fukuoka" },
     { name: "Omuta", prefecture: "Fukuoka" },
     { name: "Iizuka", prefecture: "Fukuoka" },
@@ -315,32 +303,30 @@ window.WTT_LOCATIONS = {
     { name: "Yanagawa", prefecture: "Fukuoka" },
     { name: "Asakura", prefecture: "Fukuoka" },
     { name: "Nogata", prefecture: "Fukuoka" },
-    { name: "Kumamoto", prefecture: "Kumamoto" },
+    // Kumamoto
     { name: "Yatsushiro", prefecture: "Kumamoto" },
     { name: "Hitoyoshi", prefecture: "Kumamoto" },
-    { name: "Nagasaki", prefecture: "Nagasaki" },
-    { name: "Sasebo", prefecture: "Nagasaki" },
+    // Nagasaki
     { name: "Isahaya", prefecture: "Nagasaki" },
     { name: "Shimabara", prefecture: "Nagasaki" },
-    { name: "Oita", prefecture: "Oita" },
+    // Oita
     { name: "Beppu", prefecture: "Oita" },
     { name: "Nakatsu", prefecture: "Oita" },
-    { name: "Saga", prefecture: "Saga" },
+    // Saga
     { name: "Kashima", prefecture: "Saga" },
     { name: "Tosu", prefecture: "Saga" },
-    { name: "Miyazaki", prefecture: "Miyazaki" },
+    // Miyazaki
     { name: "Miyakonojo", prefecture: "Miyazaki" },
     { name: "Nobeoka", prefecture: "Miyazaki" },
-    { name: "Kagoshima", prefecture: "Kagoshima" },
+    // Kagoshima
     { name: "Kanoya", prefecture: "Kagoshima" },
     { name: "Makurazaki", prefecture: "Kagoshima" },
-    { name: "Naha", prefecture: "Okinawa" },
-    { name: "Okinawa", prefecture: "Okinawa" },
+    // Okinawa
     { name: "Ginowan", prefecture: "Okinawa" },
     { name: "Uruma", prefecture: "Okinawa" },
     { name: "Nago", prefecture: "Okinawa" },
     { name: "Itoman", prefecture: "Okinawa" },
     { name: "Miyakojima", prefecture: "Okinawa" },
-    { name: "Ishigaki", prefecture: "Okinawa" }
+    { name: "Ishigaki", prefecture: "Okinawa" },
   ]
 };
