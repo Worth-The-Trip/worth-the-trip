@@ -927,7 +927,11 @@
     var campaign = 'wtt-' + (guideId || '');
     if (directUrl) {
       var encoded = encodeURIComponent(directUrl.trim());
-      return 'https://www.stay22.com/allez/roam?aid=' + aid + '&link=' + encoded + '&campaign=' + campaign;
+      var endpoint = 'roam';
+      if (directUrl.indexOf('booking.com') !== -1) endpoint = 'booking';
+      else if (directUrl.indexOf('expedia.com') !== -1) endpoint = 'expedia';
+      else if (directUrl.indexOf('hotels.com') !== -1) endpoint = 'hotels';
+      return 'https://www.stay22.com/allez/' + endpoint + '?aid=' + aid + '&link=' + encoded + '&campaign=' + campaign;
     }
     var address = encodeURIComponent([name, city].filter(Boolean).join(', '));
     return 'https://www.stay22.com/allez/roam?aid=' + aid + '&address=' + address + '&campaign=' + campaign;

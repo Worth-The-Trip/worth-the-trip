@@ -952,6 +952,29 @@
     return url.toString();
   }
 
+  function buildHotelStay22Link(hotel, guideId) {
+    const aid = '6ae6fed2c21651647046f81f';
+    const campaign = 'wtt-' + (guideId || '');
+    const raw = (hotel.directBookingUrl || '').trim();
+
+    if (raw) {
+      const encoded = encodeURIComponent(raw);
+      let endpoint = 'roam';
+      if (raw.includes('booking.com')) endpoint = 'booking';
+      else if (raw.includes('expedia.com')) endpoint = 'expedia';
+      else if (raw.includes('hotels.com')) endpoint = 'hotels';
+
+      const base = 'https://www.stay22.com/allez/' + endpoint + '?aid=' + aid + '&link=' + encoded + '&campaign=' + campaign;
+      return buildStay22Link(base);
+    }
+
+    if (hotel.stay22Link) return buildStay22Link(hotel.stay22Link);
+
+    const address = encodeURIComponent([hotel.name, hotel.city].filter(Boolean).join(', '));
+    const base = 'https://www.stay22.com/allez/roam?aid=' + aid + '&address=' + address + '&campaign=' + campaign;
+    return buildStay22Link(base);
+  }
+
   function buildStay22SearchLink(name, city, guideId) {
     const aid = '6ae6fed2c21651647046f81f';
     const address = encodeURIComponent([name, city].filter(Boolean).join(', '));
@@ -1655,12 +1678,7 @@
       }).join('') +
       // Append creator-added hotels as timeline steps after all days.
       (guide.hotels || []).map((h, i) => {
-        const link = h.directBookingUrl
-          ? buildStay22Link(
-              'https://www.stay22.com/allez/roam?aid=6ae6fed2c21651647046f81f&link=' + encodeURIComponent(h.directBookingUrl) + '&campaign=wtt-' + guideId
-            )
-          : buildStay22Link(h.stay22Link);
-        console.log('[WTT] hotel link for', h.name, ':', link);
+        const link = buildHotelStay22Link(h, guideId);
         return `
         <div class="timeline-item timeline-hotel">
           <span class="timeline-time"></span>
@@ -1750,17 +1768,6 @@
     if (unlocked && guide.timeline) {
       els.modalTimeline.style.display = 'block';
       els.modalTimelineContent.innerHTML = timelineHtml(guide, guideId);
-
-      els.modalTimelineContent.querySelectorAll('.timeline-book-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          console.log('[WTT] modal hotel book btn clicked, href:', btn.href);
-        });
-      });
-      els.modalTimelineContent.querySelectorAll('.timeline-search-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          console.log('[WTT] modal hotel search btn clicked, href:', btn.href);
-        });
-      });
 
       els.modalTimelineContent.querySelectorAll('[data-pin]').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -3510,17 +3517,6 @@
 
     const detailStartBtn = all.querySelector('.trip-detail-start');
     if (detailStartBtn) detailStartBtn.addEventListener('click', () => startGuideNav(guideId));
-
-    all.querySelectorAll('.timeline-book-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        console.log('[WTT] hotel book btn clicked, href:', btn.href, 'target:', btn.target);
-      });
-    });
-    all.querySelectorAll('.timeline-search-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        console.log('[WTT] hotel search btn clicked, href:', btn.href, 'target:', btn.target);
-      });
-    });
 
     all.querySelectorAll('[data-pin]').forEach(btn => {
       btn.addEventListener('click', (e) => {
