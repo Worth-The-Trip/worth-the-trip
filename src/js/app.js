@@ -1751,6 +1751,17 @@
       els.modalTimeline.style.display = 'block';
       els.modalTimelineContent.innerHTML = timelineHtml(guide, guideId);
 
+      els.modalTimelineContent.querySelectorAll('.timeline-book-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          console.log('[WTT] modal hotel book btn clicked, href:', btn.href);
+        });
+      });
+      els.modalTimelineContent.querySelectorAll('.timeline-search-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          console.log('[WTT] modal hotel search btn clicked, href:', btn.href);
+        });
+      });
+
       els.modalTimelineContent.querySelectorAll('[data-pin]').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -3499,6 +3510,17 @@
 
     const detailStartBtn = all.querySelector('.trip-detail-start');
     if (detailStartBtn) detailStartBtn.addEventListener('click', () => startGuideNav(guideId));
+
+    all.querySelectorAll('.timeline-book-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        console.log('[WTT] hotel book btn clicked, href:', btn.href, 'target:', btn.target);
+      });
+    });
+    all.querySelectorAll('.timeline-search-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        console.log('[WTT] hotel search btn clicked, href:', btn.href, 'target:', btn.target);
+      });
+    });
 
     all.querySelectorAll('[data-pin]').forEach(btn => {
       btn.addEventListener('click', (e) => {
