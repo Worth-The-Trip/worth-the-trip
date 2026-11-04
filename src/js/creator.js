@@ -425,6 +425,8 @@
     renderHotels();
     renderProblems();
     initPinMap();
+    initLocationAutocomplete('f-city', WTT_LOCATIONS.cities.map(function (c) { return c.name; }));
+    initLocationAutocomplete('f-prefecture', WTT_LOCATIONS.prefectures.slice().sort());
     // Hard-number-only inputs: block letters/symbols at the DOM level
     var numEl = $('#f-duration');
     if (numEl) numEl.addEventListener('input', function () { this.value = this.value.replace(/[^\d]/g, ''); });
@@ -568,8 +570,30 @@
     state.timer = setTimeout(function () { save(true); }, 1500);
   }
 
+  function validateLocations() {
+    var cityInput = $('#f-city');
+    var prefInput = $('#f-prefecture');
+    var errors = [];
+    if (cityInput && cityInput.value.trim()) {
+      var cityValid = WTT_LOCATIONS.cities.some(function (c) { return c.name.toLowerCase() === cityInput.value.trim().toLowerCase(); });
+      if (!cityValid) errors.push('City not recognized');
+      cityInput.classList.toggle('invalid', !cityValid);
+    }
+    if (prefInput && prefInput.value.trim()) {
+      var prefValid = WTT_LOCATIONS.prefectures.some(function (p) { return p.toLowerCase() === prefInput.value.trim().toLowerCase(); });
+      if (!prefValid) errors.push('Prefecture not recognized');
+      prefInput.classList.toggle('invalid', !prefValid);
+    }
+    return errors;
+  }
+
   function save(auto) {
     if (!state.guide) return Promise.resolve();
+    var locErrors = validateLocations();
+    if (locErrors.length) {
+      toast(locErrors.join('; '), true);
+      return Promise.reject(new Error(locErrors.join('; ')));
+    }
     var patch = collect();
     var el = $('#save-state');
     if (el) el.textContent = '· ' + t('saving');
@@ -596,6 +620,97 @@
     if (!p.length) { el.innerHTML = '<div class="ok-note">' + esc(t('readyToSubmit')) + '</div>'; return; }
     el.innerHTML = '<div class="problems"><strong>' + esc(t('missingTitle')) + '</strong><ul>' +
       p.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+  }
+
+  function initLocationAutocomplete(inputId, items) {
+    var input = $('#' + inputId);
+    if (!input) return;
+
+    var list = document.createElement('ul');
+    list.className = 'location-autocomplete';
+    list.style.display = 'none';
+    input.parentNode.appendChild(list);
+
+    var selectedIndex = -1;
+    var matches = [];
+
+    function filter(q) {
+      var term = q.toLowerCase();
+      return items.filter(function (item) {
+        return item.toLowerCase().indexOf(term) !== -1;
+      }).slice(0, 20);
+    }
+
+    function render(listItems) {
+      list.innerHTML = listItems.map(function (item, i) {
+        return '<li data-index="' + i + '">' + esc(item) + '</li>';
+      }).join('');
+    }
+
+    input.addEventListener('input', function () {
+      var q = input.value.trim();
+      if (!q) { list.style.display = 'none'; input.classList.remove('invalid'); return; }
+      matches = filter(q);
+      selectedIndex = -1;
+      render(matches);
+      list.style.display = matches.length ? 'block' : 'none';
+      input.classList.remove('invalid');
+    });
+
+    input.addEventListener('keydown', function (e) {
+      if (list.style.display === 'none') return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedIndex = Math.min(selectedIndex + 1, matches.length - 1);
+        updateActive();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedIndex = Math.max(selectedIndex - 1, 0);
+        updateActive();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedIndex >= 0 && selectedIndex < matches.length) {
+          input.value = matches[selectedIndex];
+          list.style.display = 'none';
+          input.classList.remove('invalid');
+        }
+      } else if (e.key === 'Escape') {
+        list.style.display = 'none';
+      }
+    });
+
+    function updateActive() {
+      var items = list.querySelectorAll('li');
+      items.forEach(function (el, i) {
+        el.classList.toggle('active', i === selectedIndex);
+      });
+      if (selectedIndex >= 0 && selectedIndex < items.length) {
+        items[selectedIndex].scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    list.addEventListener('click', function (e) {
+      var li = e.target.closest('li');
+      if (!li) return;
+      var idx = parseInt(li.getAttribute('data-index'), 10);
+      if (idx >= 0 && idx < matches.length) {
+        input.value = matches[idx];
+        list.style.display = 'none';
+        input.classList.remove('invalid');
+      }
+    });
+
+    input.addEventListener('blur', function () {
+      setTimeout(function () {
+        list.style.display = 'none';
+        var val = input.value.trim();
+        if (!val) { input.classList.remove('invalid'); return; }
+        var valid = items.some(function (item) {
+          return item.toLowerCase() === val.toLowerCase();
+        });
+        input.classList.toggle('invalid', !valid);
+      }, 150);
+    });
   }
 
   // ---- map pin picker ----
