@@ -2363,6 +2363,7 @@
       zoom: CONFIG.defaultZoom,
       attributionControl: false,
       fadeDuration: 150,
+      scrollZoom: true,
     });
 
     // When the map style loads
