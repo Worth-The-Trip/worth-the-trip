@@ -548,7 +548,7 @@
           address: (h.address || '').trim(),
           city: (h.city || '').trim(),
           googleMapsUrl: (h.googleMapsUrl || '').trim(),
-          directBookingUrl: (h.directBookingUrl || '').trim(),
+          directBookingUrl: normalizeDirectBookingUrl(h.directBookingUrl || ''),
           image: (h.image || '').trim(),
         };
         if (out.name || out.city) {
@@ -1002,7 +1002,7 @@
         '<button class="btn btn-danger btn-sm" data-rmhotel="' + i + '" title="' + esc(t('remove')) + '">✕</button>' +
         '</div>' +
         '<div class="field"><label>' + esc(t('hotelDirectBooking')) + '</label>' +
-        '<input data-hf="directBookingUrl" value="' + esc(h.directBookingUrl || '') + '" placeholder="https://www.booking.com/hotel/… or Expedia, etc.">' +
+        '<input data-hf="directBookingUrl" value="' + esc(h.directBookingUrl || '') + '" placeholder="https://www.booking.com/hotel/… (extra params are stripped automatically)">' +
         '</div>' +
         '<div class="field"><label>' + esc(t('hotelMapsLink')) + '</label>' +
         '<div class="link-row"><input data-hf="googleMapsUrl" value="' + esc(h.googleMapsUrl || '') + '" placeholder="https://maps.google.com/… or short link">' +
@@ -1035,6 +1035,25 @@
         else hotels[i][f] = inp.value.trim();
       });
     });
+  }
+
+  function normalizeDirectBookingUrl(url) {
+    if (!url || !url.trim()) return '';
+    url = url.trim();
+    try {
+      var u = new URL(url);
+      var path = u.pathname;
+      if (u.hostname.indexOf('booking.com') !== -1) {
+        path = path.replace(/\.([a-z]{2}(-[a-z]{2})?)\.html$/i, '.html');
+      } else if (u.hostname.indexOf('expedia.com') !== -1) {
+        path = path.replace(/\/Hotel-Information$/, '');
+      } else if (u.hostname.indexOf('hotels.com') !== -1) {
+        path = path.replace(/\/$/, '');
+      }
+      return u.origin + path;
+    } catch (e) {
+      return url;
+    }
   }
 
   function buildStay22Link(name, city, guideId, directUrl) {

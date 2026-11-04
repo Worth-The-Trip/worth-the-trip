@@ -846,6 +846,19 @@ function isLatLng(v) {
     Number.isFinite(Number(v[0])) && Number.isFinite(Number(v[1])) &&
     Math.abs(Number(v[0])) <= 90 && Math.abs(Number(v[1])) <= 180;
 }
+function isValidHotelUrl(url) {
+  if (!url || !url.trim()) return true; // empty is allowed
+  url = url.trim();
+  try {
+    var u = new URL(url);
+    if (u.hostname.indexOf('booking.com') !== -1) return /\/hotel\/[^/]+\/[^/]+\.html$/i.test(u.pathname);
+    if (u.hostname.indexOf('expedia.com') !== -1) return /\/Hotel-Information$/i.test(u.pathname) || /\/g\/\d+\//i.test(u.pathname);
+    if (u.hostname.indexOf('hotels.com') !== -1) return /\/hi\//i.test(u.pathname) || /\/hotels\//i.test(u.pathname);
+    return true; // unknown provider — allow it
+  } catch (e) {
+    return false;
+  }
+}
 function findUser(email) {
   const e = String(email || '').toLowerCase();
   return readUsers().find((u) => String(u.email || '').toLowerCase() === e);
@@ -1815,6 +1828,7 @@ function guideProblems(g) {
   if (!ON_SITEGROUND && (!g.video || !clip(g.video.url, 999).trim())) p.push('Source video link'); // TEMP: skip video check on staging for testing — REMEMBER TO RE-ENABLE FOR LIVE
   const stops = (g.timeline || []).filter((t) => t && clip(t.title, 999).trim() && isLatLng(t.mapPin));
   if (!stops.length) p.push('At least one location with a pin');
+  if ((g.hotels || []).some(function (h) { return h.directBookingUrl && !isValidHotelUrl(h.directBookingUrl); })) p.push('One or more hotel links look malformed — please check the direct booking URLs');
   return p;
 }
 
