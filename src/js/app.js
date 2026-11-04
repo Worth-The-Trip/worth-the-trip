@@ -612,12 +612,10 @@
       if (!state.map) return;
       e.stopPropagation();
       try {
-        var evt = new WheelEvent('wheel', {
-          deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode,
-          bubbles: true, cancelable: true
-        });
-        state.map.getContainer().dispatchEvent(evt);
-      } catch (err) { /* WheelEvent not supported — ignore */ }
+        var delta = e.deltaY > 0 ? -0.15 : 0.15;
+        if (e.deltaMode === 1) delta *= 40; // Ctrl+wheel
+        state.map.zoomBy(delta);
+      } catch (err) { /* zoom not available */ }
     });
 
     return svg;
@@ -896,11 +894,9 @@
         if (!state.map) return;
         e.stopPropagation();
         try {
-          var evt = new WheelEvent('wheel', {
-            deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode,
-            bubbles: true, cancelable: true
-          });
-          state.map.getContainer().dispatchEvent(evt);
+          var delta = e.deltaY > 0 ? -0.15 : 0.15;
+          if (e.deltaMode === 1) delta *= 40;
+          state.map.zoomBy(delta);
         } catch (err) {}
       });
       state.mapOverlay.appendChild(svg);
@@ -934,11 +930,9 @@
       if (!state.map) return;
       e.stopPropagation();
       try {
-        var evt = new WheelEvent('wheel', {
-          deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode,
-          bubbles: true, cancelable: true
-        });
-        state.map.getContainer().dispatchEvent(evt);
+        var delta = e.deltaY > 0 ? -0.15 : 0.15;
+        if (e.deltaMode === 1) delta *= 40;
+        state.map.zoomBy(delta);
       } catch (err) {}
     });
     return svg;
@@ -1000,8 +994,10 @@
       else if (raw.includes('expedia.com')) endpoint = 'expedia';
       else if (raw.includes('hotels.com')) endpoint = 'hotels';
 
-      const base = 'https://www.stay22.com/allez/' + endpoint + '?aid=' + aid + '&link=' + encoded + '&campaign=' + campaign;
-      return buildStay22Link(base);
+      // Direct hotel links must NOT carry checkin/checkout — those turn
+      // the deep link into a search on Booking.com. Dates belong only
+      // on the address-based fallback search.
+      return 'https://www.stay22.com/allez/' + endpoint + '?aid=' + aid + '&link=' + encoded + '&campaign=' + campaign;
     }
 
     if (hotel.stay22Link) return buildStay22Link(hotel.stay22Link);
