@@ -1660,6 +1660,7 @@
               'https://www.stay22.com/allez/roam?aid=6ae6fed2c21651647046f81f&link=' + encodeURIComponent(h.directBookingUrl) + '&campaign=wtt-' + guideId
             )
           : buildStay22Link(h.stay22Link);
+        console.log('[WTT] hotel link for', h.name, ':', link);
         return `
         <div class="timeline-item timeline-hotel">
           <span class="timeline-time"></span>
