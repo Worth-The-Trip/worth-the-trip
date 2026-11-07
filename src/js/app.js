@@ -756,26 +756,13 @@
         svg.style.display = 'none';
         return;
       }
-      // Pins must track the MAP SURFACE, not the container.  The map surface
-      // (canvas) moves inside the #map div as the map is panned.  project()
-      // returns coordinates relative to the container, so we subtract the
-      // surface offset to keep pins anchored to their geographic coordinates.
-      let offsetX = 0, offsetY = 0;
-      try {
-        const t = state.map.transform;
-        const centerPt = state.map.project(t.center);
-        // At zoom 0 the surface sits at the container's top-left when the
-        // center is at the container origin.  Each zoom level multiplies the
-        // surface movement by 256px.  Offset = projection of current center
-        // scaled by (zoom-1) gives the surface shift from its zoom-0 origin.
-        offsetX = centerPt.x * (t.zoom - 1);
-        offsetY = centerPt.y * (t.zoom - 1);
-      } catch (e) { /* offset stays 0 */ }
-      // Use left/top positioning so pins stay anchored to map coordinates
-      // as the map surface moves during pan. transform() would keep pins
-      // fixed in the container, causing them to drift relative to the map.
-      svg.style.left = (pt.x - 20 - offsetX) + 'px';
-      svg.style.top = (pt.y - 20 - offsetY) + 'px';
+      // Position the pin using project() which returns container-relative
+      // coordinates.  The overlay is fixed inside the container, so we
+      // simply subtract half the pin size.  The map surface moves relative
+      // to the container when panned, so the pins will move with the map
+      // surface to stay anchored to their geographic coordinates.
+      svg.style.left = (pt.x - 20) + 'px';
+      svg.style.top = (pt.y - 20) + 'px';
       svg.style.display = 'block';
     }
 
