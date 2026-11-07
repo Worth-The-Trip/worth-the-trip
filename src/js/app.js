@@ -827,7 +827,7 @@
   function onMapMove() {
     window.__wttMv = (window.__wttMv || 0) + 1;
     try {
-      var dbg = document.getElementById('wtt-dbg');
+      var dbg = window.__wttDbg;
       if (dbg) {
         var p0 = state.pinElements[0];
         dbg.textContent = 'mv=' + window.__wttMv +
@@ -2353,6 +2353,7 @@
     dbg.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;background:rgba(0,0,0,.88);color:#0f0;font:12px/1.45 monospace;padding:8px 10px;border-radius:6px;white-space:pre;';
     dbg.textContent = 'loading map...';
     document.body.appendChild(dbg);
+    window.__wttDbg = dbg;
     // ==========================================================================
 
     // -------- Theme first (avoid flash) --------
@@ -2390,16 +2391,25 @@
       fadeDuration: 150,
       scrollZoom: true,
     });
+    var __dbg0 = window.__wttDbg;
+    if (__dbg0) __dbg0.textContent = 'map object created';
 
     // When the map style loads
     state.map.on('load', () => {
       console.log('[WTT] Map style loaded — setting up pin overlay');
       createMapOverlay();
-      console.log('[WTT] About to call refreshMapMarkers()...');
-      refreshMapMarkers();
-      console.log('[WTT] refreshMapMarkers() completed');
+      var __dbg = window.__wttDbg;
+      if (__dbg) __dbg.textContent = 'overlay created';
+      try {
+        refreshMapMarkers();
+        if (__dbg) __dbg.textContent = 'markers placed: ' + state.pinElements.length;
+      } catch (err) {
+        if (__dbg) __dbg.textContent = 'ERROR: ' + err.message;
+        throw err;
+      }
       state.map.on('move', onMapMove);
       state.map.on('moveend', onMapMove);
+      if (__dbg) __dbg.textContent = 'LISTENERS ATTACHED — drag the map now';
       console.log('[WTT] Map move listeners attached for pin positioning');
 
       // -------- Compass (mobile true-north reset) --------
