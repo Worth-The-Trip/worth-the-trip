@@ -160,6 +160,7 @@ function cleanupStaleFiles() {
     } catch (e) { /* ignore */ }
   }
   if (cleaned) console.log('[WTT] cleaned ' + cleaned + ' stale files from ' + RUNTIME_DIR);
+  return cleaned;
 }
 
 // ------------------------------------------------------------------ writes
