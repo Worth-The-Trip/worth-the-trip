@@ -536,6 +536,7 @@
     svg.setAttribute('viewBox', '0 0 792.12 982.89');
     svg.setAttribute('width', '40');
     svg.setAttribute('height', '40');
+    svg.className = 'wtt-pin';
     svg.style.width = '40px';
     svg.style.height = '40px';
     svg.style.display = 'block';
@@ -697,6 +698,7 @@
     svg.setAttribute('viewBox', '0 0 810 1000');
     svg.setAttribute('width', '40');
     svg.setAttribute('height', '40');
+    svg.className = 'wtt-pin';
     svg.style.width = '40px';
     svg.style.height = '40px';
     svg.style.display = 'block';
@@ -2408,9 +2410,11 @@
     // Our custom wheel listener overrides it ONLY when hovering over pins.
     state.map.scrollZoom.enable();
 
-    // Capture wheel events over pins so scroll zoom still works when hovering
+    // Capture wheel events over pins so scroll zoom works when hovering
     // over pins. We use capture phase (true) to catch events before they
     // reach the pins, and check if the event target or any ancestor is a pin.
+    // Pins can be <img> or <svg> elements with class wtt-pin, hotel-pin,
+    // step-pin, or logo-pin.
     const mapContainer = state.map.getContainer();
     mapContainer.addEventListener('wheel', function (e) {
       // Check if we're over a pin (any ancestor of the event target)
@@ -2418,7 +2422,8 @@
       let overPin = false;
       while (target) {
         if (target === mapContainer) break;
-        if (target.tagName === 'IMG' && target.classList &&
+        if ((target.tagName === 'IMG' || target.tagName === 'svg') &&
+            target.classList &&
             (target.classList.contains('wtt-pin') || target.classList.contains('hotel-pin') ||
              target.classList.contains('step-pin') || target.classList.contains('logo-pin'))) {
           overPin = true;
