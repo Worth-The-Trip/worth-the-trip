@@ -756,13 +756,14 @@
         svg.style.display = 'none';
         return;
       }
-      // Position the pin using project() which returns container-relative
-      // coordinates.  The overlay is fixed inside the container, so we
-      // simply subtract half the pin size.  The map surface moves relative
-      // to the container when panned, so the pins will move with the map
-      // surface to stay anchored to their geographic coordinates.
-      svg.style.left = (pt.x - 20) + 'px';
-      svg.style.top = (pt.y - 20) + 'px';
+      // Position the pin using transform — this keeps the pin anchored
+      // to the map surface as the map pans.  The pin's base position is
+      // left: -20px, top: -20px (pin center offset), so we translate
+      // by (pt.x - 20, pt.y - 20) to place the pin center at the
+      // projected coordinates.
+      const offsetX = pt.x - 20;
+      const offsetY = pt.y - 20;
+      svg.style.transform = 'translate(' + offsetX.toFixed(1) + 'px, ' + offsetY.toFixed(1) + 'px)';
       svg.style.display = 'block';
     }
 
