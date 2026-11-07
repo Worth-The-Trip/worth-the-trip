@@ -471,7 +471,7 @@ body {
    ============================================================ */
 
 #map-container {
-  position: absolute;
+  position: relative;
   inset: 0;
   z-index: 1;
   width: 100%;
