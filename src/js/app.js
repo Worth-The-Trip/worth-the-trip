@@ -2404,13 +2404,13 @@
     }, 150);
 
     // ============ PIN SCROLL ZOOM ============
-    // Disable native MapLibre scrollZoom so our custom wheel handler can
-    // route events over pins correctly. We handle zoom manually via zoomBy().
-    state.map.scrollZoom.disable();
+    // Re-enable native MapLibre scrollZoom so normal map scrolling works.
+    // Our custom wheel listener overrides it ONLY when hovering over pins.
+    state.map.scrollZoom.enable();
 
-    // Capture wheel events over pins so scroll zoom works.
-    // We use capture phase (true) to catch events before they reach
-    // the pins, and check if the event target or any ancestor is a pin.
+    // Capture wheel events over pins so scroll zoom still works when hovering
+    // over pins. We use capture phase (true) to catch events before they
+    // reach the pins, and check if the event target or any ancestor is a pin.
     const mapContainer = state.map.getContainer();
     mapContainer.addEventListener('wheel', function (e) {
       // Check if we're over a pin (any ancestor of the event target)
@@ -2426,19 +2426,18 @@
         }
         target = target.parentElement;
       }
-      if (!overPin) return;
-
-      // Stop the event from reaching the map's native scrollZoom
-      e.stopPropagation();
-
-      try {
-        // Zoom by delta
-        const delta = e.deltaY > 0 ? -0.15 : 0.15;
-        if (e.deltaMode === 1) delta *= 40;
-        state.map.zoomBy(delta);
-        // Prevent map's native scrollZoom from also handling this event
-        e.preventDefault();
-      } catch (err) {}
+      if (overPin) {
+        // Stop the event from reaching the map's native scrollZoom
+        e.stopPropagation();
+        try {
+          const delta = e.deltaY > 0 ? -0.15 : 0.15;
+          if (e.deltaMode === 1) delta *= 40;
+          state.map.zoomBy(delta);
+          e.preventDefault();
+        } catch (err) {}
+      }
+      // If NOT over a pin, let MapLibre's native scrollZoom handle it
+      // (we return early without preventDefault, so MapLibre's handler runs)
     }, { passive: false, capture: true });
 
     // Also attach wheel listener directly to the map container for the
