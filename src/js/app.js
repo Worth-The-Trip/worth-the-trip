@@ -536,7 +536,7 @@
     svg.setAttribute('viewBox', '0 0 792.12 982.89');
     svg.setAttribute('width', '40');
     svg.setAttribute('height', '40');
-    svg.className = 'wtt-pin';
+    svg.setAttribute('class', 'wtt-pin');
     svg.style.width = '40px';
     svg.style.height = '40px';
     svg.style.display = 'block';
@@ -696,7 +696,7 @@
     svg.setAttribute('viewBox', '0 0 810 1000');
     svg.setAttribute('width', '40');
     svg.setAttribute('height', '40');
-    svg.className = 'wtt-pin';
+    svg.setAttribute('class', 'wtt-pin');
     svg.style.width = '40px';
     svg.style.height = '40px';
     svg.style.display = 'block';
@@ -825,17 +825,6 @@
 
   // -------- Update pin positions when map moves --------
   function onMapMove() {
-    window.__wttMv = (window.__wttMv || 0) + 1;
-    try {
-      var dbg = window.__wttDbg;
-      if (dbg) {
-        var p0 = state.pinElements[0];
-        dbg.textContent = 'mv=' + window.__wttMv +
-          ' | pin0=' + (p0 && p0.svg ? p0.svg.style.transform : 'none') +
-          ' | ctr=' + state.map.getCenter().toFixed(4) +
-          ' | z=' + state.map.getZoom().toFixed(2);
-      }
-    } catch (e) {}
     state.pinElements.forEach(p => {
       if (p.hidden) return;
       positionPin(p.svg, p.lngLat, p.ax, p.ay);
@@ -2337,25 +2326,6 @@
   // ============================================================
   function init() {
     console.log('[WTT] build v6 — bookings full-card renderer active');
-    // ============ TEMP DIAGNOSTIC (remove once pin tracking is confirmed) ============
-    window.addEventListener('error', function (e) {
-      var d = document.getElementById('wtt-err');
-      if (!d) {
-        d = document.createElement('div');
-        d.id = 'wtt-err';
-        d.style.cssText = 'position:fixed;left:8px;top:8px;z-index:99999;background:rgba(150,0,0,.95);color:#fff;font:12px/1.45 monospace;padding:8px 10px;border-radius:6px;max-width:70vw;white-space:pre-wrap;';
-        document.body.appendChild(d);
-      }
-      d.textContent = 'JS ERROR: ' + (e.message || e.type) + ' @ ' + (e.filename || '') + ':' + (e.lineno || '');
-    });
-    var dbg = document.createElement('div');
-    dbg.id = 'wtt-dbg';
-    dbg.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;background:rgba(0,0,0,.88);color:#0f0;font:12px/1.45 monospace;padding:8px 10px;border-radius:6px;white-space:pre;';
-    dbg.textContent = 'loading map...';
-    document.body.appendChild(dbg);
-    window.__wttDbg = dbg;
-    // ==========================================================================
-
     // -------- Theme first (avoid flash) --------
     applyTheme(currentTheme(), false);
     applyStaticI18n();
@@ -2391,25 +2361,16 @@
       fadeDuration: 150,
       scrollZoom: true,
     });
-    var __dbg0 = window.__wttDbg;
-    if (__dbg0) __dbg0.textContent = 'map object created';
 
     // When the map style loads
     state.map.on('load', () => {
       console.log('[WTT] Map style loaded — setting up pin overlay');
       createMapOverlay();
-      var __dbg = window.__wttDbg;
-      if (__dbg) __dbg.textContent = 'overlay created';
-      try {
-        refreshMapMarkers();
-        if (__dbg) __dbg.textContent = 'markers placed: ' + state.pinElements.length;
-      } catch (err) {
-        if (__dbg) __dbg.textContent = 'ERROR: ' + err.message;
-        throw err;
-      }
+      // Pin placement must never prevent the move listeners from being
+      // attached — otherwise pins get drawn once and then freeze on screen.
+      try { refreshMapMarkers(); } catch (e) { console.error('[WTT] refreshMapMarkers failed:', e); }
       state.map.on('move', onMapMove);
       state.map.on('moveend', onMapMove);
-      if (__dbg) __dbg.textContent = 'LISTENERS ATTACHED — drag the map now';
       console.log('[WTT] Map move listeners attached for pin positioning');
 
       // -------- Compass (mobile true-north reset) --------
