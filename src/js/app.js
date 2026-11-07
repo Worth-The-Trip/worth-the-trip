@@ -2403,28 +2403,47 @@
       } catch (e) { console.warn('[WTT Map] resize failed:', e); }
     }, 150);
 
-    // Capture wheel events over pins so scroll zoom still works.
+    // ============ PIN SCROLL ZOOM ============
+    // Disable native MapLibre scrollZoom so our custom wheel handler can
+    // route events over pins correctly. We handle zoom manually via zoomBy().
+    state.map.scrollZoom.disable();
+
+    // Capture wheel events over pins so scroll zoom works.
+    // We use capture phase (true) to catch events before they reach
+    // the pins, and check if the event target or any ancestor is a pin.
     const mapContainer = state.map.getContainer();
     mapContainer.addEventListener('wheel', function (e) {
-      if (!state.map) return;
-      var t = e.target;
-      var overPin = false;
-      while (t) {
-        if (t === mapContainer) break;
-        if (t.tagName === 'IMG' && t.classList && (t.classList.contains('wtt-pin') || t.classList.contains('hotel-pin') || t.classList.contains('step-pin') || t.classList.contains('logo-pin'))) {
+      // Check if we're over a pin (any ancestor of the event target)
+      let target = e.target;
+      let overPin = false;
+      while (target) {
+        if (target === mapContainer) break;
+        if (target.tagName === 'IMG' && target.classList &&
+            (target.classList.contains('wtt-pin') || target.classList.contains('hotel-pin') ||
+             target.classList.contains('step-pin') || target.classList.contains('logo-pin'))) {
           overPin = true;
           break;
         }
-        t = t.parentElement;
+        target = target.parentElement;
       }
       if (!overPin) return;
+
+      // Stop the event from reaching the map's native scrollZoom
       e.stopPropagation();
+
       try {
-        var delta = e.deltaY > 0 ? -0.15 : 0.15;
+        // Zoom by delta
+        const delta = e.deltaY > 0 ? -0.15 : 0.15;
         if (e.deltaMode === 1) delta *= 40;
         state.map.zoomBy(delta);
+        // Prevent map's native scrollZoom from also handling this event
+        e.preventDefault();
       } catch (err) {}
-    }, { passive: true });
+    }, { passive: false, capture: true });
+
+    // Also attach wheel listener directly to the map container for the
+    // case where the overlay doesn't have pointer-events enabled
+    // (but keep it as fallback only, not for pin zoom)
 
     // -------- Map click: close modal --------
     state.map.on('click', () => {
