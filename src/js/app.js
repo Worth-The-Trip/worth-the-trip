@@ -669,15 +669,6 @@
     overlay.style.pointerEvents = 'none';
     overlay.style.zIndex = '10';
     overlay.style.overflow = 'hidden';
-    overlay.addEventListener('wheel', function (e) {
-      if (!state.map) return;
-      e.stopPropagation();
-      try {
-        var delta = e.deltaY > 0 ? -0.15 : 0.15;
-        if (e.deltaMode === 1) delta *= 40;
-        state.map.zoomBy(delta);
-      } catch (err) {}
-    });
     container.appendChild(overlay);
     state.mapOverlay = overlay;
     console.log('[WTT Overlay] Created overlay div — appended to ' + container.tagName + ', overlay size: ' + overlay.clientWidth + 'x' + overlay.clientHeight + 'px');
@@ -2411,6 +2402,29 @@
           ', zoom: ' + state.map.getZoom().toFixed(1));
       } catch (e) { console.warn('[WTT Map] resize failed:', e); }
     }, 150);
+
+    // Capture wheel events over pins so scroll zoom still works.
+    const mapContainer = state.map.getContainer();
+    mapContainer.addEventListener('wheel', function (e) {
+      if (!state.map) return;
+      var t = e.target;
+      var overPin = false;
+      while (t) {
+        if (t === mapContainer) break;
+        if (t.tagName === 'IMG' && t.classList && (t.classList.contains('wtt-pin') || t.classList.contains('hotel-pin') || t.classList.contains('step-pin') || t.classList.contains('logo-pin'))) {
+          overPin = true;
+          break;
+        }
+        t = t.parentElement;
+      }
+      if (!overPin) return;
+      e.stopPropagation();
+      try {
+        var delta = e.deltaY > 0 ? -0.15 : 0.15;
+        if (e.deltaMode === 1) delta *= 40;
+        state.map.zoomBy(delta);
+      } catch (err) {}
+    }, { passive: true });
 
     // -------- Map click: close modal --------
     state.map.on('click', () => {
