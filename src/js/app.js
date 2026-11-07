@@ -875,6 +875,7 @@
         '</svg>';
       svg.src = 'data:image/svg+xml,' + svgMarkup;
       svg.alt = hotel.name;
+      svg.className = 'hotel-pin';
       svg.style.position = 'absolute';
       svg.style.width = size + 'px';
       svg.style.height = size + 'px';
@@ -2409,48 +2410,72 @@
     }, 150);
 
     // ============ PIN SCROLL ZOOM ============
-    // Re-enable native MapLibre scrollZoom so normal map scrolling works.
-    // Our custom wheel listener overrides it ONLY when hovering over pins.
+    // MapLibre's scrollZoom listens on the canvas container. Pins live in
+    // #pin-overlay, a sibling of the canvas container, so a wheel event that
+    // starts on a pin never reaches it. When the pointer is over a pin we
+    // forward an identical wheel event to the canvas container, so MapLibre
+    // handles it exactly as if the pin weren't there — same zoom rate and
+    // same zoom-towards-cursor behaviour. Everywhere else the event is left
+    // untouched and MapLibre's native scrollZoom deals with it.
     state.map.scrollZoom.enable();
 
-    // Capture wheel events over pins so scroll zoom works when hovering
-    // over pins. We use capture phase (true) to catch events before they
-    // reach the pins, and check if the event target or any ancestor is a pin.
-    // Pins can be <img> or <svg> elements with class wtt-pin, hotel-pin,
-    // step-pin, or logo-pin.
     const mapContainer = state.map.getContainer();
+    const canvasContainer = (typeof state.map.getCanvasContainer === 'function')
+      ? state.map.getCanvasContainer()
+      : mapContainer.querySelector('.maplibregl-canvas-container');
+
     mapContainer.addEventListener('wheel', function (e) {
-      // Check if we're over a pin (any ancestor of the event target)
+      // Is the pointer over a pin (the event target, or one of its ancestors)?
       let target = e.target;
       let overPin = false;
-      while (target) {
-        if (target === mapContainer) break;
+      while (target && target !== mapContainer) {
         if ((target.tagName === 'IMG' || target.tagName === 'svg') &&
             target.classList &&
-            (target.classList.contains('wtt-pin') || target.classList.contains('hotel-pin') ||
-             target.classList.contains('step-pin') || target.classList.contains('logo-pin'))) {
+            (target.classList.contains('wtt-pin') ||
+             target.classList.contains('hotel-pin') ||
+             target.classList.contains('step-pin') ||
+             target.classList.contains('logo-pin'))) {
           overPin = true;
           break;
         }
         target = target.parentElement;
       }
-      if (overPin) {
-        // Stop the event from reaching the map's native scrollZoom
-        e.stopPropagation();
-        try {
-          const delta = e.deltaY > 0 ? -0.15 : 0.15;
-          if (e.deltaMode === 1) delta *= 40;
-          state.map.zoomBy(delta);
-          e.preventDefault();
-        } catch (err) {}
-      }
-      // If NOT over a pin, let MapLibre's native scrollZoom handle it
-      // (we return early without preventDefault, so MapLibre's handler runs)
-    }, { passive: false, capture: true });
+      if (!overPin) return;
 
-    // Also attach wheel listener directly to the map container for the
-    // case where the overlay doesn't have pointer-events enabled
-    // (but keep it as fallback only, not for pin zoom)
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (!canvasContainer) {
+        // Fallback if the canvas container can't be found: zoom around the
+        // cursor using MapLibre's public API.
+        try {
+          const rect = mapContainer.getBoundingClientRect();
+          const around = state.map.unproject([e.clientX - rect.left, e.clientY - rect.top]);
+          const wheelDelta = (e.deltaMode === 1 ? 40 * e.deltaY : e.deltaY);
+          state.map.jumpTo({ zoom: state.map.getZoom() + (wheelDelta > 0 ? -0.25 : 0.25), around });
+        } catch (err) { /* ignore */ }
+        return;
+      }
+
+      // Re-dispatch on the canvas container. No isTrusted guard in MapLibre,
+      // and mousePos() reads clientX/clientY, which we copy across — so the
+      // zoom lands under the cursor just like a native scroll.
+      canvasContainer.dispatchEvent(new WheelEvent('wheel', {
+        bubbles: true,
+        cancelable: true,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        deltaX: e.deltaX,
+        deltaY: e.deltaY,
+        deltaZ: e.deltaZ,
+        deltaMode: e.deltaMode,
+        ctrlKey: e.ctrlKey,
+        altKey: e.altKey,
+        shiftKey: e.shiftKey,
+        metaKey: e.metaKey,
+        view: window
+      }));
+    }, { passive: false, capture: true });
 
     // -------- Map click: close modal --------
     state.map.on('click', () => {
