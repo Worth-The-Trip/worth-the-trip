@@ -541,7 +541,8 @@
     svg.style.height = '40px';
     svg.style.display = 'block';
     svg.style.position = 'absolute';
-    svg.style.transform = 'translate(-20px, -20px)';
+    svg.style.left = '-20px';
+    svg.style.top = '-20px';
     svg.style.transformOrigin = 'center center';
     svg.style.flexShrink = '0';
 
@@ -682,7 +683,8 @@
     img.alt = 'Worth The Trip guide';
     img.className = 'logo-pin';
     img.style.position = 'absolute';
-    img.style.transform = 'translate(-20px, -20px)';
+    img.style.left = '-20px';
+    img.style.top = '-20px';
     return img;
   }
 
@@ -703,7 +705,8 @@
     svg.style.height = '40px';
     svg.style.display = 'block';
     svg.style.position = 'absolute';
-    svg.style.transform = 'translate(-20px, -20px)';
+    svg.style.left = '-20px';
+    svg.style.top = '-20px';
     svg.style.transformOrigin = 'center center';
     svg.style.flexShrink = '0';
 
@@ -753,9 +756,11 @@
       svg.style.display = 'none';
       return;
     }
-    const offsetX = pt.x - 20;
-    const offsetY = pt.y - 20;
-    svg.style.transform = 'translate(' + offsetX.toFixed(1) + 'px, ' + offsetY.toFixed(1) + 'px)';
+    // Use left/top positioning so pins stay anchored to map coordinates
+    // as the map surface moves during pan. transform() would keep pins
+    // fixed in the container, causing them to drift relative to the map.
+    svg.style.left = (pt.x - 20) + 'px';
+    svg.style.top = (pt.y - 20) + 'px';
     svg.style.display = 'block';
   }
 
@@ -871,9 +876,10 @@
       svg.src = 'data:image/svg+xml,' + svgMarkup;
       svg.alt = hotel.name;
       svg.style.position = 'absolute';
+      svg.style.left = '-16px';
+      svg.style.top = '-32px';
       svg.style.width = size + 'px';
       svg.style.height = size + 'px';
-      svg.style.transform = 'translate(-' + (size / 2) + 'px, -' + size + 'px)';
       svg.style.pointerEvents = 'auto';
       svg.style.cursor = 'pointer';
       svg.style.opacity = isAlt && !isSelected ? '0.4' : '1';
@@ -900,9 +906,10 @@
     svg.alt = 'Step ' + number;
     svg.className = 'step-pin';
     svg.style.position = 'absolute';
+    svg.style.left = '-' + (size / 2) + 'px';
+    svg.style.top = '-' + (size * 52 / 40) + 'px';
     svg.style.width = size + 'px';
     svg.style.height = (size * 52 / 40) + 'px';
-    svg.style.transform = 'translate(-' + (size / 2) + 'px, -' + (size * 52 / 40) + 'px)';
     svg.style.pointerEvents = 'auto';
     svg.style.cursor = 'pointer';
     svg.style.zIndex = '15';
