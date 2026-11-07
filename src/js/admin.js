@@ -82,11 +82,39 @@
   }
 
   $('#tabs').addEventListener('click', (e) => {
-    const tab = e.target.closest('.tab');
-    if (!tab) return;
-    document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
-    tab.classList.add('active');
-    showTabs(tab.dataset.tab);
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+  tab.classList.add('active');
+  showTabs(tab.dataset.tab);
+  });
+
+  // ---- Stale file cleanup ----
+  $('#btn-cleanup-stale').addEventListener('click', async () => {
+  const $btn = $('#btn-cleanup-stale');
+  const $status = $('#cleanup-status');
+  $btn.disabled = true;
+  $status.textContent = 'Cleaning...';
+  try {
+    const res = await fetch('/api/admin/cleanup-stale-files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (data.ok) {
+      $status.textContent = 'Cleaned ' + data.cleaned + ' stale files';
+      toast('Cleaned ' + data.cleaned + ' stale files');
+    } else {
+      $status.textContent = 'Failed: ' + (data.error || 'unknown');
+      toast('Cleanup failed');
+    }
+  } catch (e) {
+    $status.textContent = 'Error: ' + e.message;
+    toast('Cleanup error');
+  } finally {
+    $btn.disabled = false;
+  }
   });
 
   function showTabs(name) {

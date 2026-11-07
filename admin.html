@@ -118,11 +118,10 @@
         <button class="tab" data-tab="creators">Creators</button>
       </div>
 
-      <div id="panel-users"></div>
-      <div id="panel-purchases"></div>
-      <div id="panel-freeguides"></div>
-      <div id="panel-guides"></div>
-      <div id="panel-creators"></div>
+      <div class="action-row" style="margin-top:12px;">
+        <button class="btn btn-outline" id="btn-cleanup-stale">🧹 Clean stale files</button>
+        <span class="hint" id="cleanup-status" style="color:var(--muted-foreground);"></span>
+      </div>
     </div>
 
   </div>
@@ -169,6 +168,6 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="src/js/admin.js?v=5"></script>
+  <script src="src/js/admin.js?v=6"></script>
 </body>
 </html>
