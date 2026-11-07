@@ -742,27 +742,42 @@
   }
 
   function positionPin(svg, lngLat) {
-    if (!state.map || !state.mapOverlay) return;
-    // Skip pins outside the current view — no layout work for them.
-    try {
-      if (state.map.getBounds && !state.map.getBounds().contains(lngLat)) {
-        if (svg.style.display !== 'none') svg.style.display = 'none';
+      if (!state.map || !state.mapOverlay) return;
+      // Skip pins outside the current view — no layout work for them.
+      try {
+        if (state.map.getBounds && !state.map.getBounds().contains(lngLat)) {
+          if (svg.style.display !== 'none') svg.style.display = 'none';
+          return;
+        }
+      } catch (e) { /* fall through to project */ }
+      const pt = state.map.project(lngLat);
+      if (!isFinite(pt.x) || !isFinite(pt.y)) {
+        console.log('[WTT positionPin] ABORT: invalid coordinates (off screen)');
+        svg.style.display = 'none';
         return;
       }
-    } catch (e) { /* fall through to project */ }
-    const pt = state.map.project(lngLat);
-    if (!isFinite(pt.x) || !isFinite(pt.y)) {
-      console.log('[WTT positionPin] ABORT: invalid coordinates (off screen)');
-      svg.style.display = 'none';
-      return;
+      // Pins must track the MAP SURFACE, not the container.  The map surface
+      // (canvas) moves inside the #map div as the map is panned.  project()
+      // returns coordinates relative to the container, so we subtract the
+      // surface offset to keep pins anchored to their geographic coordinates.
+      let offsetX = 0, offsetY = 0;
+      try {
+        const t = state.map.transform;
+        const centerPt = state.map.project(t.center);
+        // At zoom 0 the surface sits at the container's top-left when the
+        // center is at the container origin.  Each zoom level multiplies the
+        // surface movement by 256px.  Offset = projection of current center
+        // scaled by (zoom-1) gives the surface shift from its zoom-0 origin.
+        offsetX = centerPt.x * (t.zoom - 1);
+        offsetY = centerPt.y * (t.zoom - 1);
+      } catch (e) { /* offset stays 0 */ }
+      // Use left/top positioning so pins stay anchored to map coordinates
+      // as the map surface moves during pan. transform() would keep pins
+      // fixed in the container, causing them to drift relative to the map.
+      svg.style.left = (pt.x - 20 - offsetX) + 'px';
+      svg.style.top = (pt.y - 20 - offsetY) + 'px';
+      svg.style.display = 'block';
     }
-    // Use left/top positioning so pins stay anchored to map coordinates
-    // as the map surface moves during pan. transform() would keep pins
-    // fixed in the container, causing them to drift relative to the map.
-    svg.style.left = (pt.x - 20) + 'px';
-    svg.style.top = (pt.y - 20) + 'px';
-    svg.style.display = 'block';
-  }
 
   // -------- Build / rebuild map pins --------
   function refreshMapMarkers(opts) {
