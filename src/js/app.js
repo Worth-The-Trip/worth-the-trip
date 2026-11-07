@@ -825,6 +825,17 @@
 
   // -------- Update pin positions when map moves --------
   function onMapMove() {
+    window.__wttMv = (window.__wttMv || 0) + 1;
+    try {
+      var dbg = document.getElementById('wtt-dbg');
+      if (dbg) {
+        var p0 = state.pinElements[0];
+        dbg.textContent = 'mv=' + window.__wttMv +
+          ' | pin0=' + (p0 && p0.svg ? p0.svg.style.transform : 'none') +
+          ' | ctr=' + state.map.getCenter().toFixed(4) +
+          ' | z=' + state.map.getZoom().toFixed(2);
+      }
+    } catch (e) {}
     state.pinElements.forEach(p => {
       if (p.hidden) return;
       positionPin(p.svg, p.lngLat, p.ax, p.ay);
@@ -2326,6 +2337,24 @@
   // ============================================================
   function init() {
     console.log('[WTT] build v6 — bookings full-card renderer active');
+    // ============ TEMP DIAGNOSTIC (remove once pin tracking is confirmed) ============
+    window.addEventListener('error', function (e) {
+      var d = document.getElementById('wtt-err');
+      if (!d) {
+        d = document.createElement('div');
+        d.id = 'wtt-err';
+        d.style.cssText = 'position:fixed;left:8px;top:8px;z-index:99999;background:rgba(150,0,0,.95);color:#fff;font:12px/1.45 monospace;padding:8px 10px;border-radius:6px;max-width:70vw;white-space:pre-wrap;';
+        document.body.appendChild(d);
+      }
+      d.textContent = 'JS ERROR: ' + (e.message || e.type) + ' @ ' + (e.filename || '') + ':' + (e.lineno || '');
+    });
+    var dbg = document.createElement('div');
+    dbg.id = 'wtt-dbg';
+    dbg.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;background:rgba(0,0,0,.88);color:#0f0;font:12px/1.45 monospace;padding:8px 10px;border-radius:6px;white-space:pre;';
+    dbg.textContent = 'loading map...';
+    document.body.appendChild(dbg);
+    // ==========================================================================
+
     // -------- Theme first (avoid flash) --------
     applyTheme(currentTheme(), false);
     applyStaticI18n();
