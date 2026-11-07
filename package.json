@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "create-sessions": "node create-checkout-sessions.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "deploy": "npm run clean-data && node server.js",
+    "clean-data": "rm -rf wtt-data/*.log wtt-data/*.tmp wtt-data/*.bak wtt-data/*.journal wtt-data/*.wal 2>/dev/null; echo 'Data cleanup complete.'"
   },
   "keywords": [
     "stripe",

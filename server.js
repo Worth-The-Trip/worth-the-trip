@@ -138,6 +138,30 @@ function writeArray(file, arr) {
   fs.renameSync(tmp, file);
 }
 
+// Clean up stale temp/log files left behind by Node.js and SiteGround builds so
+// inode quota is not exhausted by old files that are no longer referenced.
+// Called once on startup, plus via /api/admin/cleanup-stale-files.
+function cleanupStaleFiles() {
+  const MAX_LOG_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+  const directories = [RUNTIME_DIR, GUIDES_IMG_DIR, path.join(DATA_DIR, 'public/Guide Images')];
+  let cleaned = 0;
+  for (const dir of directories) {
+    if (!fs.existsSync(dir)) continue;
+    try {
+      for (const entry of fs.readdirSync(dir)) {
+        const full = path.join(dir, entry);
+        const st = fs.statSync(full);
+        if (st.isFile() && st.mtimeMs < Date.now() - MAX_LOG_AGE_MS) {
+          if (entry.endsWith('.log') || entry.endsWith('.tmp') || entry.endsWith('.bak') || entry.endsWith('.journal') || entry.endsWith('.wal')) {
+            try { fs.unlinkSync(full); cleaned++; } catch (e) {}
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+  if (cleaned) console.log('[WTT] cleaned ' + cleaned + ' stale files from ' + RUNTIME_DIR);
+}
+
 // ------------------------------------------------------------------ writes
 // All state lives in flat files and Node serves every request from one thread,
 // so a read-modify-write is only atomic if nothing yields between the read and
@@ -1797,6 +1821,12 @@ app.post('/api/admin/logout', (req, res) => {
   });
 });
 
+// ---- Admin: cleanup stale temp files to free disk/inode quota ----
+app.post('/api/admin/cleanup-stale-files', requireAdmin, (req, res) => {
+  const count = cleanupStaleFiles();
+  res.json({ ok: true, cleaned: count });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, users: readUsers().length, purchases: readPurchases().length, creators: readCreators().length, dataDir: RUNTIME_DIR, dbPath: DB_PATH });
 });
@@ -2621,6 +2651,9 @@ app.use(express.static(DATA_DIR));
 // Must run after the module-level `const` declarations below are initialised.
 ensureDataFiles();
 migrateData();
+// Clean up stale temp/log files left behind by Node.js and SiteGround builds so
+// inode quota is not exhausted by old files that are no longer referenced.
+cleanupStaleFiles();
 
 migrateDatabase();
 
