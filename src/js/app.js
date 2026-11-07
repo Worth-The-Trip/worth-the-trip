@@ -541,8 +541,6 @@
     svg.style.height = '40px';
     svg.style.display = 'block';
     svg.style.position = 'absolute';
-    svg.style.left = '-20px';
-    svg.style.top = '-20px';
     svg.style.transformOrigin = 'center center';
     svg.style.flexShrink = '0';
 
@@ -683,8 +681,6 @@
     img.alt = 'Worth The Trip guide';
     img.className = 'logo-pin';
     img.style.position = 'absolute';
-    img.style.left = '-20px';
-    img.style.top = '-20px';
     return img;
   }
 
@@ -705,8 +701,6 @@
     svg.style.height = '40px';
     svg.style.display = 'block';
     svg.style.position = 'absolute';
-    svg.style.left = '-20px';
-    svg.style.top = '-20px';
     svg.style.transformOrigin = 'center center';
     svg.style.flexShrink = '0';
 
@@ -741,8 +735,13 @@
     return svg;
   }
 
-  function positionPin(svg, lngLat) {
+  function positionPin(svg, lngLat, ax, ay) {
       if (!state.map || !state.mapOverlay) return;
+      // ax/ay = the point inside the pin box (px from its top-left) that
+      // must sit on the geographic coordinate. Defaults match a 40x40 pin
+      // anchored at its centre — the live site's convention.
+      const anchorX = (typeof ax === 'number') ? ax : 20;
+      const anchorY = (typeof ay === 'number') ? ay : 20;
       // Skip pins outside the current view — no layout work for them.
       try {
         if (state.map.getBounds && !state.map.getBounds().contains(lngLat)) {
@@ -756,13 +755,11 @@
         svg.style.display = 'none';
         return;
       }
-      // Position the pin using transform — this keeps the pin anchored
-      // to the map surface as the map pans.  The pin's base position is
-      // left: -20px, top: -20px (pin center offset), so we translate
-      // by (pt.x - 20, pt.y - 20) to place the pin center at the
-      // projected coordinates.
-      const offsetX = pt.x - 20;
-      const offsetY = pt.y - 20;
+      // The pin element carries no left/top offset of its own, so the
+      // transform alone places it. Recomputed on every map move so each pin
+      // stays locked to its geographic coordinate while panning/zooming.
+      const offsetX = pt.x - anchorX;
+      const offsetY = pt.y - anchorY;
       svg.style.transform = 'translate(' + offsetX.toFixed(1) + 'px, ' + offsetY.toFixed(1) + 'px)';
       svg.style.display = 'block';
     }
@@ -789,9 +786,9 @@
 
     visible.forEach(guide => {
       const svg = createPinElement(guide);
-      state.pinElements.push({ svg, guide, lngLat: [guide.coordinates[1], guide.coordinates[0]] });
+      state.pinElements.push({ svg, guide, lngLat: [guide.coordinates[1], guide.coordinates[0]], ax: 20, ay: 20 });
       state.mapOverlay.appendChild(svg);
-      positionPin(svg, [guide.coordinates[1], guide.coordinates[0]]);
+      positionPin(svg, [guide.coordinates[1], guide.coordinates[0]], 20, 20);
 
       svg.addEventListener('click', (e) => {
         console.log('[WTT] pin clicked:', guide.id, guide.title);
@@ -830,13 +827,13 @@
   function onMapMove() {
     state.pinElements.forEach(p => {
       if (p.hidden) return;
-      positionPin(p.svg, p.lngLat);
+      positionPin(p.svg, p.lngLat, p.ax, p.ay);
     });
     state.hotelPinElements.forEach(p => {
-      positionPin(p.svg, p.lngLat);
+      positionPin(p.svg, p.lngLat, p.ax, p.ay);
     });
     state.stepPinElements.forEach(p => {
-      positionPin(p.svg, p.lngLat);
+      positionPin(p.svg, p.lngLat, p.ax, p.ay);
     });
     positionNavDot();
   }
@@ -879,8 +876,6 @@
       svg.src = 'data:image/svg+xml,' + svgMarkup;
       svg.alt = hotel.name;
       svg.style.position = 'absolute';
-      svg.style.left = '-16px';
-      svg.style.top = '-32px';
       svg.style.width = size + 'px';
       svg.style.height = size + 'px';
       svg.style.pointerEvents = 'auto';
@@ -892,8 +887,8 @@
         selectHotelInGuide(guide.id, idx);
       });
       state.mapOverlay.appendChild(svg);
-      state.hotelPinElements.push({ svg, lngLat: [hotel.coordinates[1], hotel.coordinates[0]] });
-      if (state.map) positionPin(svg, [hotel.coordinates[1], hotel.coordinates[0]]);
+      state.hotelPinElements.push({ svg, lngLat: [hotel.coordinates[1], hotel.coordinates[0]], ax: size / 2, ay: size });
+      if (state.map) positionPin(svg, [hotel.coordinates[1], hotel.coordinates[0]], size / 2, size);
     });
   }
 
@@ -909,8 +904,6 @@
     svg.alt = 'Step ' + number;
     svg.className = 'step-pin';
     svg.style.position = 'absolute';
-    svg.style.left = '-' + (size / 2) + 'px';
-    svg.style.top = '-' + (size * 52 / 40) + 'px';
     svg.style.width = size + 'px';
     svg.style.height = (size * 52 / 40) + 'px';
     svg.style.pointerEvents = 'auto';
@@ -930,8 +923,8 @@
       if (!Array.isArray(stop.mapPin)) return;
       const pin = buildStepPin(idx + 1, idx);
       state.mapOverlay.appendChild(pin);
-      state.stepPinElements.push({ svg: pin, lngLat: [stop.mapPin[1], stop.mapPin[0]], stepIndex: idx });
-      if (state.map) positionPin(pin, [stop.mapPin[1], stop.mapPin[0]]);
+      state.stepPinElements.push({ svg: pin, lngLat: [stop.mapPin[1], stop.mapPin[0]], stepIndex: idx, ax: 17, ay: 44.2 });
+      if (state.map) positionPin(pin, [stop.mapPin[1], stop.mapPin[0]], 17, 44.2);
     });
   }
 

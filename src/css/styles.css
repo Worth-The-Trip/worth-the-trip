@@ -660,7 +660,9 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease-spring);
+  /* No transform transition here: pins are re-positioned on every map
+     move, and animating that transform made them trail the map surface
+     while panning (pins appeared to drift). */
 }
 
 .wtt-pin:hover {
