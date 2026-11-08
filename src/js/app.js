@@ -1154,7 +1154,8 @@
       if (b && Array.isArray(b.coordinates) && b.coordinates.length === 2
           && Number.isFinite(Number(b.coordinates[0])) && Number.isFinite(Number(b.coordinates[1]))) {
         return {
-          mapPin: [Number(b.coordinates[1]), Number(b.coordinates[0])],
+          // mapPin is [lat, lng] everywhere else in the nav code.
+          mapPin: [Number(b.coordinates[0]), Number(b.coordinates[1])],
           title: b.title,
           travelTime: '',
           booking: b
@@ -1388,7 +1389,7 @@
   }
 
   function startDriveMode() {
-    if (!state.nav.guideId) return;
+    if (!state.nav.guideId && !state.nav.bookingId) return;
     state.drive.active = true;
     state.drive.followPauseUntil = 0;
     document.body.classList.add('nav-immersive');
