@@ -1758,7 +1758,7 @@
     setSplitView(true);
     els.navBanner.style.display = 'flex';
     updateNavBanner();
-    showToast('▶ ' + t('toast.navStart') + ': ' + guide.title, 'success');
+    showToast(t('toast.navStart') + ': ' + guide.title, 'success');
     try {
       armNavWatch();
     } catch (e) {
@@ -2561,7 +2561,6 @@
       fadeDuration: 150,
       scrollZoom: true,
     });
-    window.__wttMap = function () { return state.map; };
 
     // When the map style loads
     state.map.on('load', () => {
