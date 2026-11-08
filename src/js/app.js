@@ -109,8 +109,6 @@
     modalIncludes: $('#modal-includes'),
     modalTimeline: $('#modal-timeline'),
     modalTimelineContent: $('#modal-timeline-content'),
-    modalHotelsLabel: $('#hotels-label'),
-    modalHotels: $('#modal-hotels'),
     modalSubDests: $('#subdest-label'),
     modalSubDestGrid: $('#modal-sub-dest-grid'),
     modalCreator: $('#modal-creator'),
