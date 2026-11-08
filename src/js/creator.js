@@ -157,7 +157,7 @@
   function applyTheme() {
     document.documentElement.setAttribute('data-theme', theme());
     var b = $('#theme-btn');
-    if (b) { b.textContent = theme() === 'light' ? '☀️' : '🌙'; b.setAttribute('aria-label', theme() === 'light' ? 'Switch to dark mode' : 'Switch to light mode'); }
+    if (b) { b.textContent = theme() === 'light' ? 'Light' : 'Dark'; b.setAttribute('aria-label', theme() === 'light' ? 'Switch to dark mode' : 'Switch to light mode'); }
   }
 
   function toast(msg, isErr) {
@@ -440,7 +440,7 @@
 
   function incRow(v, cls) {
     return '<div class="inc-row"><input class="' + cls + '" value="' + esc(v || '') + '" placeholder="' + esc(t('includes')) + '">' +
-      '<button class="btn btn-ghost btn-sm" data-rm-inc="1">✕</button></div>';
+      '<button class="btn btn-ghost btn-sm" data-rm-inc="1">×</button></div>';
   }
 
   function legText(leg) {
@@ -476,7 +476,7 @@
         '<div class="stop-name">' + esc(s.title || '(' + t('stopName') + ')') + '</div>' +
         '<button class="btn btn-ghost btn-sm" data-move="-1" data-i="' + i + '" title="' + esc(t('moveUp')) + '">↑</button>' +
         '<button class="btn btn-ghost btn-sm" data-move="1" data-i="' + i + '" title="' + esc(t('moveDown')) + '">↓</button>' +
-        '<button class="btn btn-danger btn-sm" data-rmstop="' + i + '" title="' + esc(t('remove')) + '">✕</button>' +
+        '<button class="btn btn-danger btn-sm" data-rmstop="' + i + '" title="' + esc(t('remove')) + '">×</button>' +
         '</div>' +
 
         '<div class="field"><label>' + esc(t('mapsLink')) + '</label>' +
@@ -1034,7 +1034,7 @@
       return '<div class="hotel-row" data-hotel="' + i + '">' +
         '<div class="stop-head"><div class="stop-num hotel-num">' + num + '</div>' +
         '<div class="stop-name">' + esc(h.name || '(' + t('hotelName') + ')') + '</div>' +
-        '<button class="btn btn-danger btn-sm" data-rmhotel="' + i + '" title="' + esc(t('remove')) + '">✕</button>' +
+        '<button class="btn btn-danger btn-sm" data-rmhotel="' + i + '" title="' + esc(t('remove')) + '">×</button>' +
         '</div>' +
         '<div class="field"><label>' + esc(t('hotelAfter')) + '</label>' +
         '<select data-hf="afterIndex">' + opts + '</select></div>' +

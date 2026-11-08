@@ -1010,8 +1010,8 @@
         '<div class="hotel-rec-name">' + hotel.name + '</div>' +
         '<div class="hotel-rec-address">' + (hotel.address || rec.address) + '</div>' +
         '<div class="hotel-rec-meta">' +
-          '<span>📅 ' + (state.travelStart || checkIn) + ' → ' + (state.travelEnd || checkOut) + '</span>' +
-          '<span>👤 ' + (hotel.guests || rec.guests) + ' ' + t('hotelRec.guests') + '</span>' +
+          '<span>' + (state.travelStart || checkIn) + ' → ' + (state.travelEnd || checkOut) + '</span>' +
+          '<span>' + (hotel.guests || rec.guests) + ' ' + t('hotelRec.guests') + '</span>' +
         '</div>' +
         '<a href="' + link + '" target="_blank" rel="noopener" class="btn-primary book-btn">' +
           '<span class="btn-label">' + t('hotelRec.book') + '</span>' +
@@ -1071,8 +1071,8 @@
           '<div class="hotel-rec-name">' + rec.name + '</div>' +
           '<div class="hotel-rec-address">' + rec.address + '</div>' +
           '<div class="hotel-rec-meta">' +
-            '<span>📅 ' + checkIn + ' → ' + checkOut + '</span>' +
-            '<span>👤 ' + rec.guests + ' ' + t('hotelRec.guests') + '</span>' +
+            '<span>' + checkIn + ' → ' + checkOut + '</span>' +
+            '<span>' + rec.guests + ' ' + t('hotelRec.guests') + '</span>' +
           '</div>' +
           '<a href="' + link + '" target="_blank" rel="noopener" class="btn-primary book-btn">' +
             '<span class="btn-label">' + t('hotelRec.book') + '</span>' +
@@ -1289,7 +1289,7 @@
     }
     const mode = state.nav.mode === 'transit' ? 'transit' : 'walking';
     els.navGmaps.href = 'https://www.google.com/maps/dir/?api=1&destination=' + target.mapPin[0] + ',' + target.mapPin[1] + '&travelmode=' + mode;
-    els.navMode.textContent = state.nav.mode === 'transit' ? '🚃' : '🚶';
+    els.navMode.textContent = state.nav.mode === 'transit' ? 'Train' : 'Walk';
   }
 
   function positionNavDot() {
@@ -1675,13 +1675,13 @@
 
   function travelIcon(text) {
     const t = (text || '').toLowerCase();
-    if (/walk/.test(t)) return '🚶';
-    if (/train|line|station|subway|shinkansen/.test(t)) return '🚃';
-    if (/bus/.test(t)) return '🚌';
-    if (/drive|car|taxi/.test(t)) return '🚗';
-    if (/ferry|boat|ship/.test(t)) return '⛴';
-    if (/bike|cycle/.test(t)) return '🚲';
-    return '🕐';
+    if (/walk/.test(t)) return 'Walk';
+    if (/train|line|station|subway|shinkansen/.test(t)) return 'Train';
+    if (/bus/.test(t)) return 'Bus';
+    if (/drive|car|taxi/.test(t)) return 'Car';
+    if (/ferry|boat|ship/.test(t)) return 'Ferry';
+    if (/bike|cycle/.test(t)) return 'Bike';
+    return 'Time';
   }
 
   function shortStopName(title) {
@@ -1777,13 +1777,13 @@
       // Inject the hotel stay as a literal timeline step after the configured index.
       if (hotel && group.indexes.includes(hotel.afterIndex)) {
         const hr = guide.hotelRec;
-        const dates = hr.checkIn && hr.checkOut ? `<span>📅 ${hr.checkIn} → ${hr.checkOut} · ${hr.guests} ${t('hotelRec.guests').toLowerCase()}</span>` : '';
+        const dates = hr.checkIn && hr.checkOut ? `<span>${hr.checkIn} → ${hr.checkOut} · ${hr.guests} ${t('hotelRec.guests').toLowerCase()}</span>` : '';
         out += `
           <div class="timeline-item timeline-hotel">
             <span class="timeline-time">${hotel.time}</span>
             <div class="timeline-row">
               <div class="timeline-text">
-                <div class="timeline-title">🛏 ${hotel.title}</div>
+                <div class="timeline-title">${hotel.title}</div>
                 <div class="timeline-desc">${dates}</div>
                 <div class="timeline-meta">
                   <a class="timeline-meta-btn timeline-book-btn" href="${buildStay22Link(hr.recommended.stay22Link)}" target="_blank" rel="noopener noreferrer">
@@ -2407,8 +2407,8 @@
     state.diagnosticShown = true;
     const isFileProtocol = window.location.protocol === 'file:';
     const msg = isFileProtocol
-      ? '🗺️ Map tiles not loading — open this file through a local server (see README.md) for the full map.'
-      : '🗺️ Map tiles not loading — check your internet connection.';
+      ? 'Map tiles not loading — open this file through a local server (see README.md) for the full map.'
+      : 'Map tiles not loading — check your internet connection.';
     const banner = document.createElement('div');
     banner.id = 'map-error-banner';
     banner.className = 'map-error-banner';
@@ -2713,7 +2713,7 @@
           openBookingsPage();
           return;
         }
-        toast('📱 ' + t('nav.' + tab) + ' ' + t('toast.tabSoon'));
+        toast(t('nav.' + tab) + ' ' + t('toast.tabSoon'));
       });
     });
 
@@ -3891,8 +3891,8 @@
   function bookingCardHtml(b) {
     const status = bookingStatus(b);
     const dates = b.dateEnd && b.dateEnd !== b.dateStart
-      ? `📅 ${formatBookingDate(b.dateStart)} → ${formatBookingDate(b.dateEnd)}`
-      : `📅 ${formatBookingDate(b.dateStart)}`;
+      ? `${formatBookingDate(b.dateStart)} → ${formatBookingDate(b.dateEnd)}`
+      : `${formatBookingDate(b.dateStart)}`;
     return `
       <div class="booking-card">
         <div class="booking-card-imgwrap">
@@ -3905,7 +3905,7 @@
         <div class="booking-card-body">
           <div class="booking-title">${b.title}</div>
           <div class="booking-location">${b.location}</div>
-          <div class="booking-dates"><span>${dates}</span>${b.time ? `<span>🕐 ${b.time}</span>` : ''}</div>
+          <div class="booking-dates"><span>${dates}</span>${b.time ? `<span>${b.time}</span>` : ''}</div>
           ${b.reference ? `<div class="booking-ref">${t('bookings.ref')}: ${b.reference}</div>` : ''}
           ${b.notes ? `<div class="booking-notes">${b.notes}</div>` : ''}
         </div>
@@ -4039,7 +4039,7 @@
     const opts = [
       { key: 'all', label: t('creators.all') },
       ...CREATOR_PLATFORMS.map(p => ({ key: p, label: CREATOR_PLATFORM_LABELS[p] })),
-      { key: 'following', label: '♥ ' + t('creators.following') },
+      { key: 'following', label: t('creators.following') },
     ];
     box.innerHTML = opts.map(o =>
       `<button class="chip${state.creatorPlatform === o.key ? ' active' : ''}" data-cplat="${o.key}">${o.label}</button>`
@@ -4090,7 +4090,7 @@
               <div class="creator-card-name">${escHtml(c.name)}</div>
               <div class="creator-card-handle">${escHtml(handleBits)}${c.city ? ' · ' + escHtml(cityLabel(c.city)) : ''}</div>
             </div>
-            <button class="creator-btn follow-pill${following ? ' following' : ''}" data-follow="${c.id}">${following ? '♥ ' + t('creators.following') : t('creators.follow')}</button>
+            <button class="creator-btn follow-pill${following ? ' following' : ''}" data-follow="${c.id}">${following ? t('creators.following') : t('creators.follow')}</button>
           </div>
           <div class="creator-card-bio">${creatorText(c, 'bio')}</div>
           <div class="creator-card-meta">

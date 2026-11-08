@@ -2672,18 +2672,18 @@ app.listen(PORT, HOST, () => {
   console.log('Account:    http://' + HOST + ':' + PORT + '/account');
   console.log('Data dir:   ' + RUNTIME_DIR);
   if (ON_SITEGROUND && RUNTIME_DIR === DATA_DIR) {
-    console.log('⚠️  No writable persistent data dir found — signups and purchases will be LOST on the next deploy.');
+    console.log(' No writable persistent data dir found — signups and purchases will be LOST on the next deploy.');
   }
   if (STRIPE_SECRET_KEY === '__STRIPE_NO_KEY__') {
-    console.log('⚠️  STRIPE_SECRET_KEY is not set — Stripe checkout/webhook will NOT work until env is configured.');
+    console.log(' STRIPE_SECRET_KEY is not set — Stripe checkout/webhook will NOT work until env is configured.');
   }
   if (STRIPE_WEBHOOK_SECRET === '__STRIPE_WEBHOOK_NO_KEY__') {
-    console.log('⚠️  STRIPE_WEBHOOK_SECRET is not set — real Stripe events will be rejected. Set it from the Stripe Dashboard.');
+    console.log(' STRIPE_WEBHOOK_SECRET is not set — real Stripe events will be rejected. Set it from the Stripe Dashboard.');
   }
   if (process.env.YOUTUBE_API_KEY) console.log('Follower counts: YouTube live');
-  else console.log('⚠️  YOUTUBE_API_KEY is not set — YouTube follower counts will not refresh.');
+  else console.log(' YOUTUBE_API_KEY is not set — YouTube follower counts will not refresh.');
   if (process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET) console.log('Follower counts: Twitch live');
-  else console.log('⚠️  TWITCH_CLIENT_ID/SECRET not set — Twitch follower counts will not refresh.');
+  else console.log(' TWITCH_CLIENT_ID/SECRET not set — Twitch follower counts will not refresh.');
 
   // Refresh follower counts in the background so a slow platform never blocks a
   // request, then keep them roughly in step.
