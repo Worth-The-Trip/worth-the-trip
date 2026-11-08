@@ -3034,18 +3034,33 @@ body.nav-immersive .drive-bar {
   gap: 8px;
   flex: none;
 }
+.drive-actions .btn,
 .drive-actions .nav-gmaps {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-size: 12px;
+  justify-content: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
   font-weight: 600;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.drive-actions .nav-gmaps {
+  background: var(--vermilion);
+  border: none;
+  color: #fff;
   text-decoration: none;
 }
-.drive-actions .nav-gmaps:hover { color: var(--text-primary); background: var(--surface-raised); }
+.drive-actions .nav-gmaps:hover { background: #b32525; color: #fff; }
+#drive-end {
+  background: transparent;
+  border: 1px solid var(--vermilion);
+  color: var(--vermilion);
+}
+#drive-end:hover { background: rgba(211, 47, 47, 0.14); }
 @media (max-width: 700px) {
   .drive-banner, .drive-bar { left: 10px; right: 10px; }
   .drive-bar { bottom: calc(10px + 56px); }
