@@ -2939,7 +2939,7 @@ body.nav-immersive #map-container {
 }
 body.nav-immersive .nav-panel,
 body.nav-immersive .nav-banner {
-  display: none;
+  display: none !important;
 }
 body.nav-immersive .drive-banner,
 body.nav-immersive .drive-bar {
