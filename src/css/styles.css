@@ -3175,16 +3175,22 @@ body.nav-immersive .drive-bar {
   order: 1;
   flex: 1;
   min-width: 0;
+  min-height: 0;
   padding: var(--space-sm) var(--space-md);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* Content starts at the top so a long title never drifts out of view. */
+  justify-content: flex-start;
 }
 
 .booking-title {
   font-size: 15px;
   font-weight: 800;
   color: var(--text-primary);
+  /* A long hotel name wraps inside the bubble instead of being clipped. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  flex: none;
 }
 
 .booking-location {
@@ -3220,6 +3226,120 @@ body.nav-immersive .drive-bar {
   font-size: 13px;
   line-height: 1.5;
   color: var(--text-secondary);
+  /* Long confirmations stay a readable snippet; the detail page has the lot. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---- Booking detail sheet ---- */
+.booking-detail-sheet .modal-body {
+  padding-top: var(--space-sm);
+}
+
+.booking-detail-hero {
+  position: relative;
+  margin: 0 0 var(--space-md);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  background: var(--surface-2, #1a1a1a);
+}
+
+.booking-detail-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.booking-detail-pills {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  right: var(--space-sm);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.booking-detail-pills .booking-status {
+  position: static;
+}
+
+.booking-detail-location {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+}
+
+.booking-detail-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: var(--space-md);
+}
+
+.booking-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  font-size: 14px;
+}
+
+.booking-detail-row > span:first-child {
+  color: var(--text-secondary);
+  flex: none;
+}
+
+.booking-detail-row > span:last-child {
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.booking-detail-notes {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-bottom: var(--space-md);
+}
+
+.booking-detail-actions {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.booking-detail-actions .btn-primary {
+  flex: 1;
+}
+
+.booking-detail-actions .btn-ghost[disabled],
+.booking-detail-actions .btn-primary[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.booking-detail-hint {
+  margin: var(--space-sm) 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Single destination pin used while navigating to a booking */
+.booking-pin {
+  width: 24px;
+  height: 32px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
 }
 
 /* Keep scroll content clear of the floating bottom nav (must stay last) */

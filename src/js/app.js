@@ -949,10 +949,10 @@
     const prev = state.nav || {};
     // Keep the blue dot + last known position: passive tracking owns them.
     state.nav = {
-      watchId: null, guideId: null, stopIndex: 0, mode: 'walking',
+      watchId: null, guideId: null, bookingId: null, stopIndex: 0, mode: 'walking',
       userLngLat: prev.userLngLat || null, dot: prev.dot || null,
       routeKey: null, routeOrigin: null, routeDrawn: false,
-      lastFixAt: 0, watchTimer: null
+      lastFixAt: 0, watchTimer: null, bookingMarker: null
     };
   }
   resetNavState();
@@ -1027,7 +1027,7 @@
   function navTargetTitle() {
     const target = navTarget();
     if (!target) return '';
-    if (target.kind === 'hotel') return target.title || '';
+    if (target.kind === 'hotel' || target.booking) return target.title || '';
     const guide = guideById(state.nav.guideId);
     const idx = guide && guide.timeline ? guide.timeline.indexOf(target.ref) : -1;
     return tlText(guide, idx, 'title');
@@ -1147,6 +1147,20 @@
   }
 
   function navTarget() {
+    // A booking is a single destination rather than a guide itinerary.
+    if (state.nav.bookingId) {
+      const b = state.bookings.find(x => x.id === state.nav.bookingId);
+      if (b && Array.isArray(b.coordinates) && b.coordinates.length === 2
+          && Number.isFinite(Number(b.coordinates[0])) && Number.isFinite(Number(b.coordinates[1]))) {
+        return {
+          mapPin: [Number(b.coordinates[1]), Number(b.coordinates[0])],
+          title: b.title,
+          travelTime: '',
+          booking: b
+        };
+      }
+      return null;
+    }
     const guide = guideById(state.nav.guideId);
     if (!guide) return null;
     const stops = navStops(guide);
@@ -1277,7 +1291,9 @@
     const moved = state.nav.routeOrigin
       ? haversineM(state.nav.routeOrigin[0], state.nav.routeOrigin[1], uLat, uLng)
       : Infinity;
-    const key = state.nav.guideId + ':' + state.nav.stopIndex;
+    const key = state.nav.bookingId
+      ? 'bk:' + state.nav.bookingId
+      : state.nav.guideId + ':' + state.nav.stopIndex;
     if (state.nav.routeKey === key && moved < NAV_ROUTE_REFETCH_M) return;
     state.nav.routeKey = key;
 
@@ -1662,6 +1678,12 @@
     if (!target) return;
     const d = haversineM(pos.coords.latitude, pos.coords.longitude, target.mapPin[0], target.mapPin[1]);
     if (d <= NAV_CHECKIN_M) {
+      // A booking has no itinerary after it, so arriving is the end of the trip.
+      if (state.nav.bookingId) {
+        showToast(t('toast.checkedIn') + ': ' + target.title, 'success');
+        stopGuideNav();
+        return;
+      }
       state.nav.stopIndex += 1;
       const guide = guideById(state.nav.guideId);
       const remaining = navStops(guide).length - state.nav.stopIndex;
@@ -1706,7 +1728,7 @@
     // navigation resumes by itself instead of silently freezing.
     clearInterval(state.nav.watchTimer);
     state.nav.watchTimer = setInterval(() => {
-      if (!state.nav.guideId) return;
+      if (!state.nav.guideId && !state.nav.bookingId) return;
       if (Date.now() - state.nav.lastFixAt < NAV_WATCH_RETRY_MS) return;
       state.nav.lastFixAt = Date.now();
       armNavWatch();
@@ -1796,6 +1818,10 @@
     clearNavRoute();
     clearNavPanel();
     setSplitView(false);
+    if (state.nav.bookingMarker) {
+      try { state.nav.bookingMarker.remove(); } catch (e) {}
+      state.nav.bookingMarker = null;
+    }
     resetNavState();
     if (els.navBanner) els.navBanner.style.display = 'none';
     // Clear collapsed/past state when nav ends.
@@ -1803,6 +1829,52 @@
     clearStepPins();
     showGuidePins();
     if (!silent) showToast(t('toast.navEnd'), 'success');
+  }
+
+  // A single destination pin for a booking.
+  function showBookingPin(b) {
+    if (!state.map) return;
+    if (state.nav.bookingMarker) {
+      try { state.nav.bookingMarker.remove(); } catch (e) {}
+      state.nav.bookingMarker = null;
+    }
+    const el = document.createElement('div');
+    el.className = 'booking-pin';
+    el.innerHTML = '<svg width="24" height="32" viewBox="0 0 24 30" fill="#D32F2F" stroke="#fff" stroke-width="1.6"><path d="M12 1C6.5 1 2 5.5 2 11c0 7.5 10 18 10 18s10-10.5 10-18C22 5.5 17.5 1 12 1z"/><circle cx="12" cy="11" r="3.6" fill="#fff" stroke="none"/></svg>';
+    state.nav.bookingMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([b.coordinates[1], b.coordinates[0]])
+      .addTo(state.map);
+  }
+
+  // Navigate to a booking's location using the same routing, banner and drive
+  // camera as guide navigation. Without coordinates we hand off to Google Maps.
+  function bookingNav(b) {
+    if (!b) return;
+    if (!Array.isArray(b.coordinates) || b.coordinates.length !== 2) {
+      const q = [b.title, b.location].filter(Boolean).join(', ');
+      window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q), '_blank', 'noopener');
+      return;
+    }
+    stopGuideNav(true);
+    state.nav = {
+      watchId: null, guideId: null, bookingId: b.id, stopIndex: 0, mode: 'walking',
+      userLngLat: null, dot: null, route: null, routeDrawn: false, routeOrigin: null,
+      routeKey: null, lastFixAt: 0, watchTimer: null, bookingMarker: null
+    };
+    state.activeGuideId = null;
+    hideGuidePins();
+    clearStepPins();
+    if (state.map) {
+      try {
+        state.map.flyTo({ center: [b.coordinates[1], b.coordinates[0]], zoom: 14, pitch: 0, bearing: 0, duration: 1200 });
+      } catch (e) {}
+    }
+    showBookingPin(b);
+    setSplitView(false);
+    if (els.navBanner) els.navBanner.style.display = 'flex';
+    updateNavBanner();
+    armNavWatch();
+    if (state.nav.userLngLat) updateNavRoute();
   }
 
   function travelIcon(text) {
@@ -4205,15 +4277,29 @@
     return d.toLocaleDateString(lang() === 'ja' ? 'ja-JP' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  // Default artwork per booking type — used when no photo was uploaded.
+  const BOOKING_ART = {
+    hotel: 'public/Branding/booking-hotel.svg',
+    event: 'public/Branding/booking-event.svg',
+    transport: 'public/Branding/booking-flight.svg',
+    experience: 'public/Branding/booking-experience.svg'
+  };
+
+  function bookingImage(b) {
+    const uploaded = (b && b.image || '').trim();
+    return uploaded || BOOKING_ART[(b && b.type) || 'hotel'] || BOOKING_ART.hotel;
+  }
+
   function bookingCardHtml(b) {
     const status = bookingStatus(b);
     const dates = b.dateEnd && b.dateEnd !== b.dateStart
       ? `${formatBookingDate(b.dateStart)} → ${formatBookingDate(b.dateEnd)}`
       : `${formatBookingDate(b.dateStart)}`;
     return `
-      <div class="booking-card">
+      <div class="booking-card${b.source && b.source !== 'manual' ? ' is-user' : ''}" data-booking-id="${esc(b.id)}"
+           role="button" tabindex="0" aria-label="${esc(b.title)}">
         <div class="booking-card-imgwrap">
-          <img src="${b.image}" alt="${b.title}" loading="lazy" onerror="this.style.display='none'">
+          <img src="${esc(bookingImage(b))}" alt="${esc(b.title)}" loading="lazy">
           <div class="booking-pills">
             <span class="booking-type">${t('bookings.type.' + b.type) !== 'bookings.type.' + b.type ? t('bookings.type.' + b.type) : b.type}</span>
             <span class="booking-status${status === 'past' ? ' past' : ''}">${status === 'past' ? t('bookings.past') : t('bookings.upcoming')}</span>
@@ -4221,13 +4307,13 @@
         </div>
         <div class="booking-card-body">
           <div class="booking-title-row">
-            <div class="booking-title">${b.title}</div>
+            <div class="booking-title">${esc(b.title)}</div>
             ${b.source && b.source !== 'manual' ? `<button class="booking-del" data-del-booking="${esc(b.id)}" aria-label="${esc(t('import.delete'))}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>` : ''}
           </div>
-          <div class="booking-location">${b.location}</div>
-          <div class="booking-dates"><span>${dates}</span>${b.time ? `<span>${b.time}</span>` : ''}</div>
-          ${b.reference ? `<div class="booking-ref">${t('bookings.ref')}: ${b.reference}</div>` : ''}
-          ${b.notes ? `<div class="booking-notes">${b.notes}</div>` : ''}
+          <div class="booking-location">${esc(b.location)}</div>
+          <div class="booking-dates"><span>${dates}</span>${b.time ? `<span>${esc(b.time)}</span>` : ''}</div>
+          ${b.reference ? `<div class="booking-ref">${t('bookings.ref')}: ${esc(b.reference)}</div>` : ''}
+          ${b.notes ? `<div class="booking-notes">${esc(b.notes)}</div>` : ''}
         </div>
       </div>`;
   }
@@ -4247,11 +4333,92 @@
         html = `<div class="page-empty">${t('bookings.empty')}</div>`;
       }
       $('#bookings-list').innerHTML = html;
-      $('#bookings-list').querySelectorAll('[data-del-booking]').forEach(btn => {
-        btn.addEventListener('click', () => deleteBooking(btn.getAttribute('data-del-booking')));
-      });
     });
   }
+
+  let bookingDetailId = null;
+
+  function bookingById(id) {
+    return state.bookings.find(b => b.id === id) || null;
+  }
+
+  function openBookingDetail(id) {
+    const b = bookingById(id);
+    if (!b) return;
+    bookingDetailId = id;
+    const status = bookingStatus(b);
+    const dates = b.dateEnd && b.dateEnd !== b.dateStart
+      ? `${formatBookingDate(b.dateStart)} → ${formatBookingDate(b.dateEnd)}`
+      : `${formatBookingDate(b.dateStart)}`;
+    const img = $('#booking-detail-image');
+    img.src = bookingImage(b);
+    img.alt = b.title;
+    $('#booking-detail-type').textContent = t('bookings.type.' + b.type) !== 'bookings.type.' + b.type
+      ? t('bookings.type.' + b.type) : b.type;
+    const st = $('#booking-detail-status');
+    st.textContent = status === 'past' ? t('bookings.past') : t('bookings.upcoming');
+    st.classList.toggle('past', status === 'past');
+    $('#booking-detail-title').textContent = b.title;
+    $('#booking-detail-location').textContent = b.location || '';
+    $('#booking-detail-dates').textContent = dates;
+    $('#booking-detail-time').textContent = b.time || '';
+    $('#booking-detail-time-row').style.display = b.time ? '' : 'none';
+    $('#booking-detail-ref').textContent = b.reference || '';
+    $('#booking-detail-ref-row').style.display = b.reference ? '' : 'none';
+    $('#booking-detail-notes').textContent = b.notes || '';
+    $('#booking-detail-notes').style.display = b.notes ? '' : 'none';
+    const hasCoords = Array.isArray(b.coordinates) && b.coordinates.length === 2;
+    $('#booking-detail-navigate').disabled = !hasCoords;
+    $('#booking-detail-navhint').textContent = hasCoords ? '' : t('bookingDetail.noCoords');
+    const m = $('#booking-detail-modal');
+    m.classList.add('active');
+    m.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeBookingDetail() {
+    const m = $('#booking-detail-modal');
+    if (!m || !m.classList.contains('active')) return;
+    m.classList.remove('active');
+    m.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    bookingDetailId = null;
+  }
+
+  function deleteBookingDetail() {
+    if (!bookingDetailId) return;
+    const id = bookingDetailId;
+    closeBookingDetail();
+    deleteBooking(id);
+  }
+
+  // Opening a booking, and the two buttons inside its detail page.
+  document.addEventListener('click', (e) => {
+    const delBtn = e.target.closest('[data-del-booking]');
+    if (delBtn) {
+      e.stopPropagation();
+      deleteBooking(delBtn.getAttribute('data-del-booking'));
+      return;
+    }
+    const card = e.target.closest('.booking-card[data-booking-id]');
+    if (card) openBookingDetail(card.getAttribute('data-booking-id'));
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = e.target.closest && e.target.closest('.booking-card[data-booking-id]');
+    if (!card) return;
+    e.preventDefault();
+    openBookingDetail(card.getAttribute('data-booking-id'));
+  });
+
+  $('#booking-detail-close').addEventListener('click', closeBookingDetail);
+  $('#booking-detail-delete').addEventListener('click', deleteBookingDetail);
+  $('#booking-detail-navigate').addEventListener('click', () => {
+    const b = bookingById(bookingDetailId);
+    closeBookingDetail();
+    if (b) bookingNav(b);
+  });
 
   async function deleteBooking(id) {
     try {

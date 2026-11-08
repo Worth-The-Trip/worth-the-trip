@@ -546,6 +546,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   image TEXT NOT NULL DEFAULT '',
   notes TEXT NOT NULL DEFAULT '',
   url TEXT NOT NULL DEFAULT '',
+  coordinates TEXT NOT NULL DEFAULT '',
   source TEXT NOT NULL DEFAULT 'manual',
   created_at TEXT NOT NULL DEFAULT ''
 );
@@ -2890,33 +2891,69 @@ function parseBookingText(raw) {
 }
 
 // ---- Bookings storage ----
+// Best-effort geocoding so a booking can be navigated to. Nominatim is free
+// and keyless; a miss just leaves the booking without coordinates.
+async function geocodeLocation(location) {
+  const q = String(location || '').trim();
+  if (!q) return null;
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q);
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'WorthTheTrip/1.0 (booking import)' },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (Array.isArray(d) && d.length && d[0].lat && d[0].lon) {
+      return [Number(d[0].lat), Number(d[0].lon)];
+    }
+  } catch (e) { /* offline, rate-limited, no match — all fine */ }
+  return null;
+}
+
 function readUserBookings(userId) {
   return db().prepare(`SELECT id, type, title, location, date_start AS dateStart, date_end AS dateEnd,
-      time, reference, image, notes, url, source, created_at AS createdAt
-    FROM bookings WHERE user_id = ? ORDER BY date_start DESC, created_at DESC`).all(userId);
+      time, reference, image, notes, url, coordinates, source, created_at AS createdAt
+    FROM bookings WHERE user_id = ? ORDER BY date_start DESC, created_at DESC`).all(userId)
+    .map(function (b) {
+      let coords = null;
+      try { coords = JSON.parse(b.coordinates || ''); } catch (e) { coords = null; }
+      if (!Array.isArray(coords) || coords.length !== 2 || !Number.isFinite(Number(coords[0])) || !Number.isFinite(Number(coords[1]))) coords = null;
+      b.coordinates = coords;
+      return b;
+    });
 }
 
 app.get('/api/bookings', requireUser, (req, res) => {
   res.json({ bookings: readUserBookings(req.user.id) });
 });
 
-app.post('/api/bookings', requireUser, (req, res) => {
+app.post('/api/bookings', requireUser, async (req, res) => {
   const b = req.body || {};
   const id = String(b.id || 'bk_' + crypto.randomBytes(8).toString('hex'));
   const now = new Date().toISOString();
+  // Accept client-supplied coordinates, otherwise look the location up once so
+  // the booking can be navigated to later.
+  let coords = Array.isArray(b.coordinates) && b.coordinates.length === 2
+    && Number.isFinite(Number(b.coordinates[0])) && Number.isFinite(Number(b.coordinates[1]))
+    ? [Number(b.coordinates[0]), Number(b.coordinates[1])]
+    : null;
+  const location = clip(b.location, 120).trim();
+  if (!coords && location) coords = await geocodeLocation(location);
+  const coordJson = coords ? JSON.stringify(coords) : '';
   db().prepare(`INSERT INTO bookings
-      (id, user_id, type, title, location, date_start, date_end, time, reference, image, notes, url, source, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      (id, user_id, type, title, location, date_start, date_end, time, reference, image, notes, url, coordinates, source, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(id) DO UPDATE SET user_id=excluded.user_id, type=excluded.type, title=excluded.title,
       location=excluded.location, date_start=excluded.date_start, date_end=excluded.date_end,
       time=excluded.time, reference=excluded.reference, image=excluded.image, notes=excluded.notes,
-      url=excluded.url, source=excluded.source`)
+      url=excluded.url, coordinates=excluded.coordinates, source=excluded.source`)
     .run(id, req.user.id,
       ['hotel', 'event', 'experience', 'transport'].includes(b.type) ? b.type : 'hotel',
-      clip(b.title, 120).trim(), clip(b.location, 120).trim(),
+      clip(b.title, 120).trim(), location,
       clip(b.dateStart, 10), clip(b.dateEnd, 10), clip(b.time, 5),
       clip(b.reference, 40).trim(), clip(b.image, 400).trim(),
-      clip(b.notes, 500).trim(), clip(b.url, 400).trim(),
+      clip(b.notes, 500).trim(), clip(b.url, 400).trim(), coordJson,
       clip(b.source, 20).trim() || 'manual', now);
   res.status(201).json({ ok: true, booking: readUserBookings(req.user.id).find(x => x.id === id) || null });
 });

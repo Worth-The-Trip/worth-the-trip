@@ -419,6 +419,35 @@
       </div>
     </div>
 
+    <!-- Booking detail -->
+    <div id="booking-detail-modal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-sheet booking-detail-sheet">
+        <button id="booking-detail-close" class="modal-close" aria-label="Close"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <div class="modal-body">
+          <div class="booking-detail-hero">
+            <img id="booking-detail-image" alt="">
+            <div class="booking-detail-pills">
+              <span class="booking-type" id="booking-detail-type"></span>
+              <span class="booking-status" id="booking-detail-status"></span>
+            </div>
+          </div>
+          <h2 class="modal-title" id="booking-detail-title"></h2>
+          <div class="booking-detail-location" id="booking-detail-location"></div>
+          <div class="booking-detail-rows">
+            <div class="booking-detail-row"><span data-i18n="bookingDetail.dates">Dates</span><span id="booking-detail-dates"></span></div>
+            <div class="booking-detail-row" id="booking-detail-time-row"><span data-i18n="bookingDetail.time">Time</span><span id="booking-detail-time"></span></div>
+            <div class="booking-detail-row" id="booking-detail-ref-row"><span data-i18n="bookings.ref">Ref</span><span id="booking-detail-ref"></span></div>
+          </div>
+          <div class="booking-detail-notes" id="booking-detail-notes"></div>
+          <div class="booking-detail-actions">
+            <button class="btn-ghost" id="booking-detail-delete"><span data-i18n="bookingDetail.delete">Delete</span></button>
+            <button class="btn-primary" id="booking-detail-navigate"><span class="btn-label" data-i18n="bookingDetail.navigate">Navigate</span></button>
+          </div>
+          <p class="booking-detail-hint" id="booking-detail-navhint"></p>
+        </div>
+      </div>
+    </div>
+
   <div id="toast" class="toast"></div>
 
   <div id="nav-banner" class="nav-banner" style="display:none">
@@ -466,10 +495,10 @@
   <script src="src/js/data/creators.js?v=3"></script>
   <script src="src/js/data/creator-profiles.js?v=2"></script>
   <script src="src/js/data/bookings.js?v=2"></script>
-  <script src="src/js/data/strings.js?v=19"></script>
+  <script src="src/js/data/strings.js?v=20"></script>
   <script src="src/js/data/creator-guides.js?v=7"></script>
   <script src="src/js/data/japan-locations.js?v=1"></script>
-  <script src="src/js/app.js?v=135"></script>
+  <script src="src/js/app.js?v=136"></script>
   <!-- Stay22 Affiliate (Let Me Allez) — tracks bookings on worththetripapp.com -->
   <script>
     (function (s, t, a, y, twenty, two) {
