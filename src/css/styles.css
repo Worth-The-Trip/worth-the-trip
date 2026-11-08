@@ -3039,6 +3039,7 @@ body.nav-immersive .drive-bar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   height: 34px;
   padding: 0 14px;
   border-radius: var(--radius-full);
@@ -3048,6 +3049,7 @@ body.nav-immersive .drive-bar {
   white-space: nowrap;
   cursor: pointer;
 }
+.drive-ext-icon { flex: none; opacity: 0.9; }
 .drive-actions .nav-gmaps {
   background: var(--vermilion);
   border: none;
