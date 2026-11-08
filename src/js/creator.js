@@ -379,7 +379,7 @@
         var on = (g.season || []).indexOf(m) !== -1;
         return '<label class="month"><input type="checkbox" name="season" value="' + m + '"' + (on ? ' checked' : '') + '><span>' + m.toUpperCase() + '</span></label>';
       }).join('') + '</div></div>' +
-      '<div class="field"><label>' + esc(t('creatorRating')) + '</label>' +
+      '<div class="field"><label for="f-creator-rating">' + esc(t('creatorRating')) + '</label>' +
       '<div class="star-input" id="f-creator-rating" role="radiogroup" aria-label="' + esc(t('creatorRating')) + '"></div>' +
       '<p class="hint">' + esc(t('creatorRatingHint')) + '</p></div>' +
       '<div class="field"><label>' + esc(t('cover')) + '</label>' +
