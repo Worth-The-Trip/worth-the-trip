@@ -2896,12 +2896,6 @@ app.post('/api/bookings/parse', requireUser, (req, res) => {
   res.json({ draft: parseBookingText(text) });
 });
 
-// A per-account forwarding address the traveller can BCC/forward to.
-app.get('/api/me/booking-address', requireUser, (req, res) => {
-  const domain = process.env.WTT_BOOKING_MAIL_DOMAIN || 'bookings.worththetripapp.com';
-  res.json({ address: req.user.id + '@' + domain, domain: domain });
-});
-
 // Attachment (a photo of the confirmation) — kept on the booking card.
 app.post('/api/bookings/attachment', requireUser, (req, res) => {
   const m = /^data:(image\/(png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String((req.body || {}).dataUrl || ''));
@@ -2915,26 +2909,6 @@ app.post('/api/bookings/attachment', requireUser, (req, res) => {
   const name = Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex') + '.' + ext;
   fs.writeFileSync(path.join(dir, name), buf);
   res.json({ ok: true, path: '/booking-images/' + req.user.id + '/' + name });
-});
-
-// Inbound email webhook — an email service (SendGrid Inbound Parse, Mailgun
-// routes, Cloudflare Email Workers) POSTs the forwarded confirmation here.
-app.post('/api/bookings/inbound', (req, res) => {
-  const secret = process.env.WTT_INBOUND_SECRET || '';
-  if (secret && req.get('x-wtt-secret') !== secret) return jsonError(res, 403, 'Forbidden');
-  const to = String((req.body || {}).to || '');
-  const user = findUserById(to.split('@')[0].trim());
-  if (!user) return jsonError(res, 404, 'Unknown recipient');
-  const htmlText = String((req.body || {}).html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ');
-  const draft = parseBookingText([(req.body || {}).subject || '', (req.body || {}).text || '', htmlText].join('\n'));
-  const id = 'bk_' + crypto.randomBytes(8).toString('hex');
-  const now = new Date().toISOString();
-  db().prepare(`INSERT INTO bookings
-      (id, user_id, type, title, location, date_start, date_end, time, reference, image, notes, url, source, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(id, user.id, draft.type || 'hotel', draft.title, draft.location, draft.dateStart, draft.dateEnd,
-      draft.time, draft.reference, '', draft.notes, '', 'forward', now);
-  res.json({ ok: true, booking: readUserBookings(user.id).find(x => x.id === id) || null });
 });
 
 // ---- Admin: guide review ----

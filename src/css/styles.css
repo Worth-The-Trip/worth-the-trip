@@ -3673,12 +3673,6 @@ a.creator-plat:hover {
   margin-bottom: 10px;
 }
 .import-textarea:focus { outline: none; border-color: var(--vermilion); }
-.import-address-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.import-address-row .field-input { flex: 1; }
 .import-preview-card {
   margin-top: 16px;
   padding: 14px;

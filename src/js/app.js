@@ -3170,14 +3170,6 @@
     $('#bookings-import').addEventListener('click', openImportModal);
     $('#import-close').addEventListener('click', closeImportModal);
     $('#import-parse').addEventListener('click', parsePastedText);
-    $('#import-copy').addEventListener('click', () => {
-      const input = $('#import-address');
-      if (!input || !input.value) return;
-      const done = () => { input.select(); showToast(t('import.copied'), 'success'); };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(input.value).then(done).catch(() => { input.select(); document.execCommand('copy'); done(); });
-      } else { input.select(); document.execCommand('copy'); done(); }
-    });
     $('#import-ics-btn').addEventListener('click', () => $('#import-ics').click());
     $('#import-ics').addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -4291,15 +4283,6 @@
     $('#import-text').value = '';
     $('#import-preview').innerHTML = '';
     importDraft = null;
-    fetch('/api/me/booking-address', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        const input = $('#import-address');
-        if (input) input.value = d && d.address ? d.address : '';
-        const block = $('#import-address') ? $('#import-address').closest('.import-block') : null;
-        if (block) block.style.display = (d && d.address) ? '' : 'none';
-      })
-      .catch(() => {});
   }
 
   function closeImportModal() {
