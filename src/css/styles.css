@@ -2952,7 +2952,6 @@ body.nav-immersive .drive-bar {
   left: var(--space-lg);
   right: var(--space-lg);
   z-index: 1600;
-  display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
@@ -3010,7 +3009,6 @@ body.nav-immersive .drive-bar {
   right: var(--space-lg);
   bottom: calc(var(--space-lg) + 56px);
   z-index: 1600;
-  display: flex;
   align-items: center;
   gap: var(--space-sm);
   padding: 10px 12px;
