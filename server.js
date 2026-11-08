@@ -574,6 +574,14 @@ function db() {
   _db.exec('PRAGMA journal_mode=WAL');
   _db.exec('PRAGMA busy_timeout=5000');
   _db.exec(SCHEMA);
+  // Older installs predate some columns; add them in place rather than relying
+  // on CREATE TABLE IF NOT EXISTS, which never alters an existing table.
+  try {
+    const cols = _db.prepare('PRAGMA table_info(bookings)').all().map(c => c.name);
+    if (cols.indexOf('coordinates') === -1) {
+      _db.prepare("ALTER TABLE bookings ADD COLUMN coordinates TEXT NOT NULL DEFAULT ''").run();
+    }
+  } catch (e) { /* no bookings table yet — SCHEMA created it above */ }
   importLegacy(_db);
   return _db;
 }
