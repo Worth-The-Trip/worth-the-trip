@@ -1223,8 +1223,11 @@
     // While navigating this guide, route the GPS line to the tapped stop.
     if (!guide || timelineIdx == null || isNaN(timelineIdx)) return;
     if (state.nav.guideId !== guide.id) return;
-    const step = guideSteps(guide).find(s => s.kind === 'stop' && s.timelineIndex === Number(timelineIdx));
-    const stopIdx = step ? navStops(guide).indexOf(step) : -1;
+    // guideSteps() builds fresh objects on every call, so the step lookup and
+    // the nav index must come from ONE list or indexOf() never matches.
+    const steps = guideSteps(guide);
+    const step = steps.find(s => s.kind === 'stop' && s.timelineIndex === Number(timelineIdx));
+    const stopIdx = step ? steps.filter(s => s.mapPin).indexOf(step) : -1;
     if (stopIdx < 0) return;
     state.nav.stopIndex = stopIdx;
     updateNavBanner();
@@ -1235,8 +1238,9 @@
     // Same as retargetNavToStop, but for a creator-added hotel step.
     if (!guide || hotelIdx == null || isNaN(hotelIdx)) return;
     if (state.nav.guideId !== guide.id) return;
-    const step = guideSteps(guide).find(s => s.kind === 'hotel' && s.hotelIndex === Number(hotelIdx));
-    const stopIdx = step ? navStops(guide).indexOf(step) : -1;
+    const steps = guideSteps(guide);
+    const step = steps.find(s => s.kind === 'hotel' && s.hotelIndex === Number(hotelIdx));
+    const stopIdx = step ? steps.filter(s => s.mapPin).indexOf(step) : -1;
     if (stopIdx < 0) return;
     state.nav.stopIndex = stopIdx;
     updateNavBanner();
@@ -1581,15 +1585,10 @@
     updateNavBanner();
     updateNavRoute();
 
-    // Auto-collapse past steps as user advances through the guide.
+    // Auto-collapse past steps as user advances through the guide. The nav
+    // index is what collapsePastSteps() compares against data-navidx.
     const guide = guideById(state.nav.guideId);
-    if (guide) {
-      const currentTarget = navTarget();
-      if (currentTarget) {
-        const tidx = guide.timeline.indexOf(currentTarget);
-        if (tidx >= 0) collapsePastSteps(guide.id, tidx);
-      }
-    }
+    if (guide) collapsePastSteps(guide.id, state.nav.stopIndex);
   }
 
   function onNavError(err) {
@@ -1612,16 +1611,20 @@
     stopGuideNav(true);
     state.nav.guideId = guideId;
 
-    // Convert a timeline index / hotel index into a nav stop index.
+    // Convert a timeline index / hotel index into a nav stop index. Both the
+    // step lookup and the nav index must come from ONE guideSteps() list — it
+    // returns fresh objects, so indexing across two calls never matches.
+    const steps = guideSteps(guide);
+    const navSteps = steps.filter(s => s.mapPin);
     let startNavIdx = null;
     if (hotelIndex != null && !isNaN(hotelIndex)) {
-      const step = guideSteps(guide).find(s => s.kind === 'hotel' && s.hotelIndex === Number(hotelIndex));
-      const stopIdx = step ? navStops(guide).indexOf(step) : -1;
+      const step = steps.find(s => s.kind === 'hotel' && s.hotelIndex === Number(hotelIndex));
+      const stopIdx = step ? navSteps.indexOf(step) : -1;
       state.nav.stopIndex = stopIdx >= 0 ? stopIdx : 0;
       startNavIdx = state.nav.stopIndex;
     } else if (startStopIndex != null && !isNaN(startStopIndex)) {
-      const step = guideSteps(guide).find(s => s.kind === 'stop' && s.timelineIndex === Number(startStopIndex));
-      const stopIdx = step ? navStops(guide).indexOf(step) : -1;
+      const step = steps.find(s => s.kind === 'stop' && s.timelineIndex === Number(startStopIndex));
+      const stopIdx = step ? navSteps.indexOf(step) : -1;
       state.nav.stopIndex = stopIdx >= 0 ? stopIdx : 0;
       startNavIdx = state.nav.stopIndex;
     } else {
