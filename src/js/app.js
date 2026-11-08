@@ -19,6 +19,7 @@
     travelEnd: null,
     unlockedGuides: loadUnlocked(),
     savedGuides: loadSavedGuides(),
+    bookings: [],
     activeFilter: 'all',
     searchQuery: '',
     diagnosticShown: false,
@@ -4320,6 +4321,8 @@
 
   function renderBookingsPage() {
     bookingsForPage().then(function (list) {
+      // Kept for the detail page and for booking navigation.
+      state.bookings = list;
       const upcoming = list.filter(b => bookingStatus(b) !== 'past');
       const past = list.filter(b => bookingStatus(b) === 'past');
       let html = '';
