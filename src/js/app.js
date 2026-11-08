@@ -1374,6 +1374,10 @@
     document.body.classList.add('nav-immersive');
     const target = navTarget();
     const p = state.nav.userLngLat || (target && target.mapPin ? [target.mapPin[1], target.mapPin[0]] : null);
+    // Face the camera along the route from the very first frame.
+    if (p && state.nav.route && state.nav.route.length > 1) {
+      state.drive.bearing = routeBearing(p, state.nav.route);
+    }
     if (state.map) {
       // Drop from wherever the map is into the follow view.
       state.map.flyTo({
