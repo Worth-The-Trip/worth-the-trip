@@ -938,11 +938,18 @@
 
   // -------- Live navigation (GPS follow + check-in + Maps handoff) --------
   const NAV_CHECKIN_M = 50;
+  const NAV_ROUTE_REFETCH_M = 25;    // redraw the route after this much movement
+  const NAV_WATCH_RETRY_MS = 60000;  // re-arm a quiet GPS watch after this long
 
   function resetNavState() {
     const prev = state.nav || {};
     // Keep the blue dot + last known position: passive tracking owns them.
-    state.nav = { watchId: null, guideId: null, stopIndex: 0, mode: 'walking', userLngLat: prev.userLngLat || null, dot: prev.dot || null, routeKey: null };
+    state.nav = {
+      watchId: null, guideId: null, stopIndex: 0, mode: 'walking',
+      userLngLat: prev.userLngLat || null, dot: prev.dot || null,
+      routeKey: null, routeOrigin: null, routeDrawn: false,
+      lastFixAt: 0, watchTimer: null
+    };
   }
   resetNavState();
 
@@ -1230,7 +1237,11 @@
       if (state.map && state.map.getLayer('nav-route-line')) state.map.removeLayer('nav-route-line');
       if (state.map && state.map.getSource('nav-route')) state.map.removeSource('nav-route');
     } catch (e) { /* already gone */ }
-    if (state.nav) state.nav.routeKey = null;
+    if (state.nav) {
+      state.nav.routeKey = null;
+      state.nav.routeOrigin = null;
+      state.nav.routeDrawn = false;
+    }
   }
 
   function updateNavRoute() {
@@ -1238,33 +1249,65 @@
     if (!target || !state.nav.userLngLat || !state.map) return;
     const [uLng, uLat] = state.nav.userLngLat;
     const [tLat, tLng] = target.mapPin;
-    // Refetch only when the target changed or the user moved ~30m+
-    const key = state.nav.guideId + ':' + state.nav.stopIndex + ':' + uLat.toFixed(4) + ',' + uLng.toFixed(4);
-    if (state.nav.routeKey === key) return;
+
+    // Refetch only when the target changed, or the traveller has moved 25m+
+    // since the last successful route. Walking does not need a redraw every
+    // few metres, and every redraw is another request to a rate-limited router.
+    const moved = state.nav.routeOrigin
+      ? haversineM(state.nav.routeOrigin[0], state.nav.routeOrigin[1], uLat, uLng)
+      : Infinity;
+    const key = state.nav.guideId + ':' + state.nav.stopIndex;
+    if (state.nav.routeKey === key && moved < NAV_ROUTE_REFETCH_M) return;
     state.nav.routeKey = key;
-    const fallback = () => setRouteLine([[uLng, uLat], [tLng, tLat]]);
-    const tryOrs = () => {
-      if (!CONFIG.openRouteServiceKey) return fallback();
-      fetch('https://api.openrouteservice.org/v2/directions/foot-walking?start=' + uLng + ',' + uLat + '&end=' + tLng + ',' + tLat, {
-        headers: { 'Authorization': CONFIG.openRouteServiceKey }
-      })
-        .then(r => r.ok ? r.json() : Promise.reject())
-        .then(data => {
-          const coords = data && data.routes && data.routes[0] && data.routes[0].geometry && data.routes[0].geometry.coordinates;
-          if (coords && coords.length > 1) setRouteLine(coords);
-          else fallback();
-        })
-        .catch(fallback);
+
+    const straight = () => setRouteLine([[uLng, uLat], [tLng, tLat]]);
+    const ok = (coords) => {
+      state.nav.routeOrigin = [uLat, uLng];
+      state.nav.routeDrawn = true;
+      setRouteLine(coords);
     };
-    fetch('https://router.project-osrm.org/route/v1/foot/' + uLng + ',' + uLat + ';' + tLng + ',' + tLat + '?overview=full&geometries=geojson')
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => {
-        const coords = data && data.routes && data.routes[0] && data.routes[0].geometry && data.routes[0].geometry.coordinates;
-        // If OSRM returned only 2 points, it likely has no Japan road data — try ORS.
-        if (coords && coords.length > 2) setRouteLine(coords);
-        else tryOrs();
+    const fail = () => {
+      // Keep whatever line is on screen and clear the key so the next GPS fix
+      // retries. Locking the key here used to freeze a straight line for the
+      // rest of the walk whenever one request failed.
+      state.nav.routeKey = null;
+      if (!state.nav.routeDrawn) straight();
+    };
+
+    // 1) Our own proxy — cached, retried, three public routers behind it.
+    const tryProxy = () => fetch('/api/route?from=' + uLat + ',' + uLng + '&to=' + tLat + ',' + tLng)
+      .then(r => (r.ok ? r.json() : Promise.reject()))
+      .then(d => {
+        const c = d && d.coordinates;
+        if (c && c.length > 1) ok(c); else tryOsrm();
       })
-      .catch(tryOrs);
+      .catch(tryOsrm);
+
+    // 2) Straight to a public router if the proxy is unavailable.
+    const tryOsrm = () => {
+      const u = uLng + ',' + uLat, v = tLng + ',' + tLat;
+      fetch('https://router.project-osrm.org/route/v1/foot/' + u + ';' + v + '?overview=full&geometries=geojson')
+        .then(r => (r.ok ? r.json() : Promise.reject()))
+        .then(d => {
+          const c = d && d.routes && d.routes[0] && d.routes[0].geometry && d.routes[0].geometry.coordinates;
+          if (c && c.length > 2) ok(c); else tryOsmDe();
+        })
+        .catch(tryOsmDe);
+    };
+
+    // 3) A second public foot router on a different host.
+    const tryOsmDe = () => {
+      const u = uLng + ',' + uLat, v = tLng + ',' + tLat;
+      fetch('https://routing.openstreetmap.de/routed-foot/route/v1/driving/' + u + ';' + v + '?overview=full&geometries=geojson')
+        .then(r => (r.ok ? r.json() : Promise.reject()))
+        .then(d => {
+          const c = d && d.routes && d.routes[0] && d.routes[0].geometry && d.routes[0].geometry.coordinates;
+          if (c && c.length > 2) ok(c); else fail();
+        })
+        .catch(fail);
+    };
+
+    tryProxy();
   }
 
   function setSplitView(on) {
@@ -1412,6 +1455,7 @@
 
   function onNavPosition(pos) {
     state.nav.userLngLat = [pos.coords.longitude, pos.coords.latitude];
+    state.nav.lastFixAt = Date.now();
     ensureNavDot();
     positionNavDot();
     const target = navTarget();
@@ -1438,10 +1482,34 @@
   }
 
   function onNavError(err) {
-    const msg = err && err.code === 1 ? t('toast.locBlocked') : t('toast.noLoc');
-    showToast(t('toast.navFailed'), 'success');
+    // A GPS error is normal — a tunnel, a weak signal, the phone dozing.
+    // watchPosition keeps retrying on its own, so never tear it down here:
+    // clearing the watch is what used to end navigation until the guide was
+    // restarted. Tell the traveller, then let the next fix recover.
+    if (err && err.code === 1) showToast(t('toast.locBlocked'), 'success');
+    else showToast(t('toast.navRetrying'), 'success');
+  }
+
+  function armNavWatch() {
     try { navigator.geolocation.clearWatch(state.nav.watchId); } catch (e) {}
-    // Keep the guide open — do NOT stop navigation or close the split view.
+    state.nav.lastFixAt = Date.now();
+    try {
+      state.nav.watchId = navigator.geolocation.watchPosition(onNavPosition, onNavError, {
+        enableHighAccuracy: true,
+        maximumAge: 5000,
+        timeout: 20000
+      });
+    } catch (e) { return; }
+    // If the phone dozes or the signal never recovers, re-arm the watch so
+    // navigation resumes by itself instead of silently freezing.
+    clearInterval(state.nav.watchTimer);
+    state.nav.watchTimer = setInterval(() => {
+      if (!state.nav.guideId) return;
+      if (Date.now() - state.nav.lastFixAt < NAV_WATCH_RETRY_MS) return;
+      state.nav.lastFixAt = Date.now();
+      armNavWatch();
+    }, 30000);
+    if (state.nav.watchTimer.unref) state.nav.watchTimer.unref();
   }
 
   function startGuideNav(guideId, startStopIndex, hotelIndex) {
@@ -1493,11 +1561,7 @@
     updateNavBanner();
     showToast('▶ ' + t('toast.navStart') + ': ' + guide.title, 'success');
     try {
-      state.nav.watchId = navigator.geolocation.watchPosition(onNavPosition, onNavError, {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 15000,
-      });
+      armNavWatch();
     } catch (e) {
       onNavError(e);
     }
@@ -1520,6 +1584,8 @@
   }
 
   function stopGuideNav(silent) {
+    clearInterval(state.nav.watchTimer);
+    state.nav.watchTimer = null;
     if (state.nav.watchId !== null && state.nav.watchId !== undefined) {
       try { navigator.geolocation.clearWatch(state.nav.watchId); } catch (e) {}
     }

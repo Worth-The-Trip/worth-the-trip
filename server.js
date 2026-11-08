@@ -1832,6 +1832,76 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, users: readUsers().length, purchases: readPurchases().length, creators: readCreators().length, dataDir: RUNTIME_DIR, dbPath: DB_PATH });
 });
 
+// ---- Route proxy -------------------------------------------------------------
+// Walking routes come from public routers that are rate-limited and occasionally
+// unreachable. The app used to call one of them directly, so a single hiccup
+// turned the map line into a straight line (or nothing) until the traveller
+// moved far enough to trigger a refetch. This proxy caches routes, retries,
+// and falls back across three public routers before giving up.
+const ROUTE_TTL_MS = 30 * 60 * 1000;
+const ROUTE_CACHE_MAX = 500;
+const routeCache = new Map();
+const ROUTE_PROVIDERS = [
+  (u, v) => 'https://router.project-osrm.org/route/v1/foot/' + u + ';' + v + '?overview=full&geometries=geojson',
+  (u, v) => 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/' + u + ';' + v + '?overview=full&geometries=geojson',
+  (u, v) => 'https://routing.openstreetmap.de/routed-car/route/v1/driving/' + u + ';' + v + '?overview=full&geometries=geojson',
+];
+const routeHits = new Map();
+
+function rateLimitRoute(req, res, next) {
+  const k = String(req.ip || 'x');
+  const now = Date.now();
+  const rec = routeHits.get(k) || { n: 0, at: now };
+  if (now - rec.at > 60000) { rec.n = 0; rec.at = now; }
+  rec.n++;
+  if (routeHits.size > 2000) routeHits.clear();
+  routeHits.set(k, rec);
+  if (rec.n > 60) return jsonError(res, 429, 'Too many route requests');
+  next();
+}
+
+app.get('/api/route', rateLimitRoute, async (req, res) => {
+  const parse = (s) => {
+    const parts = String(s == null ? '' : s).split(',').map(Number);
+    return isLatLng(parts) ? parts : null;
+  };
+  // from/to are "lat,lng" — the same order mapPin uses everywhere.
+  const from = parse(req.query.from);
+  const to = parse(req.query.to);
+  if (!from || !to) return jsonError(res, 400, 'from and to must be "lat,lng"');
+
+  // Round to ~11m so nearby positions share one cached route.
+  const key = from[0].toFixed(4) + ',' + from[1].toFixed(4) + '>' + to[0].toFixed(4) + ',' + to[1].toFixed(4);
+  const hit = routeCache.get(key);
+  if (hit && Date.now() - hit.at < ROUTE_TTL_MS) {
+    return res.json({ ok: true, coordinates: hit.coordinates, cached: true });
+  }
+
+  for (const makeUrl of ROUTE_PROVIDERS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 8000);
+        const r = await fetch(makeUrl(from[1] + ',' + from[0], to[1] + ',' + to[0]), {
+          signal: ctl.signal,
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WorthTheTrip/1.0)' }
+        });
+        clearTimeout(timer);
+        if (!r.ok) continue;
+        const d = await r.json();
+        const coords = d && d.routes && d.routes[0] && d.routes[0].geometry && d.routes[0].geometry.coordinates;
+        if (coords && coords.length > 2) {
+          routeCache.set(key, { at: Date.now(), coordinates: coords });
+          if (routeCache.size > ROUTE_CACHE_MAX) routeCache.delete(routeCache.keys().next().value);
+          return res.json({ ok: true, coordinates: coords, cached: false });
+        }
+      } catch (e) { /* try the next provider */ }
+    }
+  }
+  // Nothing worked — still return a line so the map never looks dead.
+  return res.json({ ok: true, coordinates: [[from[1], from[0]], [to[1], to[0]]], straight: true });
+});
+
 // ------------------------------------------------------------------ helpers
 function saveAvatar(userId, dataUrl) {
   try {
