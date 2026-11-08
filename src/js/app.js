@@ -1400,8 +1400,6 @@
     }
   }
 
-  window.__wttMap = function () { return state.map; };
-
   function updateDriveCamera() {
     if (!state.drive.active || !state.map) return;
     if (Date.now() < state.drive.followPauseUntil) return;
