@@ -924,9 +924,12 @@
       if (!Array.isArray(stop.mapPin)) return;
       // stop.num keeps hotel pins in the same numbering as the timeline.
       const pin = buildStepPin(stop.num || (idx + 1), idx);
+      // A borrowed pin (hotel with no coordinates of its own) sits a little to
+      // the left so the stop pin it borrowed from stays visible too.
+      const ax = stop.pinBorrowed ? 33 : 17;
       state.mapOverlay.appendChild(pin);
-      state.stepPinElements.push({ svg: pin, lngLat: [stop.mapPin[1], stop.mapPin[0]], stepIndex: idx, ax: 17, ay: 44.2 });
-      if (state.map) positionPin(pin, [stop.mapPin[1], stop.mapPin[0]], 17, 44.2);
+      state.stepPinElements.push({ svg: pin, lngLat: [stop.mapPin[1], stop.mapPin[0]], stepIndex: idx, ax: ax, ay: 44.2 });
+      if (state.map) positionPin(pin, [stop.mapPin[1], stop.mapPin[0]], ax, 44.2);
     });
   }
 
@@ -1133,7 +1136,18 @@
       (hotelByAfter[i] || []).forEach(hi => pushHotel(hi, i));
     });
     (hotelByAfter[items.length] || []).forEach(hi => pushHotel(hi, items.length));
-    steps.forEach((s, i) => { s.num = i + 1; });
+    // A hotel the creator never pinned still gets a numbered map pin: borrow
+    // the location of the stop it follows so it sits in the guide's sequence.
+    let lastPin = null;
+    steps.forEach((s, i) => {
+      s.num = i + 1;
+      if (s.kind === 'stop') {
+        if (s.mapPin) lastPin = s.mapPin;
+      } else if (!s.mapPin && lastPin) {
+        s.mapPin = lastPin;
+        s.pinBorrowed = true;
+      }
+    });
     return steps;
   }
 
@@ -3726,6 +3740,10 @@
     if (guide.hotelRec && guide.hotelRec.recommended) {
       showHotelPins(guideById(guideId) || guide, -1);
     }
+
+    // Numbered step pins (stops + hotels) so the map matches the timeline
+    // even before navigation starts.
+    if (guide) showStepPins(guide);
   }
 
   // Same detail markup as the Trips view, reusable in the nav side panel
