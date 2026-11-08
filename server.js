@@ -1844,11 +1844,32 @@ const ROUTE_TTL_MS = 30 * 60 * 1000;
 const ROUTE_CACHE_MAX = 500;
 const routeCache = new Map();
 const ROUTE_PROVIDERS = [
-  (u, v) => 'https://router.project-osrm.org/route/v1/foot/' + u + ';' + v + '?overview=full&geometries=geojson',
-  (u, v) => 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/' + u + ';' + v + '?overview=full&geometries=geojson',
-  (u, v) => 'https://routing.openstreetmap.de/routed-car/route/v1/driving/' + u + ';' + v + '?overview=full&geometries=geojson',
+  (u, v) => 'https://router.project-osrm.org/route/v1/foot/' + u + ';' + v + '?overview=full&geometries=geojson&steps=true',
+  (u, v) => 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/' + u + ';' + v + '?overview=full&geometries=geojson&steps=true',
+  (u, v) => 'https://routing.openstreetmap.de/routed-car/route/v1/driving/' + u + ';' + v + '?overview=full&geometries=geojson&steps=true',
 ];
 const routeHits = new Map();
+
+// Turn-by-turn maneuvers, in order, for the drive banner.
+function routeSteps(d) {
+  const legs = d && d.routes && d.routes[0] && d.routes[0].legs;
+  if (!Array.isArray(legs)) return [];
+  const out = [];
+  for (const leg of legs) {
+    for (const s of (leg.steps || [])) {
+      const m = s.maneuver || {};
+      if (!Array.isArray(m.location)) continue;
+      out.push({
+        type: m.type || '',
+        modifier: m.modifier || '',
+        name: s.name || '',
+        distance: Number(s.distance) || 0,
+        location: [Number(m.location[0]), Number(m.location[1])]
+      });
+    }
+  }
+  return out;
+}
 
 function rateLimitRoute(req, res, next) {
   const k = String(req.ip || 'x');
@@ -1876,7 +1897,7 @@ app.get('/api/route', rateLimitRoute, async (req, res) => {
   const key = from[0].toFixed(4) + ',' + from[1].toFixed(4) + '>' + to[0].toFixed(4) + ',' + to[1].toFixed(4);
   const hit = routeCache.get(key);
   if (hit && Date.now() - hit.at < ROUTE_TTL_MS) {
-    return res.json({ ok: true, coordinates: hit.coordinates, cached: true });
+    return res.json({ ok: true, coordinates: hit.coordinates, steps: hit.steps || [], cached: true });
   }
 
   for (const makeUrl of ROUTE_PROVIDERS) {
@@ -1893,9 +1914,10 @@ app.get('/api/route', rateLimitRoute, async (req, res) => {
         const d = await r.json();
         const coords = d && d.routes && d.routes[0] && d.routes[0].geometry && d.routes[0].geometry.coordinates;
         if (coords && coords.length > 2) {
-          routeCache.set(key, { at: Date.now(), coordinates: coords });
+          const steps = routeSteps(d);
+          routeCache.set(key, { at: Date.now(), coordinates: coords, steps: steps });
           if (routeCache.size > ROUTE_CACHE_MAX) routeCache.delete(routeCache.keys().next().value);
-          return res.json({ ok: true, coordinates: coords, cached: false });
+          return res.json({ ok: true, coordinates: coords, steps: steps, cached: false });
         }
       } catch (e) { /* try the next provider */ }
     }

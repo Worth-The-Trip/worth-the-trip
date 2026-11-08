@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="src/css/styles.css?v=72">
+  <link rel="stylesheet" href="src/css/styles.css?v=73">
   <link rel="icon" href="public/Branding/WTT Logo 1.svg">
 </head>
 <body>
@@ -391,6 +391,25 @@
     <button class="nav-end" id="nav-end" aria-label="End navigation" data-i18n="nav.end">End</button>
   </div>
 
+  <!-- Immersive drive mode: camera behind the GPS point, Google-Maps style -->
+  <div class="drive-banner" id="drive-banner" style="display:none">
+    <div class="drive-turn" id="drive-turn"></div>
+    <div class="drive-banner-text">
+      <div class="drive-next" id="drive-next"></div>
+      <div class="drive-sub" id="drive-sub"></div>
+    </div>
+    <button class="drive-exit" id="drive-exit" aria-label="Exit navigation">×</button>
+  </div>
+
+  <div class="drive-bar" id="drive-bar" style="display:none">
+    <div class="drive-eta" id="drive-eta"></div>
+    <div class="drive-actions">
+      <button class="btn btn-ghost btn-sm" id="drive-split" data-i18n="drive.splitView">Split view</button>
+      <a class="nav-gmaps" id="drive-gmaps" href="#" target="_blank" rel="noopener" data-i18n="nav.navigate">Google Maps</a>
+      <button class="btn btn-danger btn-sm" id="drive-end" data-i18n="nav.end">End</button>
+    </div>
+  </div>
+
   <aside id="nav-panel" class="nav-panel" aria-hidden="true">
     <div id="nav-panel-body"></div>
   </aside>
@@ -400,9 +419,9 @@
   <script src="src/js/data/creators.js?v=3"></script>
   <script src="src/js/data/creator-profiles.js?v=2"></script>
   <script src="src/js/data/bookings.js?v=2"></script>
-  <script src="src/js/data/strings.js?v=13"></script>
+  <script src="src/js/data/strings.js?v=14"></script>
   <script src="src/js/data/creator-guides.js?v=6"></script>
-  <script src="src/js/app.js?v=120"></script>
+  <script src="src/js/app.js?v=121"></script>
   <!-- Stay22 Affiliate (Let Me Allez) — tracks bookings on worththetripapp.com -->
   <script>
     (function (s, t, a, y, twenty, two) {

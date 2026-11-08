@@ -12,6 +12,7 @@
     mapOverlay: null,
     pinElements: [],
     stepPinElements: [],
+    drive: { active: false, bearing: 0, steps: [], nextStep: null, followPauseUntil: 0 },
     activeGuideId: null,
     tripsDetailId: null,
     travelStart: null,
@@ -1085,6 +1086,7 @@
     state.nav.stopIndex = stopIdx;
     updateNavBanner();
     updateNavRoute();
+    updateDriveCamera();
   }
 
   function retargetNavToHotel(guide, hotelIdx) {
@@ -1161,6 +1163,8 @@
     const mode = state.nav.mode === 'transit' ? 'transit' : 'walking';
     els.navGmaps.href = 'https://www.google.com/maps/dir/?api=1&destination=' + target.mapPin[0] + ',' + target.mapPin[1] + '&travelmode=' + mode;
     els.navMode.textContent = state.nav.mode === 'transit' ? 'Train' : 'Walk';
+    const driveGmaps = $('#drive-gmaps');
+    if (driveGmaps) driveGmaps.href = els.navGmaps.href;
   }
 
   function positionNavDot() {
@@ -1244,6 +1248,20 @@
     }
   }
 
+  // Turn-by-turn maneuvers from an OSRM-style payload.
+  function osrmSteps(d) {
+    const legs = d && d.routes && d.routes[0] && d.routes[0].legs;
+    if (!Array.isArray(legs)) return [];
+    const out = [];
+    legs.forEach(leg => (leg.steps || []).forEach(st => {
+      const m = st.maneuver || {};
+      if (Array.isArray(m.location)) {
+        out.push({ type: m.type || '', modifier: m.modifier || '', name: st.name || '', distance: Number(st.distance) || 0, location: [m.location[0], m.location[1]] });
+      }
+    }));
+    return out;
+  }
+
   function updateNavRoute() {
     const target = navTarget();
     if (!target || !state.nav.userLngLat || !state.map) return;
@@ -1261,10 +1279,13 @@
     state.nav.routeKey = key;
 
     const straight = () => setRouteLine([[uLng, uLat], [tLng, tLat]]);
-    const ok = (coords) => {
+    const ok = (coords, steps) => {
       state.nav.routeOrigin = [uLat, uLng];
       state.nav.routeDrawn = true;
+      state.nav.route = coords;
+      state.drive.steps = Array.isArray(steps) && steps.length ? steps : [];
       setRouteLine(coords);
+      if (state.drive.active) updateDriveBanner();
     };
     const fail = () => {
       // Keep whatever line is on screen and clear the key so the next GPS fix
@@ -1279,18 +1300,18 @@
       .then(r => (r.ok ? r.json() : Promise.reject()))
       .then(d => {
         const c = d && d.coordinates;
-        if (c && c.length > 1) ok(c); else tryOsrm();
+        if (c && c.length > 1) ok(c, d.steps); else tryOsrm();
       })
       .catch(tryOsrm);
 
     // 2) Straight to a public router if the proxy is unavailable.
     const tryOsrm = () => {
       const u = uLng + ',' + uLat, v = tLng + ',' + tLat;
-      fetch('https://router.project-osrm.org/route/v1/foot/' + u + ';' + v + '?overview=full&geometries=geojson')
+      fetch('https://router.project-osrm.org/route/v1/foot/' + u + ';' + v + '?overview=full&geometries=geojson&steps=true')
         .then(r => (r.ok ? r.json() : Promise.reject()))
         .then(d => {
           const c = d && d.routes && d.routes[0] && d.routes[0].geometry && d.routes[0].geometry.coordinates;
-          if (c && c.length > 2) ok(c); else tryOsmDe();
+          if (c && c.length > 2) ok(c, osrmSteps(d)); else tryOsmDe();
         })
         .catch(tryOsmDe);
     };
@@ -1298,17 +1319,189 @@
     // 3) A second public foot router on a different host.
     const tryOsmDe = () => {
       const u = uLng + ',' + uLat, v = tLng + ',' + tLat;
-      fetch('https://routing.openstreetmap.de/routed-foot/route/v1/driving/' + u + ';' + v + '?overview=full&geometries=geojson')
+      fetch('https://routing.openstreetmap.de/routed-foot/route/v1/driving/' + u + ';' + v + '?overview=full&geometries=geojson&steps=true')
         .then(r => (r.ok ? r.json() : Promise.reject()))
         .then(d => {
           const c = d && d.routes && d.routes[0] && d.routes[0].geometry && d.routes[0].geometry.coordinates;
-          if (c && c.length > 2) ok(c); else fail();
+          if (c && c.length > 2) ok(c, osrmSteps(d)); else fail();
         })
         .catch(fail);
     };
 
     tryProxy();
   }
+  // -------- Immersive drive mode --------
+  // Camera sits behind the GPS point, tilted, rotating to the direction of
+  // travel and zooming with the next maneuver — the Google-Maps feel, on our
+  // own basemap style.
+  const DRIVE_PITCH = 55;
+  const DRIVE_ZOOM = 17.4;
+
+  function bearingBetween(a, b) {
+    // a/b are [lng, lat]; returns a compass bearing in degrees.
+    const toRad = (d) => d * Math.PI / 180;
+    const toDeg = (r) => r * 180 / Math.PI;
+    const lat1 = toRad(a[1]), lat2 = toRad(b[1]);
+    const dlng = toRad(b[0] - a[0]);
+    const y = Math.sin(dlng) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dlng);
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  }
+
+  function routeBearing(fromLngLat, coords) {
+    if (!Array.isArray(coords) || coords.length < 2) return state.drive.bearing || 0;
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < coords.length; i++) {
+      const d = Math.abs(coords[i][0] - fromLngLat[0]) + Math.abs(coords[i][1] - fromLngLat[1]);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    const ahead = Math.min(coords.length - 1, best + 8);
+    if (ahead === best) return state.drive.bearing || 0;
+    return bearingBetween(coords[best], coords[ahead]);
+  }
+
+  function driveZoom() {
+    const next = state.drive.nextStep;
+    if (next && next.distanceTo < 80) return 18.0;
+    if (next && next.distanceTo < 250) return 17.6;
+    return DRIVE_ZOOM;
+  }
+
+  function startDriveMode() {
+    if (!state.nav.guideId) return;
+    state.drive.active = true;
+    state.drive.followPauseUntil = 0;
+    document.body.classList.add('nav-immersive');
+    const target = navTarget();
+    const p = state.nav.userLngLat || (target && target.mapPin ? [target.mapPin[1], target.mapPin[0]] : null);
+    if (state.map) {
+      // Drop from wherever the map is into the follow view.
+      state.map.flyTo({
+        center: p || state.map.getCenter(),
+        zoom: DRIVE_ZOOM,
+        pitch: DRIVE_PITCH,
+        bearing: state.drive.bearing || 0,
+        duration: 1400,
+        essential: true
+      });
+    }
+    updateDriveBanner();
+  }
+
+  function stopDriveMode() {
+    state.drive.active = false;
+    document.body.classList.remove('nav-immersive');
+    if (state.map) {
+      try { state.map.flyTo({ pitch: 0, bearing: 0, duration: 700, essential: true }); } catch (e) {}
+    }
+  }
+
+  function updateDriveCamera() {
+    if (!state.drive.active || !state.map) return;
+    if (Date.now() < state.drive.followPauseUntil) return;
+    const p = state.nav.userLngLat;
+    if (!p) return;
+    const bearing = routeBearing(p, state.nav.route);
+    state.drive.bearing = bearing;
+    try {
+      state.map.easeTo({
+        center: [p[0], p[1]],
+        bearing: bearing,
+        pitch: DRIVE_PITCH,
+        zoom: driveZoom(),
+        duration: 900,
+        easing: (t) => t,
+        essential: true
+      });
+    } catch (e) { /* map mid-style-change */ }
+  }
+
+  const DRIVE_ICONS = {
+    straight: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>',
+    left: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>',
+    right: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>',
+    slight_left: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v-6"/><path d="M12 13l-6 6"/><path d="M6 19h6"/></svg>',
+    slight_right: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v-6"/><path d="M12 13l6 6"/><path d="M18 19h-6"/></svg>',
+    uturn: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h8a4 4 0 0 1 4 4v5"/></svg>',
+    roundabout: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21a9 9 0 1 1 9-9"/><path d="M21 12a9 9 0 0 1-9 9"/><path d="M15 9l-3 3-3-3"/></svg>',
+    arrive: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.6-7-11a7 7 0 0 1 14 0c0 5.4-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>'
+  };
+
+  function driveIconKey(step) {
+    const type = String(step.type || '').toLowerCase().replace(/[^a-z]+/g, '_').replace(/^_+|_+$/g, '');
+    const mod = String(step.modifier || '').toLowerCase().replace(/[^a-z]+/g, '_').replace(/^_+|_+$/g, '');
+    if (type === 'arrive') return 'arrive';
+    if (type === 'roundabout' || type === 'rotary' || type === 'roundabout_turn') return 'roundabout';
+    if (type === 'uturn') return 'uturn';
+    if (mod === 'sharp_left') return 'left';
+    if (mod === 'sharp_right') return 'right';
+    if (mod === 'slight_left') return 'slight_left';
+    if (mod === 'slight_right') return 'slight_right';
+    if (mod === 'left') return 'left';
+    if (mod === 'right') return 'right';
+    return 'straight';
+  }
+
+  function driveStepKey(step) {
+    const type = String(step.type || 'continue').toLowerCase().replace(/[^a-z]+/g, '_').replace(/^_+|_+$/g, '');
+    const mod = String(step.modifier || '').toLowerCase().replace(/[^a-z]+/g, '_').replace(/^_+|_+$/g, '');
+    const full = mod ? type + '_' + mod : type;
+    if (t('drive.step.' + full) !== 'drive.step.' + full) return 'drive.step.' + full;
+    if (t('drive.step.' + type) !== 'drive.step.' + type) return 'drive.step.' + type;
+    return 'drive.followRoute';
+  }
+
+  function computeNextStep() {
+    const steps = state.drive.steps || [];
+    const p = state.nav.userLngLat;
+    if (!p || !steps.length) return null;
+    let idx = 0, bestD = Infinity;
+    for (let i = 0; i < steps.length; i++) {
+      const d = haversineM(p[1], p[0], steps[i].location[1], steps[i].location[0]);
+      if (d < bestD) { bestD = d; idx = i; }
+    }
+    // Standing on a maneuver means the next one is the one that matters.
+    if (bestD < 30 && idx < steps.length - 1) {
+      idx += 1;
+      bestD = haversineM(p[1], p[0], steps[idx].location[1], steps[idx].location[0]);
+    }
+    return { step: steps[idx], distanceTo: bestD };
+  }
+
+  function updateDriveBanner() {
+    const nextEl = $('#drive-next');
+    if (!nextEl) return;
+    const subEl = $('#drive-sub');
+    const turnEl = $('#drive-turn');
+    const etaEl = $('#drive-eta');
+    const next = computeNextStep();
+    state.drive.nextStep = next;
+    const target = navTarget();
+
+    if (next) {
+      nextEl.textContent = t(driveStepKey(next.step)) + (next.step.name ? ' · ' + next.step.name : '');
+      subEl.textContent = formatDist(next.distanceTo);
+      turnEl.innerHTML = DRIVE_ICONS[driveIconKey(next.step)] || DRIVE_ICONS.straight;
+    } else if (target) {
+      nextEl.textContent = target.title || t('drive.followRoute');
+      subEl.textContent = '';
+      turnEl.innerHTML = DRIVE_ICONS.straight;
+    } else {
+      nextEl.textContent = t('drive.followRoute');
+      subEl.textContent = '';
+      turnEl.innerHTML = DRIVE_ICONS.straight;
+    }
+
+    if (etaEl) {
+      if (state.nav.userLngLat && target && target.mapPin) {
+        const d = haversineM(state.nav.userLngLat[1], state.nav.userLngLat[0], target.mapPin[0], target.mapPin[1]);
+        etaEl.textContent = formatDist(d) + (target.travelTime ? ' · ' + target.travelTime : '');
+      } else {
+        etaEl.textContent = t('nav.locating');
+      }
+    }
+  }
+
 
   function setSplitView(on) {
     document.body.classList.toggle('nav-split', on);
@@ -1474,6 +1667,8 @@
     }
     updateNavBanner();
     updateNavRoute();
+    if (state.drive.active) updateDriveBanner();
+    updateDriveCamera();
 
     // Auto-collapse past steps as user advances through the guide. The nav
     // index is what collapsePastSteps() compares against data-navidx.
@@ -1584,6 +1779,7 @@
   }
 
   function stopGuideNav(silent) {
+    stopDriveMode();
     clearInterval(state.nav.watchTimer);
     state.nav.watchTimer = null;
     if (state.nav.watchId !== null && state.nav.watchId !== undefined) {
@@ -2371,6 +2567,10 @@
       try { refreshMapMarkers(); } catch (e) { console.error('[WTT] refreshMapMarkers failed:', e); }
       state.map.on('move', onMapMove);
       state.map.on('moveend', onMapMove);
+      // Pause the follow camera while the traveller pans or zooms by hand.
+      ['dragstart', 'wheel', 'rotatestart', 'pitchstart'].forEach(ev => {
+        state.map.on(ev, () => { state.drive.followPauseUntil = Date.now() + 8000; });
+      });
       console.log('[WTT] Map move listeners attached for pin positioning');
 
       // -------- Compass (mobile true-north reset) --------
@@ -2562,6 +2762,18 @@
       if (state.activeGuideId) startGuideNav(state.activeGuideId);
     });
     els.navEnd.addEventListener('click', () => stopGuideNav());
+    // Immersive drive mode — "Navigate" drops into a Google-Maps-style follow view.
+    els.navGmaps.addEventListener('click', (e) => {
+      e.preventDefault();
+      startDriveMode();
+    });
+    $('#drive-exit').addEventListener('click', stopDriveMode);
+    $('#drive-split').addEventListener('click', stopDriveMode);
+    $('#drive-end').addEventListener('click', () => stopGuideNav());
+    $('#drive-gmaps').addEventListener('click', (e) => {
+      const href = els.navGmaps && els.navGmaps.href;
+      if (href && href.indexOf('#') !== 0) { e.preventDefault(); window.open(href, '_blank', 'noopener'); }
+    });
     els.navMode.addEventListener('click', () => {
       state.nav.mode = state.nav.mode === 'transit' ? 'walking' : 'transit';
       updateNavBanner();

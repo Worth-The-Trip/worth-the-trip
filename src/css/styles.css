@@ -2932,6 +2932,126 @@ body.nav-split .nav-banner {
   right: calc(30% + var(--space-lg));
 }
 
+/* -------- Immersive drive mode (Google-Maps-style camera follow) -------- */
+body.nav-immersive #map-container {
+  right: 0;
+  bottom: 0;
+}
+body.nav-immersive .nav-panel,
+body.nav-immersive .nav-banner {
+  display: none;
+}
+body.nav-immersive .drive-banner,
+body.nav-immersive .drive-bar {
+  display: flex;
+}
+.drive-banner {
+  position: fixed;
+  top: var(--space-lg);
+  left: var(--space-lg);
+  right: var(--space-lg);
+  z-index: 1600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface-overlay);
+  border: 1px solid var(--vermilion);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: var(--shadow-sheet);
+}
+.drive-turn {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--warm-white);
+  background: var(--vermilion);
+  border-radius: var(--radius-sm);
+}
+.drive-banner-text { flex: 1; min-width: 0; }
+.drive-next {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drive-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drive-exit {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.drive-exit:hover { background: var(--surface-raised); color: var(--text-primary); }
+.drive-bar {
+  position: fixed;
+  left: var(--space-lg);
+  right: var(--space-lg);
+  bottom: calc(var(--space-lg) + 56px);
+  z-index: 1600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px 12px;
+  background: var(--surface-overlay);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: var(--shadow-sheet);
+}
+.drive-eta {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drive-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.drive-actions .nav-gmaps {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.drive-actions .nav-gmaps:hover { color: var(--text-primary); background: var(--surface-raised); }
+@media (max-width: 700px) {
+  .drive-banner, .drive-bar { left: 10px; right: 10px; }
+  .drive-bar { bottom: calc(10px + 56px); }
+  .drive-actions .nav-gmaps { display: none; }
+}
+
 @media (max-width: 700px) {
   .nav-panel {
     top: auto;
