@@ -2561,6 +2561,7 @@
       fadeDuration: 150,
       scrollZoom: true,
     });
+    window.__wttMap = function () { return state.map; };
 
     // When the map style loads
     state.map.on('load', () => {
