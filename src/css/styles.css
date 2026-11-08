@@ -3633,3 +3633,122 @@ a.creator-plat:hover {
 .comment-form .btn-primary {
   align-self: flex-end;
 }
+
+/* ============================================================
+   IMPORT A BOOKING (paste / forward / calendar / photo)
+   ============================================================ */
+.import-sheet { max-width: 660px; }
+.import-block {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+.import-block:first-of-type { padding-top: 0; }
+.import-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.import-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 10px;
+}
+.import-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+.import-textarea:focus { outline: none; border-color: var(--vermilion); }
+.import-address-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.import-address-row .field-input { flex: 1; }
+.import-preview-card {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}
+.import-preview-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+.import-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.import-field label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.import-field input {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+.import-field input:focus { outline: none; border-color: var(--vermilion); }
+.import-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.import-preview-actions .btn-primary,
+.import-preview-actions .btn-ghost {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+}
+
+/* -------- Booking card: delete + topbar actions -------- */
+.booking-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.booking-del {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 2px;
+  cursor: pointer;
+  line-height: 0;
+  border-radius: var(--radius-sm);
+}
+.booking-del:hover { color: var(--vermilion); background: var(--surface-raised); }
+.trips-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .import-grid { grid-template-columns: 1fr; }
+  .trips-topbar-actions .btn span { display: none; }
+  .trips-topbar-actions .btn { padding: 8px 10px; }
+}

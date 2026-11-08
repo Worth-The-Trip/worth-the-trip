@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="src/css/styles.css?v=79">
+  <link rel="stylesheet" href="src/css/styles.css?v=80">
   <link rel="icon" href="public/Branding/WTT Logo 1.svg">
 </head>
 <body>
@@ -328,7 +328,10 @@
     <div id="bookings-page" class="trips-page" aria-hidden="true">
       <div class="trips-topbar">
         <h2 class="trips-title" data-i18n="bookings.title">Bookings</h2>
-        <button id="bookings-close" class="sheet-close" aria-label="Close bookings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <div class="trips-topbar-actions">
+          <button id="bookings-import" class="btn btn-ghost btn-sm"><span data-i18n="import.title">Import a booking</span></button>
+          <button id="bookings-close" class="sheet-close" aria-label="Close bookings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
       </div>
       <div class="bookings-list" id="bookings-list"></div>
     </div>
@@ -382,6 +385,49 @@
       </div>
     </div>
 
+    <!-- Import a booking: paste / forward / calendar / photo -->
+    <div id="import-modal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-sheet import-sheet">
+        <button id="import-close" class="modal-close" aria-label="Close"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <div class="modal-body">
+          <h2 class="modal-title" data-i18n="import.title">Import a booking</h2>
+          <p class="page-text" data-i18n="import.lede">Bring in a hotel, flight or experience confirmation and it will appear in your Bookings tab.</p>
+
+          <div class="import-block">
+            <div class="import-label" data-i18n="import.pasteLabel">Paste your confirmation</div>
+            <p class="import-hint" data-i18n="import.pasteHint">Copy the text of the confirmation email (or forward it to the address below) and we will read the details.</p>
+            <textarea id="import-text" class="import-textarea" data-i18n-ph="import.pastePh" placeholder="Paste the confirmation email text here…"></textarea>
+            <button class="btn-primary" id="import-parse"><span class="btn-label" data-i18n="import.read">Read confirmation</span></button>
+          </div>
+
+          <div class="import-block">
+            <div class="import-label" data-i18n="import.forwardLabel">Forward it instead</div>
+            <p class="import-hint" data-i18n="import.forwardHint">BCC or forward your confirmation to this address and we will file it automatically. It works with any email provider.</p>
+            <div class="import-address-row">
+              <input class="field-input" id="import-address" readonly>
+              <button class="btn btn-ghost btn-sm" id="import-copy"><span data-i18n="import.copy">Copy</span></button>
+            </div>
+          </div>
+
+          <div class="import-block">
+            <div class="import-label" data-i18n="import.icsLabel">Import from calendar</div>
+            <p class="import-hint" data-i18n="import.icsHint">Most confirmations include an .ics calendar file. Upload it and we will read the event.</p>
+            <input type="file" id="import-ics" accept=".ics,text/calendar" style="display:none">
+            <button class="btn btn-ghost btn-sm" id="import-ics-btn"><span data-i18n="import.icsBtn">Choose .ics file</span></button>
+          </div>
+
+          <div class="import-block">
+            <div class="import-label" data-i18n="import.photoLabel">Add a photo of the confirmation</div>
+            <p class="import-hint" data-i18n="import.photoHint">A photo is attached to the booking so you can find the confirmation quickly later.</p>
+            <input type="file" id="import-photo" accept="image/*" style="display:none">
+            <button class="btn btn-ghost btn-sm" id="import-photo-btn"><span data-i18n="import.photoBtn">Choose photo</span></button>
+          </div>
+
+          <div id="import-preview"></div>
+        </div>
+      </div>
+    </div>
+
   <div id="toast" class="toast"></div>
 
   <div id="nav-banner" class="nav-banner" style="display:none">
@@ -429,9 +475,9 @@
   <script src="src/js/data/creators.js?v=3"></script>
   <script src="src/js/data/creator-profiles.js?v=2"></script>
   <script src="src/js/data/bookings.js?v=2"></script>
-  <script src="src/js/data/strings.js?v=17"></script>
+  <script src="src/js/data/strings.js?v=18"></script>
   <script src="src/js/data/creator-guides.js?v=7"></script>
-  <script src="src/js/app.js?v=132"></script>
+  <script src="src/js/app.js?v=133"></script>
   <!-- Stay22 Affiliate (Let Me Allez) — tracks bookings on worththetripapp.com -->
   <script>
     (function (s, t, a, y, twenty, two) {

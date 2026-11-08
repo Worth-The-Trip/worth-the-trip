@@ -3167,6 +3167,37 @@
     });
     $('#trips-close').addEventListener('click', closeTripsPage);
     $('#bookings-close').addEventListener('click', closeBookingsPage);
+    $('#bookings-import').addEventListener('click', openImportModal);
+    $('#import-close').addEventListener('click', closeImportModal);
+    $('#import-parse').addEventListener('click', parsePastedText);
+    $('#import-copy').addEventListener('click', () => {
+      const input = $('#import-address');
+      if (!input || !input.value) return;
+      const done = () => { input.select(); showToast(t('import.copied'), 'success'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value).then(done).catch(() => { input.select(); document.execCommand('copy'); done(); });
+      } else { input.select(); document.execCommand('copy'); done(); }
+    });
+    $('#import-ics-btn').addEventListener('click', () => $('#import-ics').click());
+    $('#import-ics').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const d = parseIcs(String(reader.result || ''));
+        if (!d.title && !d.dateStart) { showToast(t('import.icsEmpty'), true); return; }
+        renderBookingPreview(d, 'ics');
+      };
+      reader.onerror = () => showToast(t('import.icsEmpty'), true);
+      reader.readAsText(file);
+    });
+    $('#import-photo-btn').addEventListener('click', () => $('#import-photo').click());
+    $('#import-photo').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      handleImportPhoto(file);
+    });
     $('#creators-close').addEventListener('click', closeCreatorsPage);
     // Mobile: filters start collapsed, toggle expands to 25vh
     const tripsSidebar = document.querySelector('.trips-sidebar');
@@ -4124,11 +4155,11 @@
   }
 
   // -------- Bookings page --------
-  // Data lives in src/js/data/bookings.js. Future: swap WTT_BOOKINGS for an
-  // API fetch; loadBookings/saveUserBooking are the only functions the UI calls.
+  // A signed-in traveller's bookings live on the server (SQLite) so they follow
+  // them across devices; signed-out visitors fall back to this browser.
   const USER_BOOKINGS_KEY = 'wtt_user_bookings';
 
-  function loadUserBookings() {
+  function localUserBookings() {
     try {
       return JSON.parse(localStorage.getItem(USER_BOOKINGS_KEY)) || [];
     } catch (e) {
@@ -4136,17 +4167,37 @@
     }
   }
 
-  function loadBookings() {
-    const staticList = Array.isArray(typeof WTT_BOOKINGS !== 'undefined' ? WTT_BOOKINGS : []) ? WTT_BOOKINGS : [];
-    return staticList.concat(loadUserBookings());
+  async function serverBookings() {
+    try {
+      const r = await fetch('/api/bookings?_ts=' + Date.now(), { credentials: 'include' });
+      if (!r.ok) return null;
+      const d = await r.json();
+      return (d && d.bookings) || [];
+    } catch (e) { return null; }
   }
 
-  function saveUserBooking(b) {
-    const list = loadUserBookings();
-    list.push(Object.assign({ id: 'user-' + Date.now() }, b));
-    try {
-      localStorage.setItem(USER_BOOKINGS_KEY, JSON.stringify(list));
-    } catch (e) { /* unavailable */ }
+  async function saveServerBooking(b) {
+    const r = await fetch('/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(b)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Could not save that booking');
+    return d.booking;
+  }
+
+  function loadBookings() {
+    const staticList = Array.isArray(typeof WTT_BOOKINGS !== 'undefined' ? WTT_BOOKINGS : []) ? WTT_BOOKINGS : [];
+    return staticList.concat(localUserBookings());
+  }
+
+  async function bookingsForPage() {
+    const server = await serverBookings();
+    const userList = server === null ? localUserBookings() : server;
+    const staticList = Array.isArray(typeof WTT_BOOKINGS !== 'undefined' ? WTT_BOOKINGS : []) ? WTT_BOOKINGS : [];
+    return staticList.concat(userList);
   }
 
   function bookingStatus(b) {
@@ -4177,7 +4228,10 @@
           </div>
         </div>
         <div class="booking-card-body">
-          <div class="booking-title">${b.title}</div>
+          <div class="booking-title-row">
+            <div class="booking-title">${b.title}</div>
+            ${b.source && b.source !== 'manual' ? `<button class="booking-del" data-del-booking="${esc(b.id)}" aria-label="${esc(t('import.delete'))}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>` : ''}
+          </div>
           <div class="booking-location">${b.location}</div>
           <div class="booking-dates"><span>${dates}</span>${b.time ? `<span>${b.time}</span>` : ''}</div>
           ${b.reference ? `<div class="booking-ref">${t('bookings.ref')}: ${b.reference}</div>` : ''}
@@ -4187,20 +4241,31 @@
   }
 
   function renderBookingsPage() {
-    const list = loadBookings();
-    const upcoming = list.filter(b => bookingStatus(b) !== 'past');
-    const past = list.filter(b => bookingStatus(b) === 'past');
-    let html = '';
-    if (upcoming.length > 0) {
-      html += `<div class="trips-section-title">${t('bookings.upcoming')}</div>` + upcoming.map(bookingCardHtml).join('');
-    }
-    if (past.length > 0) {
-      html += `<div class="trips-section-title">${t('bookings.past')}</div>` + past.map(bookingCardHtml).join('');
-    }
-    if (!html) {
-      html = `<div class="page-empty">${t('bookings.empty')}</div>`;
-    }
-    $('#bookings-list').innerHTML = html;
+    bookingsForPage().then(function (list) {
+      const upcoming = list.filter(b => bookingStatus(b) !== 'past');
+      const past = list.filter(b => bookingStatus(b) === 'past');
+      let html = '';
+      if (upcoming.length > 0) {
+        html += `<div class="trips-section-title">${t('bookings.upcoming')}</div>` + upcoming.map(bookingCardHtml).join('');
+      }
+      if (past.length > 0) {
+        html += `<div class="trips-section-title">${t('bookings.past')}</div>` + past.map(bookingCardHtml).join('');
+      }
+      if (!html) {
+        html = `<div class="page-empty">${t('bookings.empty')}</div>`;
+      }
+      $('#bookings-list').innerHTML = html;
+      $('#bookings-list').querySelectorAll('[data-del-booking]').forEach(btn => {
+        btn.addEventListener('click', () => deleteBooking(btn.getAttribute('data-del-booking')));
+      });
+    });
+  }
+
+  async function deleteBooking(id) {
+    try {
+      await fetch('/api/bookings/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'include' });
+    } catch (e) { /* not signed in */ }
+    renderBookingsPage();
   }
 
   function openBookingsPage() {
@@ -4213,6 +4278,187 @@
     $('#bookings-page').classList.remove('open');
     $('#bookings-page').setAttribute('aria-hidden', 'true');
     $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === 'explore'));
+  }
+
+  // -------- Import a booking (paste / forward / calendar / photo) --------
+  let importDraft = null;
+
+  function openImportModal() {
+    const m = $('#import-modal');
+    m.classList.add('active');
+    m.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    $('#import-text').value = '';
+    $('#import-preview').innerHTML = '';
+    importDraft = null;
+    fetch('/api/me/booking-address', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const input = $('#import-address');
+        if (input) input.value = d && d.address ? d.address : '';
+        const block = $('#import-address') ? $('#import-address').closest('.import-block') : null;
+        if (block) block.style.display = (d && d.address) ? '' : 'none';
+      })
+      .catch(() => {});
+  }
+
+  function closeImportModal() {
+    const m = $('#import-modal');
+    if (!m || !m.classList.contains('active')) return;
+    m.classList.remove('active');
+    m.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  function renderBookingPreview(draft, source) {
+    importDraft = Object.assign({}, draft, { source: source });
+    const row = (key, label, type, value) =>
+      `<div class="import-field"><label>${esc(label)}</label><input type="${type || 'text'}" data-draft="${key}" value="${esc(value == null ? '' : value)}"></div>`;
+    $('#import-preview').innerHTML = `
+      <div class="import-preview-card">
+        <div class="import-preview-title">${esc(t('import.previewTitle'))}</div>
+        <div class="import-grid">
+          ${row('title', t('import.fTitle'), 'text', draft.title)}
+          ${row('location', t('import.fLocation'), 'text', draft.location)}
+          ${row('dateStart', t('import.fStart'), 'date', draft.dateStart)}
+          ${row('dateEnd', t('import.fEnd'), 'date', draft.dateEnd)}
+          ${row('time', t('import.fTime'), 'time', draft.time)}
+          ${row('reference', t('import.fRef'), 'text', draft.reference)}
+        </div>
+        <div class="import-preview-actions">
+          <button class="btn-ghost" id="import-cancel"><span>${esc(t('import.cancel'))}</span></button>
+          <button class="btn-primary" id="import-save"><span class="btn-label">${esc(t('import.save'))}</span></button>
+        </div>
+      </div>`;
+    $('#import-preview').querySelectorAll('[data-draft]').forEach(inp => {
+      inp.addEventListener('input', () => { importDraft[inp.getAttribute('data-draft')] = inp.value; });
+    });
+    $('#import-cancel').addEventListener('click', () => { $('#import-preview').innerHTML = ''; importDraft = null; });
+    $('#import-save').addEventListener('click', saveImported);
+    const first = $('#import-preview [data-draft="title"]');
+    if (first) first.focus();
+  }
+
+  async function saveImported() {
+    if (!importDraft) return;
+    const d = importDraft;
+    if (!d.title.trim() && !d.dateStart) {
+      showToast(t('import.needMore'), true);
+      return;
+    }
+    const payload = {
+      id: d.id || ('user-' + Date.now()),
+      type: d.type || 'hotel',
+      title: d.title.trim(),
+      location: (d.location || '').trim(),
+      dateStart: d.dateStart || '',
+      dateEnd: d.dateEnd || d.dateStart || '',
+      time: d.time || '',
+      reference: (d.reference || '').trim(),
+      notes: (d.notes || '').trim(),
+      image: d.image || '',
+      source: d.source || 'paste'
+    };
+    try {
+      await saveServerBooking(payload);
+      showToast(t('import.saved'), 'success');
+      closeImportModal();
+      renderBookingsPage();
+    } catch (e) {
+      showToast(e.message || 'Could not save that booking', true);
+    }
+  }
+
+  async function parsePastedText() {
+    const text = $('#import-text').value.trim();
+    if (!text) { showToast(t('import.pasteEmpty'), true); return; }
+    try {
+      const r = await fetch('/api/bookings/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ text: text })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Could not read that confirmation');
+      renderBookingPreview(d.draft || {}, 'paste');
+    } catch (e) {
+      showToast(e.message || 'Could not read that confirmation', true);
+    }
+  }
+
+  // Minimal .ics reader — unfold continuation lines, then read the first VEVENT.
+  function parseIcs(text) {
+    const raw = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const unfolded = raw.split('\n').reduce((acc, line) => {
+      if (/^[ \t]/.test(line) && acc.length) acc[acc.length - 1] += line.slice(1);
+      else acc.push(line);
+      return acc;
+    }, []);
+    const out = { title: '', location: '', dateStart: '', dateEnd: '', time: '', notes: '' };
+    let inEvent = false;
+    for (const line of unfolded) {
+      if (/^BEGIN:VEVENT/i.test(line)) { inEvent = true; continue; }
+      if (/^END:VEVENT/i.test(line)) break;
+      if (!inEvent) continue;
+      const m = /^([A-Z-]+)(?:;[^:]*)?:(.*)$/.exec(line);
+      if (!m) continue;
+      const key = m[1].toUpperCase(), val = m[2].trim();
+      if (key === 'SUMMARY') out.title = val;
+      else if (key === 'LOCATION') out.location = val;
+      else if (key === 'DESCRIPTION') out.notes = val.slice(0, 200);
+      else if (key === 'DTSTART') {
+        const d = /(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/.exec(val);
+        if (d) {
+          out.dateStart = d[1] + '-' + d[2] + '-' + d[3];
+          if (d[4]) out.time = d[4] + ':' + d[5];
+        }
+      } else if (key === 'DTEND') {
+        const d = /(\d{4})(\d{2})(\d{2})/.exec(val);
+        if (d) out.dateEnd = d[1] + '-' + d[2] + '-' + d[3];
+      }
+    }
+    return out;
+  }
+
+  function resizeForUpload(file, maxW) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const scale = Math.min(1, (maxW || 1600) / img.width);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        try { resolve(cv.toDataURL('image/jpeg', 0.85)); }
+        catch (e) { reject(new Error('Could not process that image')); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image')); };
+      img.src = url;
+    });
+  }
+
+  async function handleImportPhoto(file) {
+    if (!file) return;
+    try {
+      const dataUrl = await resizeForUpload(file, 1600);
+      const r = await fetch('/api/bookings/attachment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ dataUrl: dataUrl })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Could not upload that photo');
+      const draft = Object.assign({}, importDraft || {}, { image: d.path });
+      renderBookingPreview(draft, (importDraft && importDraft.source) || 'photo');
+      showToast(t('import.photoAttached'), 'success');
+    } catch (e) {
+      showToast(e.message || 'Could not upload that photo', true);
+    }
   }
 
   function closeTripsPage() {
@@ -4231,6 +4477,7 @@
     closeProfile();
     closeMenuPage();
     closeMenu();
+    closeImportModal();
     const wm = $('#welcome-modal');
     if (wm) { wm.classList.remove('active'); wm.setAttribute('aria-hidden', 'true'); }
   }

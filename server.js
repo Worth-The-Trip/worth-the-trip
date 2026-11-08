@@ -533,6 +533,23 @@ CREATE TABLE IF NOT EXISTS guide_comments (
   created_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_guide_comments_guide ON guide_comments (guide_id);
+CREATE TABLE IF NOT EXISTS bookings (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'hotel',
+  title TEXT NOT NULL DEFAULT '',
+  location TEXT NOT NULL DEFAULT '',
+  date_start TEXT NOT NULL DEFAULT '',
+  date_end TEXT NOT NULL DEFAULT '',
+  time TEXT NOT NULL DEFAULT '',
+  reference TEXT NOT NULL DEFAULT '',
+  image TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'manual',
+  created_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings (user_id);
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -2702,6 +2719,224 @@ app.post('/api/guides/:id/comments', requireUser, (req, res) => {
   });
 });
 
+// ---- Booking import: pull a structured booking out of a confirmation email ----
+const BOOKING_MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+const BOOKING_MONTH_RE = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
+const BK_CI_LABEL = 'check\\s*-?\\s*in(?:\\s+date)?|arrival(?:\\s+date)?|チェックイン|宿泊日|到着日';
+const BK_CO_LABEL = 'check\\s*-?\\s*out(?:\\s+date)?|departure(?:\\s+date)?|チェックアウト|出発日|退室日';
+
+function bkIso(y, m, d) {
+  const Y = Number(y), M = Number(m), D = Number(d);
+  if (!Y || Y < 2024 || Y > 2035 || M < 1 || M > 12 || D < 1 || D > 31) return '';
+  return Y + '-' + String(M).padStart(2, '0') + '-' + String(D).padStart(2, '0');
+}
+
+function bkDates(text) {
+  const out = [], seen = new Set();
+  const add = (s) => { if (s && !seen.has(s)) { seen.add(s); out.push(s); } };
+  let m;
+  const isoRe = /\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b/g;
+  while ((m = isoRe.exec(text))) add(bkIso(m[1], m[2], m[3]));
+  const jpRe = /(20\d{2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g;
+  while ((m = jpRe.exec(text))) add(bkIso(m[1], m[2], m[3]));
+  const dmyRe = new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + BOOKING_MONTH_RE + ')\\s*,?\\s*(20\\d{2})\\b', 'gi');
+  while ((m = dmyRe.exec(text))) add(bkIso(m[3], BOOKING_MONTHS[m[2].toLowerCase().slice(0, 3)], m[1]));
+  const mdyRe = new RegExp('\\b(' + BOOKING_MONTH_RE + ')\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s*,?\\s*(20\\d{2})\\b', 'gi');
+  while ((m = mdyRe.exec(text))) add(bkIso(m[3], BOOKING_MONTHS[m[1].toLowerCase().slice(0, 3)], m[2]));
+  // Bare numeric dates are ambiguous — only trust them when one side is > 12.
+  const numRe = /\b(\d{1,2})[\/.](\d{1,2})[\/.](20\d{2})\b/g;
+  while ((m = numRe.exec(text))) {
+    const a = Number(m[1]), b = Number(m[2]), y = Number(m[3]);
+    if (a > 12 && a <= 31) add(bkIso(y, b, a));
+    else if (b > 12 && b <= 31) add(bkIso(y, a, b));
+  }
+  return out.sort();
+}
+
+// Text on the same line after a label, up to `max` characters.
+function bkAfterLabel(text, labels, max) {
+  const re = new RegExp('(?:' + labels + ')[^\\n]{0,' + (max || 80) + '}', 'i');
+  const m = re.exec(text);
+  return m ? m[0].replace(new RegExp('^\\s*(?:' + labels + ')\\s*[:#：]?\\s*', 'i'), '') : '';
+}
+
+function bkClean(s) {
+  return String(s || '').replace(/\s+/g, ' ').replace(/[\s|,;:.\-–]+$/, '').trim();
+}
+
+function bkStripLabel(s) {
+  return bkClean(s)
+    .replace(/^(?:your hotel|hotel|property|宿泊名|宿名|旅館名|お宿|住所|所在地|address|location)\s*[:：\-–]\s*/i, '');
+}
+
+function bkReference(text) {
+  const re = new RegExp('(?:confirmation\\s+(?:number|no\\.?|#)?|booking\\s+(?:number|id|reference|code)|reservation\\s+(?:number|id|no\\.?) ?|voucher\\s+(?:number|code)|hotel\\s+confirmation|予約番号|予約ID|予約ナンバー|確認番号)\\s*[:#：]?\\s*([A-Za-z0-9][A-Za-z0-9\\-]{2,24})', 'gi');
+  const stop = new Set(['dear', 'yours', 'thank', 'your', 'guests', 'rooms', 'nights', 'hotel', 'check', 'booking', 'confirmation', 'reservation', 'subject', 'sincerely', 'regards', 'total', 'nights']);
+  let m, guard = 0;
+  while ((m = re.exec(text)) && guard++ < 40) {
+    const v = m[1].trim();
+    const core = v.replace(/[^A-Za-z0-9]/g, '');
+    if (!core || stop.has(core.toLowerCase())) continue;
+    if (!/\d/.test(core) && core.toLowerCase() === core) continue;  // lowercase prose, not a code
+    return v;
+  }
+  return '';
+}
+
+function bkTime(text) {
+  const m = /\b([01]?\d|2[0-3]):([0-5]\d)\s*(am|pm)?\b/i.exec(text || '');
+  if (!m) return '';
+  let h = Number(m[1]);
+  const ap = m[3] ? m[3].toLowerCase() : '';
+  if (ap === 'pm' && h < 12) h += 12;
+  if (ap === 'am' && h === 12) h = 0;
+  return String(h).padStart(2, '0') + ':' + m[2];
+}
+
+function parseBookingText(raw) {
+  const src = String(raw || '').replace(/\r\n?/g, '\n');
+  const out = { type: 'hotel', title: '', location: '', dateStart: '', dateEnd: '', time: '', reference: '', notes: '' };
+
+  // Dates: an explicit check-in / check-out label beats any guesswork.
+  const ciSeg = bkAfterLabel(src, BK_CI_LABEL, 120);
+  const coSeg = bkAfterLabel(src, BK_CO_LABEL, 120);
+  const ciDates = bkDates(ciSeg);
+  const coDates = bkDates(coSeg);
+  if (ciDates.length) out.dateStart = ciDates[0];
+  if (coDates.length) out.dateEnd = coDates[0];
+  if (!out.dateStart || !out.dateEnd) {
+    const all = bkDates(src);
+    if (!out.dateStart && all.length) out.dateStart = all[0];
+    if (!out.dateEnd) out.dateEnd = all.length > 1 ? all[all.length - 1] : (out.dateStart || '');
+  }
+  out.time = bkTime(ciSeg);
+
+  out.reference = bkReference(src);
+
+  // Title: the line that names the property, ignoring the boilerplate.
+  const lines = src.split('\n').map(l => l.trim()).filter(Boolean);
+  const noise = /check|book(?:ing)?|reserv|confirm|payment|cancel|address|phone|email|e-mail|date|night|guest|room|rate|policy|thank|regard|modify|portal|www\.|http|receipt|invoice|予約|確認|料金|支払/i;
+  const propertyWord = /(hotel|inn|ryokan|resort|suites?|hostel|lodg(?:e|ing)|guest\s*house|aparthotel|palace|royal|plaza|hyatt|hilton|marriott|ihg|rizzan|nikko|granvia|remm|dormy|route inn|super hotel|toyoko|tokyu|park hotel|view hotel|airline|旅館|ホテル|民宿|温泉宿|ペンション|ビューグルメ|グランド|ロイヤル|パレス|プラザ)/i;
+  for (const l of lines) {
+    if (l.length < 3 || l.length > 55) continue;
+    if (!propertyWord.test(l) || noise.test(l)) continue;
+    out.title = bkStripLabel(l);
+    break;
+  }
+  if (!out.title) {
+    const jp = bkClean(bkAfterLabel(src, '宿泊名|宿名|ホテル名|旅館名|お宿', 60));
+    if (jp) out.title = bkStripLabel(jp);
+  }
+  if (!out.title) {
+    const fromM = /from\s*:\s*([^:\n]*?)(?=\s+to\s*:|$)/i.exec(src);
+    const toM = /\bto\s*:\s*([^:\n]{1,40})/i.exec(src);
+    if (fromM && toM) out.title = bkClean(fromM[1]) + ' to ' + bkClean(toM[1]);
+  }
+  if (!out.title) {
+    const fl = bkClean(bkAfterLabel(src, 'flight(?:\\s+number)?\\s*:', 20));
+    if (fl) out.title = fl;
+  }
+  if (!out.title) {
+    const subj = bkClean(bkAfterLabel(src, 'subject\\s*:', 90));
+    if (subj && !noise.test(subj)) out.title = bkStripLabel(subj);
+  }
+
+  const addr = bkClean(bkAfterLabel(src, 'address|hotel address|location|住所|所在地', 90));
+  if (addr) out.location = bkStripLabel(addr).split(/\s{2,}|,\s*(?=[A-Z])/)[0].slice(0, 80);
+
+  if (/\b(flight|airline|airway|ana|jal|peach|jetstar)\b/i.test(src)) out.type = 'transport';
+  else if (/\b(ticket|tour|experience|activity|museum|tea ceremony|sumo)\b/i.test(src)) out.type = 'experience';
+  else out.type = 'hotel';
+
+  out.notes = lines.slice(0, 6).join(' - ').slice(0, 200);
+  return out;
+}
+
+// ---- Bookings storage ----
+function readUserBookings(userId) {
+  return db().prepare(`SELECT id, type, title, location, date_start AS dateStart, date_end AS dateEnd,
+      time, reference, image, notes, url, source, created_at AS createdAt
+    FROM bookings WHERE user_id = ? ORDER BY date_start DESC, created_at DESC`).all(userId);
+}
+
+app.get('/api/bookings', requireUser, (req, res) => {
+  res.json({ bookings: readUserBookings(req.user.id) });
+});
+
+app.post('/api/bookings', requireUser, (req, res) => {
+  const b = req.body || {};
+  const id = String(b.id || 'bk_' + crypto.randomBytes(8).toString('hex'));
+  const now = new Date().toISOString();
+  db().prepare(`INSERT INTO bookings
+      (id, user_id, type, title, location, date_start, date_end, time, reference, image, notes, url, source, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(id) DO UPDATE SET user_id=excluded.user_id, type=excluded.type, title=excluded.title,
+      location=excluded.location, date_start=excluded.date_start, date_end=excluded.date_end,
+      time=excluded.time, reference=excluded.reference, image=excluded.image, notes=excluded.notes,
+      url=excluded.url, source=excluded.source`)
+    .run(id, req.user.id,
+      ['hotel', 'event', 'experience', 'transport'].includes(b.type) ? b.type : 'hotel',
+      clip(b.title, 120).trim(), clip(b.location, 120).trim(),
+      clip(b.dateStart, 10), clip(b.dateEnd, 10), clip(b.time, 5),
+      clip(b.reference, 40).trim(), clip(b.image, 400).trim(),
+      clip(b.notes, 500).trim(), clip(b.url, 400).trim(),
+      clip(b.source, 20).trim() || 'manual', now);
+  res.status(201).json({ ok: true, booking: readUserBookings(req.user.id).find(x => x.id === id) || null });
+});
+
+app.delete('/api/bookings/:id', requireUser, (req, res) => {
+  db().prepare('DELETE FROM bookings WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  res.json({ ok: true });
+});
+
+// Read a pasted confirmation (from the "paste it here" box) and return a draft.
+app.post('/api/bookings/parse', requireUser, (req, res) => {
+  const text = String((req.body || {}).text || '');
+  if (!text.trim()) return jsonError(res, 400, 'Nothing to read');
+  res.json({ draft: parseBookingText(text) });
+});
+
+// A per-account forwarding address the traveller can BCC/forward to.
+app.get('/api/me/booking-address', requireUser, (req, res) => {
+  const domain = process.env.WTT_BOOKING_MAIL_DOMAIN || 'bookings.worththetripapp.com';
+  res.json({ address: req.user.id + '@' + domain, domain: domain });
+});
+
+// Attachment (a photo of the confirmation) — kept on the booking card.
+app.post('/api/bookings/attachment', requireUser, (req, res) => {
+  const m = /^data:(image\/(png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String((req.body || {}).dataUrl || ''));
+  if (!m) return jsonError(res, 400, 'Only PNG, JPEG or WebP images are supported');
+  let mime = m[2].toLowerCase(); if (mime === 'jpg') mime = 'jpeg';
+  const ext = mime === 'png' ? 'png' : (mime === 'webp' ? 'webp' : 'jpg');
+  const buf = Buffer.from(m[3], 'base64');
+  if (buf.length > MAX_IMAGE_BYTES) return jsonError(res, 413, 'Image is larger than 5 MB');
+  const dir = path.join(UPLOAD_DIR, 'bookings', req.user.id);
+  fs.mkdirSync(dir, { recursive: true });
+  const name = Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex') + '.' + ext;
+  fs.writeFileSync(path.join(dir, name), buf);
+  res.json({ ok: true, path: '/booking-images/' + req.user.id + '/' + name });
+});
+
+// Inbound email webhook — an email service (SendGrid Inbound Parse, Mailgun
+// routes, Cloudflare Email Workers) POSTs the forwarded confirmation here.
+app.post('/api/bookings/inbound', (req, res) => {
+  const secret = process.env.WTT_INBOUND_SECRET || '';
+  if (secret && req.get('x-wtt-secret') !== secret) return jsonError(res, 403, 'Forbidden');
+  const to = String((req.body || {}).to || '');
+  const user = findUserById(to.split('@')[0].trim());
+  if (!user) return jsonError(res, 404, 'Unknown recipient');
+  const htmlText = String((req.body || {}).html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ');
+  const draft = parseBookingText([(req.body || {}).subject || '', (req.body || {}).text || '', htmlText].join('\n'));
+  const id = 'bk_' + crypto.randomBytes(8).toString('hex');
+  const now = new Date().toISOString();
+  db().prepare(`INSERT INTO bookings
+      (id, user_id, type, title, location, date_start, date_end, time, reference, image, notes, url, source, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(id, user.id, draft.type || 'hotel', draft.title, draft.location, draft.dateStart, draft.dateEnd,
+      draft.time, draft.reference, '', draft.notes, '', 'forward', now);
+  res.json({ ok: true, booking: readUserBookings(user.id).find(x => x.id === id) || null });
+});
+
 // ---- Admin: guide review ----
 app.get('/api/admin/guides', requireAdmin, (req, res) => {
   let list = readGuides();
@@ -2914,6 +3149,7 @@ app.use('/avatars', express.static(AVATAR_DIR));
 // matches the mount against the raw path. Uploads are served from here; the
 // committed images under public/Guide Images still work via the DATA_DIR mount.
 app.use('/guide-images', express.static(GUIDES_IMG_DIR));
+app.use('/booking-images', express.static(path.join(UPLOAD_DIR, 'bookings')));
 // Legacy safety net: covers uploaded before the mount fix were addressed under
 // the spacey path. Missing here, they fall through to the committed tree.
 app.use('/public/Guide%20Images', express.static(GUIDES_IMG_DIR));
