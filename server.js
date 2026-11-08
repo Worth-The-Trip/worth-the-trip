@@ -860,7 +860,7 @@ function readRatings(guideId) {
   return db().prepare('SELECT guide_id, user_id, stars, created_at, updated_at FROM guide_ratings WHERE guide_id = ?').all(guideId);
 }
 function readComments(guideId) {
-  return db().prepare('SELECT id, guide_id, user_id, user_name, body, created_at FROM guide_comments WHERE guide_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 200').all(guideId);
+  return db().prepare('SELECT id, guide_id AS guideId, user_id AS userId, user_name AS userName, body, created_at AS createdAt FROM guide_comments WHERE guide_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 200').all(guideId);
 }
 function ratingStats(guideId) {
   const rows = readRatings(guideId);
