@@ -2492,7 +2492,6 @@ body {
   cursor: pointer;
   text-decoration: none;
   transition: background var(--duration-fast), color var(--duration-fast);
-  margin-top: 6px;
 }
 
 .timeline-search-btn:hover {
