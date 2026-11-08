@@ -61,6 +61,7 @@
       duration: g.duration || '',
       price: Number(g.price) || 0,
       priceTier: priceTierOf(g.price),
+      creatorRating: Number(g.creatorRating) || 0,
       category: g.category || 'culture',
       season: g.season || [],
       stay: [],

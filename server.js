@@ -516,6 +516,23 @@ CREATE TABLE IF NOT EXISTS creator_guides (
   id TEXT PRIMARY KEY,
   data TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS guide_ratings (
+  guide_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  stars INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (guide_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS guide_comments (
+  id TEXT PRIMARY KEY,
+  guide_id TEXT NOT NULL,
+  user_id TEXT NOT NULL DEFAULT '',
+  user_name TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_guide_comments_guide ON guide_comments (guide_id);
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -799,6 +816,7 @@ function canonicalizeGuide(g) {
     duration: g.duration, price: g.price, priceTier: g.priceTier, stay: g.stay,
     season: g.season || ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'],
     coordinates: g.coordinates, zoomLevel: g.zoomLevel, heroImage: g.heroImage,
+    creatorRating: Number(g.creatorRating) || 0,
     video: video, includes: g.includes, timeline: g.timeline, hotels: g.hotels || [], ja: ja,
     jaSourceHash: g.jaSourceHash || hashJa(ja),
     createdAt: g.createdAt || new Date().toISOString(),
@@ -834,6 +852,38 @@ function guideDescription(g) {
   return bits.join(' · ').slice(0, 200);
 }
 function findGuide(id) { return readGuides().find((g) => g.id === id); }
+
+// ---- Guide ratings & comments ----
+// The creator's own rating lives on the guide (creatorRating); traveller
+// ratings and comments are separate tables so a deploy never touches them.
+function readRatings(guideId) {
+  return db().prepare('SELECT guide_id, user_id, stars, created_at, updated_at FROM guide_ratings WHERE guide_id = ?').all(guideId);
+}
+function readComments(guideId) {
+  return db().prepare('SELECT id, guide_id, user_id, user_name, body, created_at FROM guide_comments WHERE guide_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 200').all(guideId);
+}
+function ratingStats(guideId) {
+  const rows = readRatings(guideId);
+  const count = rows.length;
+  const total = rows.reduce((s, r) => s + (Number(r.stars) || 0), 0);
+  return { average: count ? Math.round((total / count) * 10) / 10 : 0, count: count };
+}
+// Only someone who actually owns the guide may rate it — a purchase, the
+// unlock-all subscription, an admin gift, or the free first-guide claim.
+function userOwnsGuide(user, guideId) {
+  if (!user || !guideId) return false;
+  const email = String(user.email || '').toLowerCase();
+  const purchases = readPurchases().filter((p) => String(p.buyerEmail || '').toLowerCase() === email);
+  if (purchases.some((p) => p.type === 'subscription')) return true;
+  if (purchases.some((p) => p.guideId === guideId)) return true;
+  const claim = findFreeClaim(email);
+  return !!(claim && claim.guideId === guideId);
+}
+function myRating(guideId, userId) {
+  if (!userId) return 0;
+  const row = db().prepare('SELECT stars FROM guide_ratings WHERE guide_id = ? AND user_id = ?').get(guideId, userId);
+  return row ? (Number(row.stars) || 0) : 0;
+}
 function findCreatorRecord(email) {
   const e = String(email || '').toLowerCase();
   let rec = readCreators().find((c) => String(c.email || '').toLowerCase() === e);
@@ -2174,6 +2224,11 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, async (req, res) => {
       const z = Math.round(Number(b.zoomLevel));
       g.zoomLevel = Number.isFinite(z) ? Math.min(18, Math.max(1, z)) : g.zoomLevel;
     }
+    // The creator's own 0-5 rating of this guide (0 = not set).
+    if (b.creatorRating !== undefined) {
+      const r = Math.round(Number(b.creatorRating));
+      g.creatorRating = Number.isFinite(r) ? Math.min(5, Math.max(0, r)) : g.creatorRating;
+    }
     if (b.video !== undefined) {
       const v = b.video || {};
       g.video = {
@@ -2597,6 +2652,56 @@ app.get('/api/guides', (req, res) => {
   res.json({ guides: list, total: list.length });
 });
 
+// ---- Ratings & comments for a single guide ----
+// Readable by anyone (they inform a purchase); writing needs an account and,
+// for ratings, ownership of the guide.
+app.get('/api/guides/:id/ratings', (req, res) => {
+  const g = findGuide(req.params.id);
+  if (!g) return jsonError(res, 404, 'Guide not found');
+  const out = ratingStats(g.id);
+  const s = getSession(readCookie(req));
+  if (s && s.kind === 'user') {
+    const u = findUserById(s.userId);
+    if (u) out.myStars = myRating(g.id, u.id);
+  }
+  res.json(out);
+});
+
+app.post('/api/guides/:id/ratings', requireUser, (req, res) => {
+  const g = findGuide(req.params.id);
+  if (!g) return jsonError(res, 404, 'Guide not found');
+  const stars = Math.round(Number((req.body || {}).stars));
+  if (!Number.isFinite(stars) || stars < 1 || stars > 5) return jsonError(res, 400, 'Rating must be between 1 and 5 stars');
+  if (!userOwnsGuide(req.user, g.id)) return jsonError(res, 403, 'Only travellers who own this guide can rate it');
+  const now = new Date().toISOString();
+  db().prepare(`INSERT INTO guide_ratings (guide_id, user_id, stars, created_at, updated_at)
+    VALUES (?,?,?,?,?)
+    ON CONFLICT(guide_id, user_id) DO UPDATE SET stars = excluded.stars, updated_at = excluded.updated_at`)
+    .run(g.id, req.user.id, stars, now, now);
+  res.json(Object.assign({ ok: true, myStars: stars }, ratingStats(g.id)));
+});
+
+app.get('/api/guides/:id/comments', (req, res) => {
+  const g = findGuide(req.params.id);
+  if (!g) return jsonError(res, 404, 'Guide not found');
+  res.json({ comments: readComments(g.id) });
+});
+
+app.post('/api/guides/:id/comments', requireUser, (req, res) => {
+  const g = findGuide(req.params.id);
+  if (!g) return jsonError(res, 404, 'Guide not found');
+  const body = clip((req.body || {}).body, 1200).trim();
+  if (!body) return jsonError(res, 400, 'Comment cannot be empty');
+  const now = new Date().toISOString();
+  const name = clip((req.user && (req.user.name || req.user.email)) || 'Traveller', 80);
+  const id = 'c_' + crypto.randomBytes(8).toString('hex');
+  db().prepare('INSERT INTO guide_comments (id, guide_id, user_id, user_name, body, created_at) VALUES (?,?,?,?,?,?)')
+    .run(id, g.id, req.user.id, name, body, now);
+  res.status(201).json({
+    comment: { id: id, guideId: g.id, userId: req.user.id, userName: name, body: body, createdAt: now }
+  });
+});
+
 // ---- Admin: guide review ----
 app.get('/api/admin/guides', requireAdmin, (req, res) => {
   let list = readGuides();
@@ -2662,6 +2767,10 @@ app.patch('/api/admin/guides/:id', requireAdmin, async (req, res) => {
         g.duration = (Number.isFinite(d) && d >= 1 && d <= 31) ? String(Math.round(d)) : g.duration;
       }
       if (b.tagline !== undefined) g.tagline = clip(b.tagline, 200).trim();
+      if (b.creatorRating !== undefined) {
+        const r = Math.round(Number(b.creatorRating));
+        g.creatorRating = Number.isFinite(r) ? Math.min(5, Math.max(0, r)) : g.creatorRating;
+      }
       if (translated) {
         // Creators write English only — the Japanese version is produced here.
         g.ja = translated.ja;

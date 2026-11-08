@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="src/css/styles.css?v=78">
+  <link rel="stylesheet" href="src/css/styles.css?v=79">
   <link rel="icon" href="public/Branding/WTT Logo 1.svg">
 </head>
 <body>
@@ -158,6 +158,7 @@
               <span class="btn-sub"></span>
             </button>
           </div>
+          <div class="guide-ratings" id="modal-ratings" style="display:none"></div>
           <button class="btn-primary" id="modal-start-btn" style="display:none">
             <span class="btn-label" data-i18n="modal.start">Start Guide</span>
           </button>
@@ -171,6 +172,8 @@
           <div class="sub-dest-grid" id="modal-sub-dest-grid" style="display:none"></div>
           <div class="section-label" style="display:none" id="creator-label" data-i18n="modal.curatedBy">Curated by</div>
           <div class="creator-card" id="modal-creator" style="display:none"></div>
+          <div class="section-label" id="comments-label" style="display:none" data-i18n="comments.title">Traveller comments</div>
+          <div class="comments-block" id="modal-comments" style="display:none"></div>
           <div class="section-label" style="display:none" id="youtube-label" data-i18n="modal.youtube">Watch the original trip</div>
           <a class="youtube-ref" id="modal-youtube" style="display:none"></a>
         </div>
@@ -426,9 +429,9 @@
   <script src="src/js/data/creators.js?v=3"></script>
   <script src="src/js/data/creator-profiles.js?v=2"></script>
   <script src="src/js/data/bookings.js?v=2"></script>
-  <script src="src/js/data/strings.js?v=16"></script>
-  <script src="src/js/data/creator-guides.js?v=6"></script>
-  <script src="src/js/app.js?v=131"></script>
+  <script src="src/js/data/strings.js?v=17"></script>
+  <script src="src/js/data/creator-guides.js?v=7"></script>
+  <script src="src/js/app.js?v=132"></script>
   <!-- Stay22 Affiliate (Let Me Allez) — tracks bookings on worththetripapp.com -->
   <script>
     (function (s, t, a, y, twenty, two) {

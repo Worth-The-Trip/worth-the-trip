@@ -3459,3 +3459,177 @@ a.creator-plat:hover {
   padding: var(--space-sm) var(--space-md);
   margin: var(--space-sm) 0;
 }
+
+/* ============================================================
+   GUIDE RATINGS + TRAVELLER COMMENTS
+   Large red stars = the creator's own rating of the guide.
+   Smaller yellow stars = the average from guide purchasers.
+   ============================================================ */
+.guide-ratings {
+  margin: 4px 0 14px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}
+.rating-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rating-row + .rating-row {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
+}
+.rating-caption {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.stars .star {
+  display: inline-flex;
+  line-height: 0;
+}
+.stars .star svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--stone);
+  stroke-width: 1.6;
+}
+.stars .star.on svg {
+  fill: currentColor;
+  stroke: currentColor;
+}
+.creator-stars { color: var(--vermilion); }
+.creator-stars .star svg { width: 26px; height: 26px; }
+.traveller-stars { color: #F5A623; }
+.traveller-stars .star svg { width: 15px; height: 15px; }
+
+/* Votable stars — only shown to a traveller who owns the guide */
+.stars.votable { gap: 4px; }
+.stars.votable .star-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  line-height: 0;
+  color: inherit;
+}
+.stars.votable .star-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--stone);
+  stroke-width: 1.6;
+}
+.stars.votable .star-btn.on svg {
+  fill: currentColor;
+  stroke: currentColor;
+}
+.stars.votable .star-btn:hover svg {
+  transform: scale(1.12);
+}
+
+/* Creator studio — the star picker */
+.star-input {
+  display: inline-flex;
+  gap: 6px;
+}
+.star-input .star-btn {
+  border: none;
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+  line-height: 0;
+  color: var(--vermilion);
+}
+.star-input .star-btn svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: var(--stone);
+  stroke-width: 1.6;
+  transition: transform 120ms var(--ease-out);
+}
+.star-input .star-btn.on svg {
+  fill: currentColor;
+  stroke: currentColor;
+}
+.star-input .star-btn:hover svg {
+  transform: scale(1.12);
+}
+
+/* -------- Traveller comments -------- */
+.comments-block { margin-top: 6px; }
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.comment {
+  padding: 10px 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+.comment-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.comment-author {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.comment-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.comment-body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.comments-empty,
+.comments-signin {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 8px 0;
+}
+.comment-form {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.comment-form textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.comment-form textarea:focus {
+  outline: none;
+  border-color: var(--vermilion);
+}
+.comment-form .btn-primary {
+  align-self: flex-end;
+}

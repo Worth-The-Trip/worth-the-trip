@@ -11,6 +11,7 @@ const WTT_GUIDES = [
     "duration": "3 Days",
     "price": 499,
     "priceTier": 2,
+    "creatorRating": 5,
     "stay": [
       "hotel",
       "airbnb"
@@ -212,6 +213,7 @@ const WTT_GUIDES = [
     "duration": "4 Days",
     "price": 599,
     "priceTier": 2,
+    "creatorRating": 5,
     "stay": [
       "hotel",
       "ryokan",
@@ -411,6 +413,7 @@ const WTT_GUIDES = [
     "duration": "2 Days",
     "price": 399,
     "priceTier": 1,
+    "creatorRating": 5,
     "stay": [
       "hotel",
       "airbnb"
@@ -609,6 +612,7 @@ const WTT_GUIDES = [
     "duration": "4 Days",
     "price": 599,
     "priceTier": 2,
+    "creatorRating": 5,
     "stay": [
       "hotel",
       "ryokan"
@@ -775,6 +779,7 @@ const WTT_GUIDES = [
     "duration": "2 Days",
     "price": 499,
     "priceTier": 2,
+    "creatorRating": 5,
     "stay": [
       "guesthouse",
       "hotel"
@@ -941,6 +946,7 @@ const WTT_GUIDES = [
     "duration": "3 Days",
     "price": 999,
     "priceTier": 3,
+    "creatorRating": 5,
     "stay": [
       "ryokan",
       "hotel"
@@ -1107,6 +1113,7 @@ const WTT_GUIDES = [
     "duration": "3 Days",
     "price": 499,
     "priceTier": 2,
+    "creatorRating": 5,
     "stay": [
       "hotel",
       "guesthouse"
@@ -1273,6 +1280,7 @@ const WTT_GUIDES = [
     "duration": "2 Days",
     "price": 399,
     "priceTier": 1,
+    "creatorRating": 5,
     "stay": [
       "hotel",
       "airbnb"
@@ -1439,6 +1447,7 @@ const WTT_GUIDES = [
     "duration": "2 Days",
     "price": 399,
     "priceTier": 1,
+    "creatorRating": 5,
     "stay": [
       "ryokan",
       "guesthouse"
@@ -1605,6 +1614,7 @@ const WTT_GUIDES = [
     "duration": "4 Days",
     "price": 799,
     "priceTier": 3,
+    "creatorRating": 5,
     "stay": [
       "hotel",
       "airbnb"

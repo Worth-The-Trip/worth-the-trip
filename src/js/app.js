@@ -114,6 +114,9 @@
     modalSubDestGrid: $('#modal-sub-dest-grid'),
     modalCreator: $('#modal-creator'),
     modalYoutube: $('#modal-youtube'),
+    modalRatings: $('#modal-ratings'),
+    commentsLabel: $('#comments-label'),
+    modalComments: $('#modal-comments'),
     modalBody: document.querySelector('.modal-body'),
     toast: $('#toast'),
     datesModal: $('#dates-modal'),
@@ -2040,6 +2043,10 @@
 
     // Hotel recommendation block is now rendered inside the timeline as a step.
 
+    // Ratings and comments inform the purchase, so they show for locked guides too.
+    renderGuideRatings(guide);
+    renderGuideComments(guide);
+
     const isLocked = !unlocked;
     let lockedOverlay = els.modalHero.querySelector('.modal-locked-overlay');
     if (isLocked) {
@@ -2109,6 +2116,161 @@
     document.body.style.overflow = '';
     state.activeGuideId = null;
     clearStepPins();
+  }
+
+  // -------- Guide ratings: creator's red stars + traveller yellow stars --------
+  const RATING_STAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.45 6.19 20.5 7.3 14.03 2.6 9.45l6.5-.95z"/></svg>';
+
+  function starRow(value) {
+    let out = '';
+    for (let i = 1; i <= 5; i++) {
+      out += '<span class="star' + (i <= Math.round(value) ? ' on' : '') + '">' + RATING_STAR_SVG + '</span>';
+    }
+    return out;
+  }
+
+  function renderGuideRatings(guide) {
+    const box = els.modalRatings;
+    if (!box) return;
+    const creator = Math.max(0, Math.min(5, Math.round(Number(guide.creatorRating) || 0)));
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div class="rating-row">' +
+        '<div class="stars creator-stars">' + starRow(creator) + '</div>' +
+        '<div class="rating-caption">' + esc(t('rating.creator')) + (creator ? ' · ' + creator + '/5' : '') + '</div>' +
+      '</div>' +
+      '<div class="rating-row">' +
+        '<div class="stars traveller-stars" id="traveller-stars">' + starRow(0) + '</div>' +
+        '<div class="rating-caption" id="traveller-caption">' + esc(t('rating.loading')) + '</div>' +
+      '</div>';
+    loadGuideRatings(guide);
+  }
+
+  async function loadGuideRatings(guide) {
+    const starsEl = $('#traveller-stars');
+    const capEl = $('#traveller-caption');
+    if (!starsEl || !capEl) return;
+    try {
+      const r = await fetch('/api/guides/' + encodeURIComponent(guide.id) + '/ratings?_ts=' + Date.now(), { credentials: 'include' });
+      if (!r.ok) throw new Error('bad');
+      const d = await r.json();
+      const avg = Number(d.average) || 0;
+      const count = Number(d.count) || 0;
+      const myStars = Math.round(Number(d.myStars) || 0);
+      // Only travellers who own the guide may vote; everyone else just reads.
+      const canVote = isGuideUnlocked(guide.id);
+      starsEl.innerHTML = '';
+      for (let i = 1; i <= 5; i++) {
+        if (canVote) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'star-btn sm' + (i <= myStars ? ' on' : '');
+          b.setAttribute('data-stars', String(i));
+          b.setAttribute('aria-label', String(i));
+          b.innerHTML = RATING_STAR_SVG;
+          b.addEventListener('click', () => submitGuideRating(guide, i));
+          starsEl.appendChild(b);
+        } else {
+          const s = document.createElement('span');
+          s.className = 'star' + (i <= Math.round(avg) ? ' on' : '');
+          s.innerHTML = RATING_STAR_SVG;
+          starsEl.appendChild(s);
+        }
+      }
+      starsEl.classList.toggle('votable', canVote);
+      capEl.textContent = count
+        ? (avg.toFixed(1) + ' / 5 · ' + count + (count === 1 ? ' ' + t('rating.review') : ' ' + t('rating.reviews')))
+        : t('rating.noReviews');
+    } catch (e) {
+      capEl.textContent = t('rating.noReviews');
+    }
+  }
+
+  async function submitGuideRating(guide, stars) {
+    try {
+      const r = await fetch('/api/guides/' + encodeURIComponent(guide.id) + '/ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ stars: stars })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Could not save your rating');
+      showToast(t('rating.thanks'), 'success');
+      await loadGuideRatings(guide);
+    } catch (e) {
+      showToast(e.message || 'Could not save your rating', true);
+    }
+  }
+
+  // -------- Traveller comments --------
+  function formatCommentDate(iso) {
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch (e) { return ''; }
+  }
+
+  async function renderGuideComments(guide) {
+    const label = els.commentsLabel;
+    const box = els.modalComments;
+    if (!box) return;
+    if (label) label.style.display = 'block';
+    box.style.display = 'block';
+    box.innerHTML = '<p class="comments-empty">' + esc(t('comments.loading')) + '</p>';
+    try {
+      const r = await fetch('/api/guides/' + encodeURIComponent(guide.id) + '/comments?_ts=' + Date.now(), { credentials: 'include' });
+      const d = r.ok ? await r.json() : { comments: [] };
+      const list = (d.comments || []).slice().reverse();   // oldest first
+      const signedIn = !!localStorage.getItem(AUTH_KEY);
+      let html = '<div class="comments-list">';
+      if (!list.length) html += '<p class="comments-empty">' + esc(t('comments.empty')) + '</p>';
+      for (const c of list) {
+        html += '<div class="comment">' +
+          '<div class="comment-head">' +
+            '<span class="comment-author">' + esc(c.userName || 'Traveller') + '</span>' +
+            '<span class="comment-date">' + esc(formatCommentDate(c.createdAt)) + '</span>' +
+          '</div>' +
+          '<div class="comment-body">' + esc(c.body) + '</div>' +
+        '</div>';
+      }
+      html += '</div>';
+      if (signedIn) {
+        html += '<form class="comment-form" id="comment-form">' +
+          '<textarea id="comment-body" maxlength="1200" placeholder="' + esc(t('comments.placeholder')) + '"></textarea>' +
+          '<button type="submit" class="btn-primary"><span class="btn-label">' + esc(t('comments.post')) + '</span></button>' +
+        '</form>';
+      } else {
+        html += '<p class="comments-signin">' + esc(t('comments.signIn')) + '</p>';
+      }
+      box.innerHTML = html;
+      const form = $('#comment-form');
+      if (form) {
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const ta = $('#comment-body');
+          const body = (ta.value || '').trim();
+          if (!body) return;
+          try {
+            const r = await fetch('/api/guides/' + encodeURIComponent(guide.id) + '/comments', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ body: body })
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d.error || 'Could not post your comment');
+            showToast(t('comments.posted'), 'success');
+            await renderGuideComments(guide);
+          } catch (err) {
+            showToast(err.message || 'Could not post your comment', true);
+          }
+        });
+      }
+    } catch (e) {
+      box.innerHTML = '<p class="comments-empty">' + esc(t('comments.empty')) + '</p>';
+    }
   }
 
   // -------- Profile panel (local MVP — no backend yet) --------

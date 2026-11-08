@@ -44,6 +44,7 @@
       reviewNote: 'Reviewer note',
       basics: 'Basics', titleF: 'Guide title', tagline: 'Tagline (one line)', city: 'City', prefecture: 'Prefecture',
       category: 'Category', season: 'Best season', duration: 'Duration (e.g. 3 Days)', cover: 'Cover image',
+      creatorRating: "Creator's rating", creatorRatingHint: 'Your own quality rating for this guide. Shown to travellers as the large red stars.',
       coverHint: 'Landscape works best. Large images are resized automatically (max 5 MB).',
       chooseImage: 'Choose image', replacing: 'Replace image',
       pricing: 'Price', priceHint: 'Between ¥100 and ¥2,000. This is what the traveller pays.',
@@ -100,6 +101,7 @@
       reviewNote: 'レビューコメント',
       basics: '基本情報', titleF: 'ガイドタイトル', tagline: 'キャッチコピー（1行）', city: '市', prefecture: '都道府県',
       category: 'カテゴリ', season: 'おすすめの季節', duration: '所要時間（例：3日間）', cover: 'カバー画像',
+      creatorRating: 'クリエイター評価', creatorRatingHint: 'このガイドに対するあなた自身の評価です。旅行者には大きな赤い星として表示されます。',
       coverHint: '横長がおすすめです。大きい画像は自動で縮小されます（最大5MB）。',
       chooseImage: '画像を選ぶ', replacing: '画像を変更',
       pricing: '価格', priceHint: '¥100〜¥2,000の範囲です。旅行者が支払う金額です。',
@@ -377,6 +379,9 @@
         var on = (g.season || []).indexOf(m) !== -1;
         return '<label class="month"><input type="checkbox" name="season" value="' + m + '"' + (on ? ' checked' : '') + '><span>' + m.toUpperCase() + '</span></label>';
       }).join('') + '</div></div>' +
+      '<div class="field"><label>' + esc(t('creatorRating')) + '</label>' +
+      '<div class="star-input" id="f-creator-rating" role="radiogroup" aria-label="' + esc(t('creatorRating')) + '"></div>' +
+      '<p class="hint">' + esc(t('creatorRatingHint')) + '</p></div>' +
       '<div class="field"><label>' + esc(t('cover')) + '</label>' +
       '<div id="cover-preview">' + (g.heroImage ? '<img src="' + esc(g.heroImage) + '" alt="">' : '<div class="thumb-empty">' + esc(t('cover')) + '</div>') + '</div>' +
       '<div class="btn-row" style="margin-top:10px"><button class="btn btn-ghost btn-sm" id="pick-cover">' + esc(g.heroImage ? t('replacing') : t('chooseImage')) + '</button>' +
@@ -430,6 +435,7 @@
     renderStops();
     renderHotels();
     renderProblems();
+    renderCreatorRating();
     initPinMap();
     initLocationAutocomplete('f-city', WTT_LOCATIONS.cities.map(function (c) { return c.name; }));
     initLocationAutocomplete('f-prefecture', WTT_LOCATIONS.prefectures.slice().sort());
@@ -537,6 +543,7 @@
       season: Array.prototype.filter.call(document.querySelectorAll('input[name=season]'), function (c) { return c.checked; }).map(function (c) { return c.value; }),
       price: Number(($('#f-price') || {}).value || 100),
       zoomLevel: Number(($('#f-zoom') || {}).value || 11),
+      creatorRating: Math.max(0, Math.min(5, Math.round(Number((state.guide && state.guide.creatorRating) || 0)))),
       // Set by the map click and the upload handler, not by a form field —
       // collect() must still send them or the pin/cover never persist.
       heroImage: state.guide.heroImage || '',
@@ -625,6 +632,20 @@
         return res;
       })
       .catch(function (e) { toast(e.message, true); throw e; });
+  }
+
+  // ---- creator's own rating (large red stars on the guide) ----
+  var STAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.45 6.19 20.5 7.3 14.03 2.6 9.45l6.5-.95z"/></svg>';
+
+  function renderCreatorRating() {
+    var el = $('#f-creator-rating');
+    if (!el) return;
+    var value = Math.max(0, Math.min(5, Math.round(Number((state.guide && state.guide.creatorRating) || 0))));
+    var html = '';
+    for (var i = 1; i <= 5; i++) {
+      html += '<button type="button" class="star-btn' + (i <= value ? ' on' : '') + '" data-stars="' + i + '" role="radio" aria-checked="' + (i === value) + '" aria-label="' + i + '">'+ STAR_SVG + '</button>';
+    }
+    el.innerHTML = html;
   }
 
   function renderProblems() {
@@ -853,6 +874,14 @@
 
     $('#f-zoom').addEventListener('input', function () {
       $('#zoom-val').textContent = this.value;
+      markDirty();
+    });
+
+    $('#f-creator-rating').addEventListener('click', function (e) {
+      var btn = e.target.closest('.star-btn');
+      if (!btn) return;
+      state.guide.creatorRating = Number(btn.getAttribute('data-stars')) || 0;
+      renderCreatorRating();
       markDirty();
     });
 
