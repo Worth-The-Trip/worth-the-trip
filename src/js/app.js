@@ -4293,7 +4293,28 @@
     document.body.style.overflow = '';
   }
 
+  // When an email carries no address (Booking.com "request approved" mails are
+  // like that), fall back to a city/prefecture named anywhere in the draft.
+  function guessLocation(draft) {
+    if (draft.location && draft.location.trim()) return draft.location;
+    if (typeof WTT_LOCATIONS === 'undefined') return '';
+    const hay = [draft.title, draft.notes].join(' ');
+    const cities = (WTT_LOCATIONS.cities || []).slice()
+      .sort((a, b) => String(b.name || '').length - String(a.name || '').length);
+    for (const c of cities) {
+      if (c && c.name && hay.indexOf(c.name) !== -1) {
+        return c.prefecture ? (c.name + ', ' + c.prefecture) : c.name;
+      }
+    }
+    const prefs = WTT_LOCATIONS.prefectures || [];
+    for (const p of prefs) {
+      if (p && hay.indexOf(p) !== -1) return p;
+    }
+    return '';
+  }
+
   function renderBookingPreview(draft, source) {
+    draft.location = guessLocation(draft);
     importDraft = Object.assign({}, draft, { source: source });
     const row = (key, label, type, value) =>
       `<div class="import-field"><label>${esc(label)}</label><input type="${type || 'text'}" data-draft="${key}" value="${esc(value == null ? '' : value)}"></div>`;

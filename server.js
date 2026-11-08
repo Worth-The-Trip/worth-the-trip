@@ -2764,6 +2764,31 @@ function bkClean(s) {
   return String(s || '').replace(/\s+/g, ' ').replace(/[\s|,;:.\-–]+$/, '').trim();
 }
 
+// A single value that may sit on the line after its label.
+function bkLabeledLine(text, labels, max) {
+  const re = new RegExp('(?:' + labels + ')\\s*[:#：]?\\s*([^\\n]{2,' + (max || 80) + '})', 'i');
+  const m = re.exec(text);
+  return m ? m[1].trim() : '';
+}
+
+// The first time that appears after a check-in label. Some emails put the
+// time on its own line, or give a range like "20:00-21:00".
+function bkCheckinTime(text) {
+  const re = /check\s*-?\s*in(?:[^\n]{0,60})/gi;
+  let m;
+  while ((m = re.exec(text))) {
+    const t = bkTime(m[0]);
+    if (t) return t;
+  }
+  return '';
+}
+
+// Strip the trailing "said:" / "writes:" some notification emails append to
+// the property name when quoting the hotel's message.
+function bkTrimQuote(s) {
+  return bkClean(s).replace(/\s+(?:said|writes?|posted|replied|confirmed)\s*[:.]?\s*$/i, '');
+}
+
 function bkStripLabel(s) {
   return bkClean(s)
     .replace(/^(?:your hotel|hotel|property|宿泊名|宿名|旅館名|お宿|住所|所在地|address|location)\s*[:：\-–]\s*/i, '');
@@ -2809,23 +2834,30 @@ function parseBookingText(raw) {
     if (!out.dateStart && all.length) out.dateStart = all[0];
     if (!out.dateEnd) out.dateEnd = all.length > 1 ? all[all.length - 1] : (out.dateStart || '');
   }
-  out.time = bkTime(ciSeg);
+  out.time = bkCheckinTime(src);
 
   out.reference = bkReference(src);
 
-  // Title: the line that names the property, ignoring the boilerplate.
+  // Title: an explicit "Property name" style label wins, then any line that
+  // names the property, ignoring the boilerplate.
   const lines = src.split('\n').map(l => l.trim()).filter(Boolean);
   const noise = /check|book(?:ing)?|reserv|confirm|payment|cancel|address|phone|email|e-mail|date|night|guest|room|rate|policy|thank|regard|modify|portal|www\.|http|receipt|invoice|予約|確認|料金|支払/i;
   const propertyWord = /(hotel|inn|ryokan|resort|suites?|hostel|lodg(?:e|ing)|guest\s*house|aparthotel|palace|royal|plaza|hyatt|hilton|marriott|ihg|rizzan|nikko|granvia|remm|dormy|route inn|super hotel|toyoko|tokyu|park hotel|view hotel|airline|旅館|ホテル|民宿|温泉宿|ペンション|ビューグルメ|グランド|ロイヤル|パレス|プラザ)/i;
-  for (const l of lines) {
-    if (l.length < 3 || l.length > 55) continue;
-    if (!propertyWord.test(l) || noise.test(l)) continue;
-    out.title = bkStripLabel(l);
-    break;
+  const labeled = bkLabeledLine(src, 'property name|hotel name|your hotel|宿泊名|宿名|旅館名|お宿', 60);
+  if (labeled && !noise.test(labeled)) {
+    out.title = bkTrimQuote(bkStripLabel(labeled));
+  }
+  if (!out.title) {
+    for (const l of lines) {
+      if (l.length < 3 || l.length > 55) continue;
+      if (!propertyWord.test(l) || noise.test(l)) continue;
+      out.title = bkTrimQuote(bkStripLabel(l));
+      break;
+    }
   }
   if (!out.title) {
     const jp = bkClean(bkAfterLabel(src, '宿泊名|宿名|ホテル名|旅館名|お宿', 60));
-    if (jp) out.title = bkStripLabel(jp);
+    if (jp) out.title = bkTrimQuote(bkStripLabel(jp));
   }
   if (!out.title) {
     const fromM = /from\s*:\s*([^:\n]*?)(?=\s+to\s*:|$)/i.exec(src);
@@ -2841,8 +2873,13 @@ function parseBookingText(raw) {
     if (subj && !noise.test(subj)) out.title = bkStripLabel(subj);
   }
 
-  const addr = bkClean(bkAfterLabel(src, 'address|hotel address|location|住所|所在地', 90));
-  if (addr) out.location = bkStripLabel(addr).split(/\s{2,}|,\s*(?=[A-Z])/)[0].slice(0, 80);
+  // Location: an address label, or a Japanese address (postcode + text).
+  let addr = bkLabeledLine(src, 'address|hotel address|property address|location|住所|所在地', 90);
+  if (!addr) {
+    const pc = /(〒\s*\d{3}[-−]?\d{4}[^\n]{4,80})/.exec(src);
+    if (pc) addr = pc[1];
+  }
+  if (addr) out.location = bkTrimQuote(bkStripLabel(addr)).split(/\s{2,}|,\s*(?=[A-Z])/)[0].slice(0, 80);
 
   if (/\b(flight|airline|airway|ana|jal|peach|jetstar)\b/i.test(src)) out.type = 'transport';
   else if (/\b(ticket|tour|experience|activity|museum|tea ceremony|sumo)\b/i.test(src)) out.type = 'experience';
