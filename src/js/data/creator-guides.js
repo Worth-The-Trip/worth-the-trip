@@ -70,7 +70,19 @@
       heroImage: String(g.heroImage || '').replace(/^\//, ''),
       includes: g.includes || [],
       timeline: stops,
-      hotels: g.hotels || [],
+      hotels: (g.hotels || []).map(function (h) {
+        return {
+          name: h.name || '',
+          address: h.address || '',
+          city: h.city || '',
+          googleMapsUrl: h.googleMapsUrl || '',
+          directBookingUrl: h.directBookingUrl || '',
+          stay22Link: h.stay22Link || '',
+          image: h.image || '',
+          coordinates: Array.isArray(h.coordinates) ? h.coordinates : null,
+          afterIndex: Number.isFinite(Number(h.afterIndex)) ? Math.max(0, Math.floor(Number(h.afterIndex))) : null
+        };
+      }),
       subDestinations: [],
       // The app reads guide.youtubeRef for the "Watch the original trip" block.
       youtubeRef: (g.video && g.video.url) ? {

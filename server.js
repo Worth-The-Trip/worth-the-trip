@@ -2099,6 +2099,12 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
           directBookingUrl: clip(h.directBookingUrl, 500).trim(),
           stay22Link: clip(h.stay22Link, 500).trim(),
           image: clip(h.image, 400).trim(),
+          // Coordinates make a hotel a numbered map pin + nav target;
+          // afterIndex is which timeline stop it follows.
+          coordinates: (Array.isArray(h.coordinates) && h.coordinates.length === 2 &&
+            Number.isFinite(Number(h.coordinates[0])) && Number.isFinite(Number(h.coordinates[1])))
+            ? [Number(h.coordinates[0]), Number(h.coordinates[1])] : null,
+          afterIndex: Number.isFinite(Number(h.afterIndex)) ? Math.max(0, Math.floor(Number(h.afterIndex))) : null,
         };
       });
     }

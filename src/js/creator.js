@@ -56,6 +56,9 @@
       hotelDirectBooking: 'Direct booking URL (Booking.com, Expedia, etc.)',
       hotelMapsLink: 'Google Maps link (optional)', hotelBookBtn: 'Check availability',
       hotelManualHint: 'Name is filled from the link — please complete address and city manually.',
+      hotelAfter: 'Show this hotel after',
+      hotelAfterStop: 'After stop %n',
+      hotelEnd: 'End of guide',
       noHotels: 'No hotels added yet.', remove: 'Remove',
       stopTitle: 'Location name', stopDesc: 'What happens here', day: 'Day', time: 'Time',
       mapsLink: 'Google Maps link', findPin: 'Find & fill', finding: 'Finding…', pinFound: 'Pin found',
@@ -109,6 +112,9 @@
       hotelDirectBooking: '直接予約URL（Booking.com、Expediaなど）',
       hotelMapsLink: 'Googleマップリンク（任意）', hotelBookBtn: '空室を確認',
       hotelManualHint: 'リンクから名前を入力しました。住所と都市は手動で入力してください。',
+      hotelAfter: 'このホテルの表示位置',
+      hotelAfterStop: 'ストップ %n の後',
+      hotelEnd: 'ガイドの最後',
       noHotels: 'ホテルがまだ追加されていません。', remove: '削除',
       stopTitle: 'スポット名', stopDesc: 'ここでの内容', day: '日', time: '時刻',
       mapsLink: 'Googleマップのリンク', findPin: '検索して入力', finding: '検索中…', pinFound: 'ピンが見つかりました',
@@ -550,6 +556,15 @@
           googleMapsUrl: (h.googleMapsUrl || '').trim(),
           directBookingUrl: normalizeDirectBookingUrl(h.directBookingUrl || ''),
           image: (h.image || '').trim(),
+          // Coordinates make the hotel a numbered map pin + nav target;
+          // afterIndex positions it within the guide's step sequence.
+          coordinates: (function () {
+            var c = Array.isArray(h.coordinates) ? h.coordinates : (Array.isArray(h.mapPin) ? h.mapPin : null);
+            return (c && c.length === 2 && Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1])))
+              ? [Number(c[0]), Number(c[1])] : null;
+          })(),
+          afterIndex: (h.afterIndex === '' || h.afterIndex == null || !Number.isFinite(Number(h.afterIndex)))
+            ? null : Math.max(0, Math.floor(Number(h.afterIndex))),
         };
         if (out.name || out.city) {
           out.stay22Link = buildStay22Link(out.name, out.city, state.guide.id, out.directBookingUrl);
@@ -995,12 +1010,34 @@
     var list = $('#hotels-list');
     if (!list) return;
     if (!hotels.length) { list.innerHTML = ''; return; }
+    var stopCount = (state.guide.timeline || []).length;
+    // Mirrors guideSteps() in app.js: a hotel continues the guide's step
+    // numbering, or slots in after the stop the creator picked.
+    var afterKey = function (h) {
+      var ai = (h && h.afterIndex !== '' && h.afterIndex != null) ? Number(h.afterIndex) : NaN;
+      return (Number.isFinite(ai) && ai >= 0 && ai < stopCount) ? Math.floor(ai) : stopCount;
+    };
     list.innerHTML = hotels.map(function (h, i) {
+      var num = stopCount + i + 1;
+      var key = afterKey(h);
+      if (key < stopCount) {
+        num = key + 1;
+        for (var j = 0; j < i; j++) {
+          if (afterKey(hotels[j]) <= key) num++;
+        }
+      }
+      var opts = '<option value="">' + esc(t('hotelEnd')) + '</option>';
+      for (var s = 0; s < stopCount; s++) {
+        opts += '<option value="' + s + '"' + (key === s ? ' selected' : '') + '>' +
+          esc(t('hotelAfterStop').replace('%n', s + 1)) + '</option>';
+      }
       return '<div class="hotel-row" data-hotel="' + i + '">' +
-        '<div class="stop-head"><div class="stop-num hotel-num">' + (i + 1) + '</div>' +
+        '<div class="stop-head"><div class="stop-num hotel-num">' + num + '</div>' +
         '<div class="stop-name">' + esc(h.name || '(' + t('hotelName') + ')') + '</div>' +
         '<button class="btn btn-danger btn-sm" data-rmhotel="' + i + '" title="' + esc(t('remove')) + '">✕</button>' +
         '</div>' +
+        '<div class="field"><label>' + esc(t('hotelAfter')) + '</label>' +
+        '<select data-hf="afterIndex">' + opts + '</select></div>' +
         '<div class="field"><label>' + esc(t('hotelDirectBooking')) + '</label>' +
         '<input data-hf="directBookingUrl" value="' + esc(h.directBookingUrl || '') + '" placeholder="https://www.booking.com/hotel/… (extra params are stripped automatically)">' +
         '</div>' +

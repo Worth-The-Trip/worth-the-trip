@@ -922,7 +922,8 @@
     const stops = navStops(guide);
     stops.forEach((stop, idx) => {
       if (!Array.isArray(stop.mapPin)) return;
-      const pin = buildStepPin(idx + 1, idx);
+      // stop.num keeps hotel pins in the same numbering as the timeline.
+      const pin = buildStepPin(stop.num || (idx + 1), idx);
       state.mapOverlay.appendChild(pin);
       state.stepPinElements.push({ svg: pin, lngLat: [stop.mapPin[1], stop.mapPin[0]], stepIndex: idx, ax: 17, ay: 44.2 });
       if (state.map) positionPin(pin, [stop.mapPin[1], stop.mapPin[0]], 17, 44.2);
@@ -1105,15 +1106,59 @@
     return 2 * R * Math.asin(Math.sqrt(s));
   }
 
+  // One ordered list drives the timeline badges, the map pins and the
+  // navigation index, so creator-added hotels are numbered exactly like
+  // guide stops (a hotel that sits second in the guide is step 2).
+  function guideSteps(guide) {
+    const items = guide ? (guide.timeline || []) : [];
+    const hotels = guide ? (guide.hotels || []) : [];
+    const hotelByAfter = {};
+    hotels.forEach((h, hi) => {
+      const raw = (h && h.afterIndex !== '' && h.afterIndex != null) ? Number(h.afterIndex) : NaN;
+      const key = (Number.isFinite(raw) && raw >= 0 && raw < items.length) ? Math.floor(raw) : items.length;
+      (hotelByAfter[key] = hotelByAfter[key] || []).push(hi);
+    });
+    const steps = [];
+    const pushHotel = (hi, afterIndex) => steps.push(makeHotelStep(hotels[hi], hi, afterIndex));
+    items.forEach((stop, i) => {
+      steps.push({
+        kind: 'stop',
+        timelineIndex: i,
+        ref: stop,
+        mapPin: Array.isArray(stop.mapPin) ? stop.mapPin : null,
+        title: null,
+        travelTime: stop.travelTime || '',
+        afterIndex: null
+      });
+      (hotelByAfter[i] || []).forEach(hi => pushHotel(hi, i));
+    });
+    (hotelByAfter[items.length] || []).forEach(hi => pushHotel(hi, items.length));
+    steps.forEach((s, i) => { s.num = i + 1; });
+    return steps;
+  }
+
+  function makeHotelStep(h, hi, afterIndex) {
+    return {
+      kind: 'hotel',
+      hotelIndex: hi,
+      ref: h,
+      mapPin: (h && Array.isArray(h.coordinates)) ? h.coordinates : null,
+      title: (h && h.name) ? h.name : '',
+      travelTime: '',
+      afterIndex: afterIndex
+    };
+  }
+
   function navStops(guide) {
-    return (guide.timeline || []).filter(t => Array.isArray(t.mapPin));
+    return guideSteps(guide).filter(s => s.mapPin);
   }
 
   function navTargetTitle() {
     const target = navTarget();
     if (!target) return '';
+    if (target.kind === 'hotel') return target.title || '';
     const guide = guideById(state.nav.guideId);
-    const idx = guide && guide.timeline ? guide.timeline.indexOf(target) : -1;
+    const idx = guide && guide.timeline ? guide.timeline.indexOf(target.ref) : -1;
     return tlText(guide, idx, 'title');
   }
 
@@ -1164,23 +1209,42 @@
     // While navigating this guide, route the GPS line to the tapped stop.
     if (!guide || timelineIdx == null || isNaN(timelineIdx)) return;
     if (state.nav.guideId !== guide.id) return;
-    const item = (guide.timeline || [])[timelineIdx];
-    const stopIdx = navStops(guide).indexOf(item);
+    const step = guideSteps(guide).find(s => s.kind === 'stop' && s.timelineIndex === Number(timelineIdx));
+    const stopIdx = step ? navStops(guide).indexOf(step) : -1;
     if (stopIdx < 0) return;
     state.nav.stopIndex = stopIdx;
     updateNavBanner();
     updateNavRoute();
   }
 
-  function collapsePastSteps(guideId, currentTidx) {
+  function retargetNavToHotel(guide, hotelIdx) {
+    // Same as retargetNavToStop, but for a creator-added hotel step.
+    if (!guide || hotelIdx == null || isNaN(hotelIdx)) return;
+    if (state.nav.guideId !== guide.id) return;
+    const step = guideSteps(guide).find(s => s.kind === 'hotel' && s.hotelIndex === Number(hotelIdx));
+    const stopIdx = step ? navStops(guide).indexOf(step) : -1;
+    if (stopIdx < 0) return;
+    state.nav.stopIndex = stopIdx;
+    updateNavBanner();
+    updateNavRoute();
+  }
+
+  // Works out which kind of step a timeline button refers to and retargets.
+  function retargetNavFromButton(guide, btn) {
+    if (!guide || !btn) return;
+    if (btn.dataset.hotelidx != null) retargetNavToHotel(guide, parseInt(btn.dataset.hotelidx, 10));
+    else if (btn.dataset.tidx != null) retargetNavToStop(guide, parseInt(btn.dataset.tidx, 10));
+  }
+
+  function collapsePastSteps(guideId, currentNavIdx) {
     // Immediately collapse past steps so there's no flash of expanded content.
     const body = $('#nav-panel-body');
     const container = body || document;
     const items = container.querySelectorAll('.timeline-item');
     items.forEach(el => {
-      const tidxAttr = el.querySelector('.timeline-start-btn')?.dataset.tidx;
-      const tidx = tidxAttr != null ? parseInt(tidxAttr, 10) : NaN;
-      if (!isNaN(tidx) && tidx < currentTidx) {
+      const attr = el.querySelector('.timeline-start-btn')?.dataset.navidx;
+      const navIdx = attr != null ? parseInt(attr, 10) : NaN;
+      if (!isNaN(navIdx) && navIdx >= 0 && navIdx < currentNavIdx) {
         el.classList.add('past');
       } else {
         el.classList.remove('past');
@@ -1189,7 +1253,7 @@
 
     // Fade previous step pins on the map.
     state.stepPinElements.forEach(p => {
-      if (p.stepIndex < currentTidx) {
+      if (p.stepIndex < currentNavIdx) {
         p.svg.style.opacity = '0.2';
       } else {
         p.svg.style.opacity = '1';
@@ -1197,7 +1261,7 @@
     });
 
     // Scroll the current step to top after collapse is applied.
-    const currentBtn = container.querySelector('.timeline-start-btn[data-tidx="' + currentTidx + '"]');
+    const currentBtn = container.querySelector('.timeline-start-btn[data-navidx="' + currentNavIdx + '"]');
     if (currentBtn) {
       const timelineItem = currentBtn.closest('.timeline-item');
       if (timelineItem) {
@@ -1442,7 +1506,7 @@
         e.stopPropagation();
         const pin = JSON.parse(btn.dataset.pin);
         if (state.map) state.map.flyTo({ center: [pin[1], pin[0]], zoom: 16, duration: 1.2 });
-        retargetNavToStop(guide, parseInt(btn.dataset.tidx, 10));
+        retargetNavFromButton(guide, btn);
       });
     });
 
@@ -1450,8 +1514,8 @@
     body.querySelectorAll('.timeline-start-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const tidx = parseInt(btn.dataset.tidx, 10);
-        startGuideNav(guideId, tidx);
+        if (btn.dataset.hotelidx != null) startGuideNav(guideId, null, parseInt(btn.dataset.hotelidx, 10));
+        else startGuideNav(guideId, parseInt(btn.dataset.tidx, 10));
       });
     });
 
@@ -1521,7 +1585,7 @@
     // Keep the guide open — do NOT stop navigation or close the split view.
   }
 
-  function startGuideNav(guideId, startStopIndex) {
+  function startGuideNav(guideId, startStopIndex, hotelIndex) {
     const guide = guideById(guideId);
     if (!guide || !isGuideUnlocked(guideId)) {
       showToast(t('toast.unlockFirst'), 'success');
@@ -1534,11 +1598,18 @@
     stopGuideNav(true);
     state.nav.guideId = guideId;
 
-    // Convert timeline index to nav stop index if provided.
-    if (startStopIndex != null && !isNaN(startStopIndex)) {
-      const item = (guide.timeline || [])[startStopIndex];
-      const stopIdx = navStops(guide).indexOf(item);
+    // Convert a timeline index / hotel index into a nav stop index.
+    let startNavIdx = null;
+    if (hotelIndex != null && !isNaN(hotelIndex)) {
+      const step = guideSteps(guide).find(s => s.kind === 'hotel' && s.hotelIndex === Number(hotelIndex));
+      const stopIdx = step ? navStops(guide).indexOf(step) : -1;
       state.nav.stopIndex = stopIdx >= 0 ? stopIdx : 0;
+      startNavIdx = state.nav.stopIndex;
+    } else if (startStopIndex != null && !isNaN(startStopIndex)) {
+      const step = guideSteps(guide).find(s => s.kind === 'stop' && s.timelineIndex === Number(startStopIndex));
+      const stopIdx = step ? navStops(guide).indexOf(step) : -1;
+      state.nav.stopIndex = stopIdx >= 0 ? stopIdx : 0;
+      startNavIdx = state.nav.stopIndex;
     } else {
       state.nav.stopIndex = 0;
     }
@@ -1551,8 +1622,8 @@
     showStepPins(guide);
     hideGuidePins();
     // Collapse past steps after the nav panel HTML is in the DOM and painted.
-    if (startStopIndex != null) {
-      requestAnimationFrame(() => collapsePastSteps(guideId, startStopIndex));
+    if (startNavIdx != null) {
+      requestAnimationFrame(() => collapsePastSteps(guideId, startNavIdx));
     }
     setSplitView(true);
     els.navBanner.style.display = 'flex';
@@ -1572,14 +1643,14 @@
     const stops = navStops(guide);
     const target = stops[state.nav.stopIndex];
     if (state.map) {
-      if (startStopIndex != null && target && state.nav.userLngLat) {
+      if (startNavIdx != null && target && state.nav.userLngLat) {
         const bounds = new maplibregl.LngLatBounds();
         bounds.extend([state.nav.userLngLat[0], state.nav.userLngLat[1]]);
         bounds.extend([target.mapPin[1], target.mapPin[0]]);
         state.map.fitBounds(bounds, { padding: { top: 120, bottom: 160, left: 60, right: 60 }, maxZoom: 15, duration: 1.2 });
       } else if (stops.length > 0 && target) {
         state.map.flyTo({ center: [target.mapPin[1], target.mapPin[0]], zoom: 14, duration: 1.6 });
-      } else if (startStopIndex != null) {
+      } else if (startNavIdx != null) {
         showToast(t('nav.locating'), 'success');
       }
     }
@@ -1623,6 +1694,14 @@
       _tTitle: tlText(guide, i, 'title'),
       _tDesc: tlText(guide, i, 'desc'),
     }));
+    // One ordered list drives the badges, the map pins and the nav index, so
+    // creator-added hotels are numbered exactly like guide stops.
+    const steps = guideSteps(guide);
+    const navSteps = steps.filter(s => s.mapPin);
+    const stepByTimelineIndex = {};
+    steps.forEach(s => { if (s.kind === 'stop') stepByTimelineIndex[s.timelineIndex] = s; });
+    const hotelsAfter = idx => steps.filter(s => s.kind === 'hotel' && s.afterIndex === idx);
+
     const days = [];
     items.forEach((item, i) => {
       const day = item.day || 1;
@@ -1631,14 +1710,13 @@
       group.indexes.push(i);
     });
     const hotel = guide.hotelRec && guide.hotelRec.hotelStay;
-    return days.map(group => {
-      const route = group.indexes.map(i => shortStopName(items[i]._tTitle)).filter(Boolean).join(' → ');
-      let html = `
-      <div class="timeline-day"><span class="timeline-day-num">${dayLabel(group.day)}</span><span class="timeline-day-route">${route}</span></div>
-      ` + group.indexes.map(i => {
-        const item = items[i];
-        const stepNum = i + 1;
-        return `
+
+    const renderStop = i => {
+      const item = items[i];
+      const step = stepByTimelineIndex[i];
+      const stepNum = step ? step.num : (i + 1);
+      const navIdx = step ? navSteps.indexOf(step) : -1;
+      return `
         <div class="timeline-item">
           <div class="timeline-dot"></div>
           <span class="timeline-time">${item.time}</span>
@@ -1647,7 +1725,7 @@
               <div class="timeline-title-row">
                 <span class="timeline-step-num">${stepNum}</span>
                 <div class="timeline-title">${item._tTitle}</div>
-                <button class="timeline-start-btn" data-pin='${JSON.stringify(item.mapPin)}' data-tidx="${i}" aria-label="Start navigation to ${item._tTitle}">
+                <button class="timeline-start-btn"${item.mapPin ? ` data-pin='${JSON.stringify(item.mapPin)}'` : ''} data-tidx="${i}" data-navidx="${navIdx}" aria-label="Start navigation to ${item._tTitle}">
                   ${t('nav.startBtn')}
                 </button>
               </div>
@@ -1660,13 +1738,47 @@
             ${item.image ? `<img class="timeline-thumb" src="${item.image}" alt="${item._tTitle}" loading="lazy" onerror="this.style.display='none'">` : ''}
           </div>
         </div>`;
-      }).join('');
+    };
+
+    const renderHotel = s => {
+      const h = s.ref;
+      const navIdx = navSteps.indexOf(s);
+      const link = buildHotelStay22Link(h, guideId);
+      return `
+        <div class="timeline-item timeline-hotel">
+          <div class="timeline-dot"></div>
+          <span class="timeline-time"></span>
+          <div class="timeline-row">
+            <div class="timeline-text">
+              <div class="timeline-title-row">
+                <span class="timeline-step-num">${s.num}</span>
+                <div class="timeline-title">🏨 ${esc(h.name)}</div>
+                <button class="timeline-start-btn"${s.mapPin ? ` data-pin='${JSON.stringify(s.mapPin)}'` : ''} data-hotelidx="${s.hotelIndex}" data-navidx="${navIdx}" aria-label="Start navigation to ${esc(h.name)}">
+                  ${t('nav.startBtn')}
+                </button>
+              </div>
+              <div class="timeline-desc">${esc([h.address, h.city].filter(Boolean).join(' · '))}</div>
+              <div class="timeline-meta">
+                <a class="timeline-meta-btn timeline-book-btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${t('hotelRec.checkAvailability')}</a>
+                <a class="timeline-meta-btn timeline-search-btn" href="${esc(buildStay22SearchLink(h.name, h.city, guideId))}" target="_blank" rel="noopener noreferrer">${esc(t('hotelRec.searchNearby'))}</a>
+              </div>
+            </div>
+            ${h.image ? `<img class="timeline-thumb" src="${esc(h.image)}" alt="${esc(h.name)}" loading="lazy" onerror="this.style.display='none'">` : ''}
+          </div>
+        </div>`;
+    };
+
+    const html = days.map(group => {
+      const route = group.indexes.map(i => shortStopName(items[i]._tTitle)).filter(Boolean).join(' → ');
+      let out = `
+      <div class="timeline-day"><span class="timeline-day-num">${dayLabel(group.day)}</span><span class="timeline-day-route">${route}</span></div>
+      ` + group.indexes.map(i => renderStop(i) + hotelsAfter(i).map(renderHotel).join('')).join('');
 
       // Inject the hotel stay as a literal timeline step after the configured index.
       if (hotel && group.indexes.includes(hotel.afterIndex)) {
         const hr = guide.hotelRec;
         const dates = hr.checkIn && hr.checkOut ? `<span>📅 ${hr.checkIn} → ${hr.checkOut} · ${hr.guests} ${t('hotelRec.guests').toLowerCase()}</span>` : '';
-        html += `
+        out += `
           <div class="timeline-item timeline-hotel">
             <span class="timeline-time">${hotel.time}</span>
             <div class="timeline-row">
@@ -1683,28 +1795,12 @@
               <img class="timeline-thumb" src="${hr.recommended.image}" alt="${hr.recommended.name}" loading="lazy" onerror="this.style.display='none'">
             </div>
           </div>`;
-        }
-        return html;
-      }).join('') +
-      // Append creator-added hotels as timeline steps after all days.
-      (guide.hotels || []).map((h, i) => {
-        const link = buildHotelStay22Link(h, guideId);
-        return `
-        <div class="timeline-item timeline-hotel">
-          <span class="timeline-time"></span>
-          <div class="timeline-row">
-            <div class="timeline-text">
-              <div class="timeline-title">🏨 ${esc(h.name)}</div>
-              <div class="timeline-desc">${esc([h.address, h.city].filter(Boolean).join(' · '))}</div>
-              <div class="timeline-meta">
-                <a class="timeline-meta-btn timeline-book-btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${t('hotelRec.checkAvailability')}</a>
-                <a class="timeline-meta-btn timeline-search-btn" href="${esc(buildStay22SearchLink(h.name, h.city, guideId))}" target="_blank" rel="noopener noreferrer">${esc(t('hotelRec.searchNearby'))}</a>
-              </div>
-            </div>
-            ${h.image ? `<img class="timeline-thumb" src="${esc(h.image)}" alt="${esc(h.name)}" loading="lazy" onerror="this.style.display='none'">` : ''}
-          </div>
-        </div>`;
-      }).join('');
+      }
+      return out;
+    }).join('');
+
+    // Hotels with no position (or one past the last stop) close the guide.
+    return html + hotelsAfter(items.length).map(renderHotel).join('');
   }
 
   function nearestTimelineIndex(subPin, timeline) {
@@ -1784,7 +1880,7 @@
           e.stopPropagation();
           const pin = JSON.parse(btn.dataset.pin);
           state.map.flyTo({ center: [pin[1], pin[0]], zoom: 16, duration: 1.2 });
-          retargetNavToStop(guide, parseInt(btn.dataset.tidx, 10));
+          retargetNavFromButton(guide, btn);
           toast(t('toast.flyingTo') + ' ' + btn.closest('.timeline-item').querySelector('.timeline-title').textContent);
         });
       });
@@ -1793,8 +1889,8 @@
       els.modalTimelineContent.querySelectorAll('.timeline-start-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          const tidx = parseInt(btn.dataset.tidx, 10);
-          startGuideNav(guideId, tidx);
+          if (btn.dataset.hotelidx != null) startGuideNav(guideId, null, parseInt(btn.dataset.hotelidx, 10));
+          else startGuideNav(guideId, parseInt(btn.dataset.tidx, 10));
         });
       });
     } else {
@@ -3603,7 +3699,7 @@
         const pin = JSON.parse(btn.dataset.pin);
         if (closePageOnPin) closeTripsPage();
         if (state.map) state.map.flyTo({ center: [pin[1], pin[0]], zoom: 16, duration: 1.2 });
-        retargetNavToStop(guideById(guideId), parseInt(btn.dataset.tidx, 10));
+        retargetNavFromButton(guideById(guideId), btn);
         const titleEl = btn.closest('.timeline-item')?.querySelector('.timeline-title') || btn.querySelector('.sub-dest-card-title');
         showToast(t('toast.flyingTo') + ' ' + (titleEl ? titleEl.textContent : 'location'), 'success');
       });
@@ -3613,12 +3709,16 @@
     all.querySelectorAll('.timeline-start-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const tidx = parseInt(btn.dataset.tidx, 10);
         const guide = guideById(guideId);
         if (!guide) return;
 
-        // Start nav directly at this step; map centers on user if GPS available.
-        startGuideNav(guideId, tidx);
+        if (btn.dataset.hotelidx != null) {
+          // Start nav directly at this hotel step; map centers on user if GPS available.
+          startGuideNav(guideId, null, parseInt(btn.dataset.hotelidx, 10));
+        } else {
+          // Start nav directly at this step; map centers on user if GPS available.
+          startGuideNav(guideId, parseInt(btn.dataset.tidx, 10));
+        }
       });
     });
 
