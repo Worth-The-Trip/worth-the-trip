@@ -2946,6 +2946,7 @@ body.nav-immersive .drive-bar {
   display: flex;
 }
 .drive-banner {
+  display: none;
   position: fixed;
   top: var(--space-lg);
   left: var(--space-lg);
@@ -3003,6 +3004,7 @@ body.nav-immersive .drive-bar {
 }
 .drive-exit:hover { background: var(--surface-raised); color: var(--text-primary); }
 .drive-bar {
+  display: none;
   position: fixed;
   left: var(--space-lg);
   right: var(--space-lg);
