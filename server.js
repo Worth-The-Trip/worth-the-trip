@@ -2042,8 +2042,8 @@ app.get('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
 });
 
 // Update (owning creator, or any admin — admins can even edit published guides)
-app.patch('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
-  mutate(() => {
+app.patch('/api/creator/guides/:id', requireGuideEditor, async (req, res) => {
+  await mutate(async () => {
   try {
     const guides = readGuides();
     const i = guides.findIndex((g) => g.id === req.params.id);
@@ -2134,6 +2134,13 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, (req, res) => {
       g.status = 'submitted';
       g.submittedAt = g.updatedAt;
       g.reviewNote = null;
+    }
+    // A hotel with a Maps link but no pin gets one now, so a missed
+    // "Find & fill" click can never leave a hotel step without a real pin.
+    const pendingPins = (g.hotels || []).filter(h => h && !Array.isArray(h.coordinates) && typeof h.googleMapsUrl === 'string' && /^https?:\/\//i.test(h.googleMapsUrl));
+    for (const h of pendingPins) {
+      const info = await resolveMapLink(h.googleMapsUrl, 6000);
+      if (info && Array.isArray(info.coordinates)) h.coordinates = [Number(info.coordinates[0]), Number(info.coordinates[1])];
     }
     guides[i] = g;
     writeGuides(guides);
@@ -2280,6 +2287,23 @@ function extractPlaceInfo(html, finalUrl) {
   return out;
 }
 
+// Fetch a Google Maps link and read the place out of it. Returns null when the
+// link is private, offline, or simply has no pin in it.
+async function resolveMapLink(raw, timeoutMs) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs || 8000);
+  try {
+    const r = await fetch(raw, { redirect: 'follow', signal: ctl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WorthTheTrip/1.0)' } });
+    let html = '';
+    try { html = await r.text(); } catch (e) { html = ''; }
+    return extractPlaceInfo(html, r.url);
+  } catch (e) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ---- Creator: walking/driving distance + time between two pins (OSRM) ----
 async function routeBetween(fromPin, toPin) {
   if (!isLatLng(fromPin) || !isLatLng(toPin)) return null;
@@ -2309,14 +2333,8 @@ app.post('/api/creator/resolve-step', requireGuideEditor, async (req, res) => {
     return jsonError(res, 400, 'Only Google Maps links are supported');
   }
   try {
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 8000);
-    const r = await fetch(raw, { redirect: 'follow', signal: ctl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WorthTheTrip/1.0)' } });
-    clearTimeout(timer);
-    let html = '';
-    try { html = await r.text(); } catch (e) { html = ''; }
-    const info = extractPlaceInfo(html, r.url);
-    if (!info.coordinates) return jsonError(res, 404, 'Could not find a pin in that link — open the place in Maps and copy the full URL');
+    const info = await resolveMapLink(raw, 8000);
+    if (!info || !info.coordinates) return jsonError(res, 404, 'Could not find a pin in that link — open the place in Maps and copy the full URL');
     let leg = null;
     if (fromPin) leg = await routeBetween(fromPin, info.coordinates);
     res.json({ ok: true, name: info.name || '', address: info.address || '', coordinates: info.coordinates, from: fromPin, leg: leg });
@@ -2593,6 +2611,49 @@ app.get('/creator', (req, res) => {
   return res.redirect('/');
 });
 
+// A hotel the creator never pinned still has a Maps link. Resolve those in the
+// background so every hotel step can carry a real pin. Idempotent: only hotels
+// with a link and no coordinates are touched.
+function backfillHotelCoordinates() {
+  const jobs = [];
+  try {
+    for (const g of readGuides()) {
+      if (!Array.isArray(g.hotels)) continue;
+      for (const h of g.hotels) {
+        if (h && !Array.isArray(h.coordinates) && typeof h.googleMapsUrl === 'string' && /^https?:\/\//i.test(h.googleMapsUrl)) {
+          jobs.push({ guideId: g.id, url: h.googleMapsUrl });
+        }
+      }
+    }
+  } catch (e) { return; }
+  if (!jobs.length) return;
+  console.log('[WTT] backfilling hotel pins: ' + jobs.length + ' hotel(s) need a lookup');
+  (async () => {
+    let changed = 0;
+    for (const job of jobs) {
+      const info = await resolveMapLink(job.url, 6000);
+      if (!info || !Array.isArray(info.coordinates)) continue;
+      await mutate(() => {
+        const guides = readGuides();
+        const g = guides.find((x) => x.id === job.guideId);
+        if (!g || !Array.isArray(g.hotels)) return;
+        let touched = false;
+        for (const h of g.hotels) {
+          if (h && !Array.isArray(h.coordinates) && h.googleMapsUrl === job.url) {
+            h.coordinates = [Number(info.coordinates[0]), Number(info.coordinates[1])];
+            touched = true;
+          }
+        }
+        if (!touched) return;
+        g.updatedAt = new Date().toISOString();
+        writeGuides(guides);
+        changed++;
+      });
+    }
+    if (changed) console.log('[WTT] backfilled ' + changed + ' hotel pin(s)');
+  })().catch((e) => console.warn('[WTT] hotel pin backfill failed: ' + e.message));
+}
+
 // ------------------------------------------------------------------ start
 // One-time data cleanups. Idempotent, so safe to leave in: each runs only when
 // there is something to change.
@@ -2658,6 +2719,8 @@ app.use(express.static(DATA_DIR));
 // Must run after the module-level `const` declarations below are initialised.
 ensureDataFiles();
 migrateData();
+// Heal hotel pins in the background — a slow lookup must never delay startup.
+backfillHotelCoordinates();
 // Clean up stale temp/log files left behind by Node.js and SiteGround builds so
 // inode quota is not exhausted by old files that are no longer referenced.
 cleanupStaleFiles();
