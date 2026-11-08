@@ -47,6 +47,20 @@ const WTT_GUIDES = [
       "Local tips from the creator",
       "Offline access on your device"
     ],
+    "hotels": [
+      {
+        "name": "Park Hyatt Tokyo",
+        "address": "3-7-1-2 Nishi-Shinjuku, Shinjuku-ku, Tokyo 163-1055, Japan",
+        "city": "Tokyo",
+        "googleMapsUrl": "https://www.google.com/maps/place/Park+Hyatt+Tokyo/@35.6862131,139.6879025,17z/data=!3m1!4b1!4m9!3m8!1s0x6018f32cd7dab227:0x2cd8a394ca8e7d96!5m2!4m1!1i2!8m2!3d35.6862131!4d139.6904828!16s%2Fg%2F120ylk23",
+        "directBookingUrl": "https://www.booking.com/hotel/jp/park-hyatt-tokyo.html",
+        "coordinates": [
+          35.6862131,
+          139.6879025
+        ],
+        "afterIndex": 5
+      }
+    ],
     "timeline": [
       {
         "day": 1,
@@ -185,31 +199,7 @@ const WTT_GUIDES = [
     "publishedAt": "2026-10-21T09:37:47.658Z",
     "reviewedAt": "2026-10-21T09:37:47.658Z",
     "reviewNote": null,
-    "location": "Japan · Tokyo",
-    "hotelRec": {
-      "recommended": {
-        "name": "Park Hyatt Tokyo",
-        "address": "Shinjuku, Tokyo",
-        "coordinates": [35.6895, 139.6917],
-        "image": "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&q=80",
-        "checkIn": "2025-04-01",
-        "checkOut": "2025-04-04",
-        "guests": 2,
-        "stay22Link": "https://booking.stay22.com/wtt/bx5aK8oQju"
-      },
-      "alternatives": [
-        { "name": "Keio Plaza Hotel Tokyo", "image": "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400&q=80", "stay22Link": "https://allez.stay22.com/hotel/keio-plaza-tokyo" },
-        { "name": "Shinjuku Granbell Hotel", "image": "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=400&q=80", "stay22Link": "https://allez.stay22.com/hotel/shinjuku-granbell" },
-        { "name": "Tokyo Marriott", "image": "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400&q=80", "stay22Link": "https://allez.stay22.com/hotel/tokyo-marriott" }
-      ],
-      "hotelStay": {
-        "afterIndex": 5,
-        "day": 1,
-        "time": "19:30",
-        "title": "Check in — Park Hyatt Tokyo"
-      }
-    }
-  },
+    "location": "Japan · Tokyo"  },
   {
     "id": "kyoto-heritage-walk",
     "creatorId": "wtt",
@@ -258,6 +248,20 @@ const WTT_GUIDES = [
       "Best walking routes between sites",
       "Local food stops (kaiseki options)",
       "Offline map for temple hopping"
+    ],
+    "hotels": [
+      {
+        "name": "Hotel Granvia Kyoto",
+        "address": "901 Higashi-shiokoji-cho, Shimogyo-ku, Kyoto 600-8216, Japan",
+        "city": "Kyoto",
+        "googleMapsUrl": "https://www.google.com/maps/place/Hotel+Granvia+Kyoto/data=!4m2!3m1!1s0x600108aef4bc5869:0xb39dd6cf2d31fbe2",
+        "directBookingUrl": "https://www.booking.com/hotel/jp/granvia-kyoto-kyoto.html",
+        "coordinates": [
+          34.9858426,
+          135.7598191
+        ],
+        "afterIndex": 3
+      }
     ],
     "timeline": [
       {
@@ -443,6 +447,20 @@ const WTT_GUIDES = [
       "Best times to avoid food queues",
       "Offline food map"
     ],
+    "hotels": [
+      {
+        "name": "Swissotel Nankai Osaka",
+        "address": "5-1-60 Namba, Chuo-ku, Osaka 542-0076, Japan",
+        "city": "Osaka",
+        "googleMapsUrl": "https://www.google.com/maps/place/Swissotel+Nankai+Osaka/data=!4m2!3m1!1s0x6000e76b8845eae3:0x47e6c4e1571ac13d",
+        "directBookingUrl": "https://www.booking.com/hotel/jp/swissotel-nankai-osaka-osaka.html",
+        "coordinates": [
+          34.6641678,
+          135.5013282
+        ],
+        "afterIndex": 3
+      }
+    ],
     "timeline": [
       {
         "day": 1,
@@ -627,6 +645,20 @@ const WTT_GUIDES = [
       "Hot spring (onsen) recommendations",
       "Winter transport & gear tips"
     ],
+    "hotels": [
+      {
+        "name": "Sapporo View Hotel Odori Park",
+        "address": "8 Odori-Nishi, Chuo-ku, Sapporo, Hokkaido 060-0042, Japan",
+        "city": "Sapporo",
+        "googleMapsUrl": "https://www.google.com/maps/place/Sapporo+View+Hotel+Odori+Park/@43.058829,141.3449531,17z/data=!4m9!3m8!1s0x5f0b299a599e75ed:0xc98051102e770376!5m2!4m1!1i2!8m2!3d43.058829!4d141.3449531!16s%2Fg%2F11c2q58798?entry=ttu&g_ep=EgoyMDI2MTEwMy4wIKXMDSoASAFQAw%3D%3D",
+        "directBookingUrl": "https://www.booking.com/hotel/jp/tokyo-dome-sapporo.html",
+        "coordinates": [
+          43.058829,
+          141.3449531
+        ],
+        "afterIndex": 1
+      }
+    ],
     "timeline": [
       {
         "day": 1,
@@ -778,6 +810,20 @@ const WTT_GUIDES = [
       "Sunrise summit timing plan",
       "Gear checklist & rental shops",
       "Descent & onsen recovery route"
+    ],
+    "hotels": [
+      {
+        "name": "Fujisan Station Hotel",
+        "address": "2-7-12 Matsuyama, Fujiyoshida, Yamanashi 403-0016, Japan",
+        "city": "Fujiyoshida",
+        "googleMapsUrl": "https://www.google.com/maps/place/Fujisan+Station+Hotel/@35.4849415,138.7946315,17z/data=!3m1!5s0x601960cc2b7698cb:0x9eb6d6935b408f47!4m9!3m8!1s0x601960cc2a3414c5:0x323599b626c4286a!5m2!4m1!1i2!8m2!3d35.4849415!4d138.7946315!16s%2Fg%2F1tdwq49f?entry=ttu&g_ep=EgoyMDI2MTEwMy4wIKXMDSoASAFQAw%3D%3D",
+        "directBookingUrl": "https://www.booking.com/hotel/jp/fujisan-station-hotel.html",
+        "coordinates": [
+          35.4849415,
+          138.7946315
+        ],
+        "afterIndex": 1
+      }
     ],
     "timeline": [
       {
@@ -931,6 +977,20 @@ const WTT_GUIDES = [
       "Lake Ashi private cruise option",
       "Romancecar first-class rail tips"
     ],
+    "hotels": [
+      {
+        "name": "Gora Kadan",
+        "address": "1300 Gora, Hakone-machi, Ashigarashimo-gun, Kanagawa 250-0408, Japan",
+        "city": "Hakone",
+        "googleMapsUrl": "https://www.google.com/maps/place/G%C5%8Dra+Kadan/@35.2473644,139.0485614,17z/data=!4m9!3m8!1s0x6019a1ff53f7ee81:0x410784da8b30792a!5m2!4m1!1i2!8m2!3d35.2473644!4d139.0485614!16s%2Fg%2F1wbrxvd1?entry=ttu&g_ep=EgoyMDI2MTEwMy4wIKXMDSoASAFQAw%3D%3D",
+        "directBookingUrl": "https://www.booking.com/hotel/jp/gora-kadan.html",
+        "coordinates": [
+          35.2473644,
+          139.0485614
+        ],
+        "afterIndex": 1
+      }
+    ],
     "timeline": [
       {
         "day": 1,
@@ -1082,6 +1142,20 @@ const WTT_GUIDES = [
       "Hiroshima-style okonomiyaki tour",
       "Ferry schedules & IC card advice",
       "Day-trip options to Onomichi"
+    ],
+    "hotels": [
+      {
+        "name": "Mitsui Garden Hotel Hiroshima",
+        "address": "9-12 Nakamachi, Naka Ward, Hiroshima 730-0037, Japan",
+        "city": "Hiroshima",
+        "googleMapsUrl": "https://www.google.com/maps/place/Mitsui+Garden+Hotel+Hiroshima/@34.3895504,132.4567166,17z/data=!3m1!5s0x355aa211c485f31f:0x7849670396a05317!4m9!3m8!1s0x355aa211c4b09c15:0x48f5ad4cb6a40300!5m2!4m1!1i2!8m2!3d34.389546!4d132.4592915!16s%2Fg%2F1vcjk2hp",
+        "directBookingUrl": "https://www.booking.com/hotel/jp/mitsui-garden-hiroshima.html",
+        "coordinates": [
+          34.3895504,
+          132.4567166
+        ],
+        "afterIndex": 1
+      }
     ],
     "timeline": [
       {
@@ -1235,6 +1309,20 @@ const WTT_GUIDES = [
       "Ticket-machine ordering guide",
       "Late-night eating map"
     ],
+    "hotels": [
+      {
+        "name": "Dormy Inn Premium Hakata Canal City Mae",
+        "address": "9-1 Gionmachi, Hakata Ward, Fukuoka 812-0038, Japan",
+        "city": "Fukuoka",
+        "googleMapsUrl": "https://www.google.com/maps/place/Dormy+inn+PREMIUM+Hakata+Kyanal-city/@33.5906229,130.4097314,17z/data=!4m9!3m8!1s0x354191bfcbf85827:0x689f429ce43d2dd!5m2!4m1!1i2!8m2!3d33.5906185!4d130.4123063!16s%2Fg%2F1w66359d",
+        "directBookingUrl": "https://www.booking.com/hotel/jp/dormy-inn-premium-hakata-canal-city-mae.html",
+        "coordinates": [
+          33.5906229,
+          130.4097314
+        ],
+        "afterIndex": 2
+      }
+    ],
     "timeline": [
       {
         "day": 1,
@@ -1387,6 +1475,20 @@ const WTT_GUIDES = [
       "Kakinoha sushi & local eats",
       "Kyoto/Nara rail pass tips"
     ],
+    "hotels": [
+      {
+        "name": "Hotel Nikko Nara",
+        "address": "8-1 Sanjohonmachi, Nara 630-8122, Japan",
+        "city": "Nara",
+        "googleMapsUrl": "https://www.google.com/maps/place/Hotel+Nikko+Nara/@34.6815806,135.8158169,17z/data=!3m1!5s0x60013a31e297f3a1:0xa230d50ad3c0f360!4m9!3m8!1s0x600150777bcbed7b:0xb26b8abf60e80cb6!5m2!4m1!1i2!8m2!3d34.6815762!4d135.8183918!16s%2Fg%2F12283ykn",
+        "directBookingUrl": "https://www.booking.com/hotel/jp/nikko-nara.html",
+        "coordinates": [
+          34.6815806,
+          135.8158169
+        ],
+        "afterIndex": 2
+      }
+    ],
     "timeline": [
       {
         "day": 1,
@@ -1538,6 +1640,20 @@ const WTT_GUIDES = [
       "Ryukyu food & Orion beer guide",
       "Rental car route with parking tips",
       "Sunset & stargazing locations"
+    ],
+    "hotels": [
+      {
+        "name": "Rizzan Sea-Park Hotel Tancha Bay",
+        "address": "1496 Tancha, Onna, Kunigami District, Okinawa 904-0496, Japan",
+        "city": "Onna",
+        "googleMapsUrl": "https://www.google.com/maps/place/Rizzan+Sea-Park+Hotel+Tancha+Bay/@26.4631348,127.8143001,17z/data=!4m9!3m8!1s0x34e503805745373b:0xbd0d3f133a64b532!5m2!4m1!1i2!8m2!3d26.46313!4d127.816875!16s%2Fg%2F12334tc83",
+        "directBookingUrl": "https://www.booking.com/hotel/jp/rizzan-sea-park-hotel-tancha-bay.html",
+        "coordinates": [
+          26.4631348,
+          127.8143001
+        ],
+        "afterIndex": 0
+      }
     ],
     "timeline": [
       {

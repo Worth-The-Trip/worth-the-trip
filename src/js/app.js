@@ -11,10 +11,8 @@
     map: null,
     mapOverlay: null,
     pinElements: [],
-    hotelPinElements: [],
     stepPinElements: [],
     activeGuideId: null,
-    selectedHotelIdx: -1,
     tripsDetailId: null,
     travelStart: null,
     travelEnd: null,
@@ -829,20 +827,10 @@
       if (p.hidden) return;
       positionPin(p.svg, p.lngLat, p.ax, p.ay);
     });
-    state.hotelPinElements.forEach(p => {
-      positionPin(p.svg, p.lngLat, p.ax, p.ay);
-    });
     state.stepPinElements.forEach(p => {
       positionPin(p.svg, p.lngLat, p.ax, p.ay);
     });
     positionNavDot();
-  }
-
-  function clearHotelPins() {
-    state.hotelPinElements.forEach(p => {
-      if (p.svg && p.svg.parentNode) p.svg.parentNode.removeChild(p.svg);
-    });
-    state.hotelPinElements = [];
   }
 
   function hideGuidePins() {
@@ -856,40 +844,6 @@
     state.pinElements.forEach(p => {
       p.hidden = false;
       if (p.svg) p.svg.style.display = 'block';
-    });
-  }
-
-  function showHotelPins(guide, selectedIdx) {
-    clearHotelPins();
-    if (!guide.hotelRec || !state.mapOverlay) return;
-    const hotels = [guide.hotelRec.recommended, ...guide.hotelRec.alternatives];
-    hotels.forEach((hotel, idx) => {
-      if (!hotel.coordinates || !Array.isArray(hotel.coordinates)) return;
-      const isAlt = idx > 0;
-      const isSelected = selectedIdx === -1 ? idx === 0 : idx === selectedIdx;
-      const size = isAlt ? 24 : 32;
-      const svg = document.createElement('img');
-      const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">' +
-        '<circle cx="20" cy="20" r="16" fill="' + (isAlt ? '%233A6B8C' : '%23D32F2F') + '" stroke="%23fff" stroke-width="2.5"/>' +
-        '<text x="20" y="26" text-anchor="middle" fill="%23fff" font-size="16" font-weight="bold" font-family="sans-serif">H</text>' +
-        '</svg>';
-      svg.src = 'data:image/svg+xml,' + svgMarkup;
-      svg.alt = hotel.name;
-      svg.className = 'hotel-pin';
-      svg.style.position = 'absolute';
-      svg.style.width = size + 'px';
-      svg.style.height = size + 'px';
-      svg.style.pointerEvents = 'auto';
-      svg.style.cursor = 'pointer';
-      svg.style.opacity = isAlt && !isSelected ? '0.4' : '1';
-      if (isAlt) svg.style.filter = 'grayscale(20%)';
-      svg.addEventListener('click', (e) => {
-        e.stopPropagation();
-        selectHotelInGuide(guide.id, idx);
-      });
-      state.mapOverlay.appendChild(svg);
-      state.hotelPinElements.push({ svg, lngLat: [hotel.coordinates[1], hotel.coordinates[0]], ax: size / 2, ay: size });
-      if (state.map) positionPin(svg, [hotel.coordinates[1], hotel.coordinates[0]], size / 2, size);
     });
   }
 
@@ -940,21 +894,6 @@
     state.stepPinElements = [];
   }
 
-  function selectHotelInGuide(guideId, hotelIdx) {
-    const guide = guideById(guideId);
-    if (!guide || !guide.hotelRec) return;
-    state.selectedHotelIdx = hotelIdx;
-    const container = document.querySelector('.hotel-rec-section[data-guide-id="' + guideId + '"]');
-    if (container) {
-      container.querySelectorAll('.hotel-rec-pill').forEach((pill, i) => {
-        const activeIdx = hotelIdx === -1 ? 0 : hotelIdx + 1;
-        pill.classList.toggle('active', i === activeIdx);
-      });
-      updateHotelCard(guide, hotelIdx);
-    }
-    showHotelPins(guide, hotelIdx);
-  }
-
   function buildStay22Link(baseUrl, checkIn, checkOut) {
     const url = new URL(baseUrl, window.location.origin);
     const start = state.travelStart || checkIn;
@@ -997,97 +936,6 @@
     if (state.travelStart) url.searchParams.set('checkin', state.travelStart);
     if (state.travelEnd) url.searchParams.set('checkout', state.travelEnd);
     return url.toString();
-  }
-
-  function updateHotelCard(guide, hotelIdx) {
-    const card = document.getElementById('hotel-rec-card-' + guide.id);
-    if (!card || !guide.hotelRec) return;
-    const hotel = hotelIdx === -1 ? guide.hotelRec.recommended : guide.hotelRec.alternatives[hotelIdx];
-    const rec = guide.hotelRec.recommended;
-    const checkIn = hotel.checkIn || rec.checkIn;
-    const checkOut = hotel.checkOut || rec.checkOut;
-    const link = buildStay22Link(hotel.stay22Link, checkIn, checkOut);
-    card.innerHTML =
-      '<img src="' + (hotel.image || rec.image) + '" alt="' + hotel.name + '" class="hotel-rec-img">' +
-      '<div class="hotel-rec-info">' +
-        '<div class="hotel-rec-name">' + hotel.name + '</div>' +
-        '<div class="hotel-rec-address">' + (hotel.address || rec.address) + '</div>' +
-        '<div class="hotel-rec-meta">' +
-          '<span>' + (state.travelStart || checkIn) + ' → ' + (state.travelEnd || checkOut) + '</span>' +
-          '<span>' + (hotel.guests || rec.guests) + ' ' + t('hotelRec.guests') + '</span>' +
-        '</div>' +
-        '<a href="' + link + '" target="_blank" rel="noopener" class="btn-primary book-btn">' +
-          '<span class="btn-label">' + t('hotelRec.book') + '</span>' +
-          '<span class="btn-sub">' + t('hotelRec.affiliateNote') + '</span>' +
-        '</a>' +
-        '<button class="btn-ghost log-booking-btn" data-hotel-idx="' + hotelIdx + '">' +
-          '<span class="btn-label">' + t('hotelRec.logBooking') + '</span>' +
-        '</button>' +
-      '</div>';
-    const logBtn = card.querySelector('.log-booking-btn');
-    if (logBtn) {
-      logBtn.addEventListener('click', () => {
-        const idx = parseInt(logBtn.dataset.hotelIdx, 10);
-        logHotelBooking(guide.id, idx);
-      });
-    }
-  }
-
-  function logHotelBooking(guideId, hotelIdx) {
-    const guide = guideById(guideId);
-    if (!guide || !guide.hotelRec) return;
-    const hotel = hotelIdx === -1 ? guide.hotelRec.recommended : guide.hotelRec.alternatives[hotelIdx];
-    const rec = guide.hotelRec.recommended;
-    const booking = {
-      type: 'hotel',
-      title: hotel.name,
-      location: hotel.address || rec.address,
-      dateStart: state.travelStart || hotel.checkIn || rec.checkIn,
-      dateEnd: state.travelEnd || hotel.checkOut || rec.checkOut,
-      reference: '',
-      image: hotel.image || rec.image,
-      notes: 'Booked via Worth The Trip',
-      url: buildStay22Link(hotel.stay22Link, hotel.checkIn || rec.checkIn, hotel.checkOut || rec.checkOut)
-    };
-    saveUserBooking(booking);
-    showToast(t('hotelRec.logged'), 'success');
-  }
-
-  function hotelRecBlock(guide, guideId) {
-    const rec = guide.hotelRec.recommended;
-    const alts = guide.hotelRec.alternatives;
-    const checkIn = state.travelStart || rec.checkIn;
-    const checkOut = state.travelEnd || rec.checkOut;
-    const link = buildStay22Link(rec.stay22Link, rec.checkIn, rec.checkOut);
-    let html =
-      '<div class="section-label">' + t('hotelRec.title') + '</div>' +
-      '<div class="hotel-rec-section" data-guide-id="' + guideId + '">' +
-        '<div class="hotel-rec-pills">' +
-          '<button class="hotel-rec-pill active" data-hotel-idx="-1">' + rec.name + '</button>';
-    alts.forEach((alt, i) => {
-      html += '<button class="hotel-rec-pill" data-hotel-idx="' + i + '">' + alt.name + '</button>';
-    });
-    html += '</div>' +
-      '<div class="hotel-rec-card" id="hotel-rec-card-' + guideId + '">' +
-        '<img src="' + rec.image + '" alt="' + rec.name + '" class="hotel-rec-img">' +
-        '<div class="hotel-rec-info">' +
-          '<div class="hotel-rec-name">' + rec.name + '</div>' +
-          '<div class="hotel-rec-address">' + rec.address + '</div>' +
-          '<div class="hotel-rec-meta">' +
-            '<span>' + checkIn + ' → ' + checkOut + '</span>' +
-            '<span>' + rec.guests + ' ' + t('hotelRec.guests') + '</span>' +
-          '</div>' +
-          '<a href="' + link + '" target="_blank" rel="noopener" class="btn-primary book-btn">' +
-            '<span class="btn-label">' + t('hotelRec.book') + '</span>' +
-            '<span class="btn-sub">' + t('hotelRec.affiliateNote') + '</span>' +
-          '</a>' +
-          '<button class="btn-ghost log-booking-btn" data-hotel-idx="-1">' +
-            '<span class="btn-label">' + t('hotelRec.logBooking') + '</span>' +
-          '</button>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
-    return html;
   }
 
   // -------- Live navigation (GPS follow + check-in + Maps handoff) --------
@@ -1726,7 +1574,6 @@
       if (!group) { group = { day, indexes: [] }; days.push(group); }
       group.indexes.push(i);
     });
-    const hotel = guide.hotelRec && guide.hotelRec.hotelStay;
 
     const renderStop = i => {
       const item = items[i];
@@ -1790,29 +1637,6 @@
       let out = `
       <div class="timeline-day"><span class="timeline-day-num">${dayLabel(group.day)}</span><span class="timeline-day-route">${route}</span></div>
       ` + group.indexes.map(i => renderStop(i) + hotelsAfter(i).map(renderHotel).join('')).join('');
-
-      // Inject the hotel stay as a literal timeline step after the configured index.
-      if (hotel && group.indexes.includes(hotel.afterIndex)) {
-        const hr = guide.hotelRec;
-        const dates = hr.checkIn && hr.checkOut ? `<span>${hr.checkIn} → ${hr.checkOut} · ${hr.guests} ${t('hotelRec.guests').toLowerCase()}</span>` : '';
-        out += `
-          <div class="timeline-item timeline-hotel">
-            <span class="timeline-time">${hotel.time}</span>
-            <div class="timeline-row">
-              <div class="timeline-text">
-                <div class="timeline-title">${hotel.title}</div>
-                <div class="timeline-desc">${dates}</div>
-                <div class="timeline-meta">
-                  <a class="timeline-meta-btn timeline-book-btn" href="${buildStay22Link(hr.recommended.stay22Link)}" target="_blank" rel="noopener noreferrer">
-                    ${t('hotelRec.book')}
-                  </a>
-                  ${t('hotelRec.affiliateNote') ? `<span class="hotel-affiliate-note">${t('hotelRec.affiliateNote')}</span>` : ''}
-                </div>
-              </div>
-              <img class="timeline-thumb" src="${hr.recommended.image}" alt="${hr.recommended.name}" loading="lazy" onerror="this.style.display='none'">
-            </div>
-          </div>`;
-      }
       return out;
     }).join('');
 
@@ -2013,7 +1837,6 @@
     els.modalOverlay.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
     refreshSaveHearts();
-    if (guide.hotelRec) showHotelPins(guide, -1);
   }
 
   function closeModal() {
@@ -2021,7 +1844,6 @@
     els.modalOverlay.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
     state.activeGuideId = null;
-    clearHotelPins();
     clearStepPins();
   }
 
@@ -2981,10 +2803,6 @@
         hideDatesModal();
         showToast(t('dates.saved'), 'success');
         refreshMapMarkers();
-        // Refresh any open guide modal / panel with updated dates.
-        if (state.activeGuideId && guideById(state.activeGuideId) && guideById(state.activeGuideId).hotelRec) {
-          updateHotelCard(guideById(state.activeGuideId), state.selectedHotelIdx);
-        }
       } else if (start && end) {
         showToast('End date must be after start date', 'success');
       }
@@ -3739,11 +3557,6 @@
       });
     });
 
-    // Hotel recommendation pins (map markers) — still shown on map when guide is open.
-    if (guide.hotelRec && guide.hotelRec.recommended) {
-      showHotelPins(guideById(guideId) || guide, -1);
-    }
-
     // Numbered step pins (stops + hotels) so the map matches the timeline
     // even before navigation starts.
     if (guide) showStepPins(guide);
@@ -3847,7 +3660,6 @@
       try { state.map.resize(); } catch (e) {}
       setTimeout(() => { try { state.map.resize(); } catch (e) {} }, 350);
     }
-    if (guide.hotelRec) showHotelPins(guide, -1);
   }
 
   function closeGuidePanel() {
@@ -3856,7 +3668,6 @@
     const panel = $('#guide-panel-content');
     if (panel) panel.innerHTML = '';
     $('#guide-panel').setAttribute('aria-hidden', 'true');
-    clearHotelPins();
     clearStepPins();
     if (state.map) {
       try { state.map.resize(); } catch (e) {}
@@ -3966,7 +3777,6 @@
     state.tripsDetailId = null;
     $('#trips-page').classList.remove('open');
     $('#trips-page').setAttribute('aria-hidden', 'true');
-    clearHotelPins();
     clearStepPins();
     $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === 'explore'));
   }
