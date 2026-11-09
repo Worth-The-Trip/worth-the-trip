@@ -2883,7 +2883,14 @@ function matchScore(a, b) {
   const na = normForMatch(a), nb = normForMatch(b);
   if (!na || !nb) return 0;
   if (na === nb) return 1;
-  if (na.indexOf(nb) !== -1 || nb.indexOf(na) !== -1) return 0.95;
+  // A short name sitting inside a longer one ("Park Hyatt" in "Park Hyatt
+  // Tokyo") is strong evidence. A bare city name is not, so demand some
+  // substance before trusting a substring match.
+  if (na.indexOf(nb) !== -1 || nb.indexOf(na) !== -1) {
+    const shorter = na.length <= nb.length ? na : nb;
+    const tokens = shorter.split(' ').filter(t => t.length > 2).length;
+    if (shorter.length >= 8 || tokens >= 2) return 0.95;
+  }
   const ta = na.split(' ').filter(t => t.length > 2);
   const tb = nb.split(' ').filter(t => t.length > 2);
   if (!ta.length || !tb.length) return 0;
