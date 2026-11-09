@@ -9,9 +9,9 @@
 //     bookingStatus(b)    -> 'upcoming' | 'ongoing' | 'past' from dates
 //   Each booking object shape (keep stable — UI depends on it):
 //     {
-//       id: 'bk-park-hyatt-tokyo',   // unique string
+//       id: 'bk-xxxxxxxx',          // unique string
 //       type: 'hotel',               // 'hotel' | 'event' | 'experience' | 'transport'
-//       title: 'Park Hyatt Tokyo',
+//       title: 'Hotel name',
 //       location: 'Shinjuku, Tokyo',
 //       dateStart: '2026-10-12',     // ISO date
 //       dateEnd: '2026-10-15',       // ISO date (hotels/stays; omit for single-day)
