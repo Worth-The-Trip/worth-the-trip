@@ -63,8 +63,12 @@
       noHotels: 'No hotels added yet.', remove: 'Remove',
       stopTitle: 'Location name', stopDesc: 'What happens here', day: 'Day', time: 'Time',
       mapsLink: 'Google Maps link', findPin: 'Find & fill', finding: 'Finding…', pinFound: 'Pin found',
-      pinMissing: 'No pin yet — paste a Maps link and press Find & fill', clearPin: 'Clear',
+      pinMissing: 'No pin yet — paste a Maps link and press Find & fill', clearPin: 'Clear',
       requiresBooking: 'Needs a booking (hotel, ticket, reservation)',
+      bookingLinkLabel: 'Booking link',
+      bookingLinkPlaceholder: 'https://… ticket, event, flight or transport site',
+      bookingLinkHint: 'Required for steps that need a booking. Shown as a Book now button in the guide — no affiliate link, it opens the provider directly.',
+      bookingNeedsLink: 'This step needs a booking but has no booking link yet.',
       stopName: 'Location name', travelHere: 'Getting here from the previous stop',
       travelTime: 'Travel time (e.g. 15 min)', travelMode: 'How you get there',
       liveNote: 'This guide is live. Saving changes sends it back to WTT for review before it goes live again.',
@@ -121,8 +125,12 @@
       noHotels: 'ホテルがまだ追加されていません。', remove: '削除',
       stopTitle: 'スポット名', stopDesc: 'ここでの内容', day: '日', time: '時刻',
       mapsLink: 'Googleマップのリンク', findPin: '検索して入力', finding: '検索中…', pinFound: 'ピンが見つかりました',
-      pinMissing: 'ピン未設定 — リンクを貼って「検索して入力」を押してください', clearPin: 'クリア',
+      pinMissing: 'ピン未設定 — リンクを貼って「検索して入力」を押してください', clearPin: 'クリア',
       requiresBooking: '予約が必要（ホテル・チケット・予約制）',
+      bookingLinkLabel: '予約リンク',
+      bookingLinkPlaceholder: 'https://… チケット・イベント・交通の予約サイト',
+      bookingLinkHint: '予約が必要なステップに表示されます。ガイド内では「予約する」ボタンとして表示され、アフィリエイトリンクではなく提供元のサイトに移動します。',
+      bookingNeedsLink: 'このステップは予約が必要ですが、まだ予約リンクがありません。',
       stopName: 'スポット名', travelHere: '前のスポットからの移動',
       travelTime: '移動時間（例：15分）', travelMode: '移動手段',
       liveNote: 'このガイドは公開中です。変更を保存すると、再公開前にWTTの審査に戻ります。',
@@ -511,8 +519,14 @@
         MODES.map(function (m) { return '<option value="' + m + '"' + (s.travelMode === m ? ' selected' : '') + '>' + m + '</option>'; }).join('') +
         '</select></div></div>' +
 
-        '<div class="field"><label>' + esc(t('stopDesc')) + '</label><textarea data-f="desc">' + esc(s.desc || '') + '</textarea></div>' +
+        '<div class="field"><label>' + esc(t('stopDesc')) + '</label><textarea data-f="desc">' + esc(s.desc || '') + '</textarea></div>' +
+
         '<div class="field">' + bookingToggleHtml('f', i, s.requiresBooking) + '</div>' +
+        '<div class="field booking-link-field" data-bookingfield="' + i + '"' + (s.requiresBooking ? '' : ' style="display:none"') + '>' +
+        '<label>' + esc(t('bookingLinkLabel')) + '</label>' +
+        '<input data-f="bookingLink" type="url" inputmode="url" value="' + esc(s.bookingLink || '') + '" placeholder="' + esc(t('bookingLinkPlaceholder')) + '">' +
+        '<p class="hint">' + esc(t('bookingLinkHint')) + '</p>' +
+        '</div>' +
 
         '<div class="field"><label>' + esc(t('travelHere')) + '</label><input data-f="travelTime" value="' + esc(s.travelTime || '') + '" placeholder="' + esc(t('travelTime')) + '"></div>' +
 
@@ -630,6 +644,11 @@
       return Promise.reject(new Error(locErrors.join('; ')));
     }
     var patch = collect();
+    // A step flagged as needing a booking should carry a link so travellers
+    // get a Book now button. Warn, but let the creator save anyway.
+    if ((patch.timeline || []).some(function (s) { return s && s.requiresBooking && !String(s.bookingLink || '').trim(); })) {
+      toast(t('bookingNeedsLink'), true);
+    }
     var el = $('#save-state');
     if (el) el.textContent = '· ' + t('saving');
     return api('/api/creator/guides/' + state.guide.id, { method: 'PATCH', body: JSON.stringify(patch) })
@@ -900,7 +919,7 @@
 
     $('#add-stop').addEventListener('click', function () {
       syncStopsFromDOM();
-      state.guide.timeline = (state.guide.timeline || []).concat([{ day: 1, time: '', title: '', desc: '', travelTime: '', travelMode: 'walk', image: '', googleMapsUrl: '', mapPin: null }]);
+      state.guide.timeline = (state.guide.timeline || []).concat([{ day: 1, time: '', title: '', desc: '', travelTime: '', travelMode: 'walk', image: '', googleMapsUrl: '', bookingLink: '', mapPin: null }]);
       renderStops(); markDirty();
     });
 
@@ -934,6 +953,12 @@
     view.addEventListener('change', function (e) {
       if (e.target && e.target.closest && e.target.closest('.stop') && e.target.getAttribute('data-f')) {
         syncStopsFromDOM();
+      }
+      // "Needs a booking" reveals the booking-link field it requires.
+      if (e.target && e.target.getAttribute('data-f') === 'requiresBooking') {
+        var stopBox = e.target.closest('.stop');
+        var linkField = stopBox ? stopBox.querySelector('[data-bookingfield]') : null;
+        if (linkField) linkField.style.display = e.target.checked ? '' : 'none';
       }
       if (e.target && e.target.closest && e.target.closest('.hotel-row') && e.target.getAttribute('data-hf')) {
         syncHotelsFromDOM();

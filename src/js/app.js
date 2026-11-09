@@ -1939,6 +1939,7 @@
               <div class="timeline-desc">${item._tDesc}</div>
               <div class="timeline-meta">
                 <span>${travelIcon(item.travelTime)} ${item.travelTime}</span>
+                ${item.requiresBooking && item.bookingLink ? `<a class="timeline-meta-btn timeline-book-btn" href="${esc(item.bookingLink)}" target="_blank" rel="noopener noreferrer">${esc(t('booking.bookNow'))}</a>` : ''}
               </div>
               ${nearbyStripHtml(guide, i)}
             </div>

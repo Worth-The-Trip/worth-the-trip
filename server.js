@@ -2396,6 +2396,9 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, async (req, res) => {
           googleMapsUrl: clip(t.googleMapsUrl, 500).trim(),
           mapPin: isLatLng(t.mapPin) ? [Number(t.mapPin[0]), Number(t.mapPin[1])] : null,
           requiresBooking: !!t.requiresBooking,
+          // Plain provider link (event / flight / transport) — no affiliate
+          // wrapper, so it is kept exactly as the creator entered it.
+          bookingLink: clip(t.bookingLink, 500).trim(),
         });
       }
       g.timeline = out;
