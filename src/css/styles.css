@@ -526,6 +526,9 @@ body {
 .welcome-sheet {
   text-align: center;
   align-items: center;
+  /* This sheet has no .modal-body wrapper, so it needs its own inset or the
+     logo, title and buttons sit flush against the border. */
+  padding: var(--space-xl) var(--space-lg) var(--space-lg);
 }
 .welcome-logo {
   width: 72px;
