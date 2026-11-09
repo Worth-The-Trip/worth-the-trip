@@ -2423,6 +2423,40 @@ body {
   gap: var(--space-sm);
 }
 
+/* Booking coverage on hotel / ticketed steps. Deliberately quiet — it sits at
+   the right of the step, faded back so it reads as a status rather than a
+   call to action, until the traveller taps it. */
+.step-booking-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  margin-left: auto;
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: 10.5px;
+  line-height: 1.5;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.step-booking-status:hover { opacity: 1; }
+.step-booking-status svg { flex: none; }
+.step-booking-status.is-missing {
+  background: rgba(255, 109, 0, 0.13);
+  border-color: rgba(255, 109, 0, 0.42);
+  color: var(--orange);
+}
+.step-booking-status.is-booked {
+  background: rgba(46, 125, 50, 0.18);
+  border-color: rgba(46, 125, 50, 0.5);
+  color: #81c784;
+  cursor: default;
+}
+.step-booking-status.is-booked:hover { opacity: 0.8; }
+
 .timeline-start-btn {
   display: none; /* hidden in guide preview; shown only during navigation */
 }

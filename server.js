@@ -2357,6 +2357,7 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, async (req, res) => {
           image: clip(t.image, 400),
           googleMapsUrl: clip(t.googleMapsUrl, 500).trim(),
           mapPin: isLatLng(t.mapPin) ? [Number(t.mapPin[0]), Number(t.mapPin[1])] : null,
+          requiresBooking: !!t.requiresBooking,
         });
       }
       g.timeline = out;
@@ -2860,6 +2861,135 @@ app.delete('/api/guides/:id/comments/:cid', requireUserOrAdmin, async (req, res)
     return ids.length;
   });
   res.json({ ok: true, removed: removed });
+});
+
+// ---- Booking coverage on guide steps ----
+// Hotel steps always need a booking; a timeline stop needs one only when the
+// creator flags it as ticketed. A booking counts as covering a step when the
+// names line up, or when it was made at (or imported with) the same pin.
+
+function normForMatch(s) {
+  return String(s || '').toLowerCase()
+    .replace(/[^a-z0-9\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// 0..1 — how much of the shorter name's wording the other one shares.
+function matchScore(a, b) {
+  const na = normForMatch(a), nb = normForMatch(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  if (na.indexOf(nb) !== -1 || nb.indexOf(na) !== -1) return 0.95;
+  const ta = na.split(' ').filter(t => t.length > 2);
+  const tb = nb.split(' ').filter(t => t.length > 2);
+  if (!ta.length || !tb.length) return 0;
+  const setB = new Set(tb);
+  let hits = 0;
+  for (const t of ta) if (setB.has(t)) hits++;
+  return hits / Math.max(ta.length, tb.length);
+}
+
+function haversineMeters(a, b) {
+  const R = 6371000, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b[0] - a[0]), dLng = toRad(b[1] - a[1]);
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function bookingMatchesStep(booking, step) {
+  if (!booking || !step) return false;
+  if (matchScore(step.title, booking.title) >= 0.6) return true;
+  // The confirmation's address is a second opinion, but only when it carries
+  // enough wording to mean something — a bare city name would otherwise match
+  // half the stops in a guide.
+  if (normForMatch(booking.location).length >= 8 && matchScore(step.title, booking.location) >= 0.6) return true;
+  if (Array.isArray(booking.coordinates) && Array.isArray(step.mapPin)) {
+    if (haversineMeters(booking.coordinates, step.mapPin) <= 400) return true;
+  }
+  return false;
+}
+
+function bookableStepsForGuide(guide) {
+  const out = [];
+  (guide.hotels || []).forEach((h, i) => {
+    out.push({
+      key: 'hotel-' + i,
+      kind: 'hotel',
+      title: (h && h.name) || '',
+      mapPin: (h && Array.isArray(h.coordinates)) ? h.coordinates : null
+    });
+  });
+  (guide.timeline || []).forEach((s, i) => {
+    if (s && s.requiresBooking) {
+      out.push({
+        key: 'stop-' + i,
+        kind: 'stop',
+        title: s.title || '',
+        mapPin: Array.isArray(s.mapPin) ? s.mapPin : null
+      });
+    }
+  });
+  return out;
+}
+
+function guideOwners(guideId) {
+  return readUsers().filter(u => userOwnsGuide(u, guideId));
+}
+
+// The signed-in traveller's own coverage: which bookable steps they have
+// already got a booking for.
+app.get('/api/guides/:id/booking-status', (req, res) => {
+  const g = findGuide(req.params.id);
+  if (!g) return jsonError(res, 404, 'Guide not found');
+  const steps = bookableStepsForGuide(g);
+  const out = {};
+  steps.forEach(st => { out[st.key] = { booked: false }; });
+  const s = getSession(readCookie(req));
+  if (s && s.kind === 'user') {
+    const u = findUserById(s.userId);
+    if (u) {
+      const bookings = readUserBookings(u.id);
+      for (const st of steps) {
+        const hit = bookings.find(b => bookingMatchesStep(b, st));
+        if (hit) {
+          out[st.key] = {
+            booked: true,
+            bookingId: hit.id,
+            bookingTitle: hit.title,
+            bookingLocation: hit.location || ''
+          };
+        }
+      }
+    }
+  }
+  res.json({ steps: out, bookable: steps.length });
+});
+
+// Admin: for each bookable step, who owns the guide and who has not booked it.
+app.get('/api/admin/guides/:id/booking-coverage', requireAdmin, (req, res) => {
+  const g = findGuide(req.params.id);
+  if (!g) return jsonError(res, 404, 'Guide not found');
+  const steps = bookableStepsForGuide(g);
+  const owners = guideOwners(g.id).map(u => ({
+    id: u.id, email: u.email, name: u.name || u.email, bookings: readUserBookings(u.id)
+  }));
+  const rows = steps.map(st => {
+    const bookedList = [];
+    const missing = [];
+    for (const o of owners) {
+      const hit = o.bookings.find(b => bookingMatchesStep(b, st));
+      if (hit) bookedList.push({ email: o.email, name: o.name, bookingTitle: hit.title });
+      else missing.push({ email: o.email, name: o.name });
+    }
+    return {
+      key: st.key, kind: st.kind, title: st.title,
+      owners: owners.length, booked: bookedList.length,
+      bookedList: bookedList, missing: missing
+    };
+  });
+  res.json({ guideId: g.id, title: g.title, steps: rows });
 });
 
 // ---- Booking import: pull a structured booking out of a confirmation email ----

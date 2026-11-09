@@ -63,7 +63,8 @@
       noHotels: 'No hotels added yet.', remove: 'Remove',
       stopTitle: 'Location name', stopDesc: 'What happens here', day: 'Day', time: 'Time',
       mapsLink: 'Google Maps link', findPin: 'Find & fill', finding: 'Finding…', pinFound: 'Pin found',
-      pinMissing: 'No pin yet — paste a Maps link and press Find & fill', clearPin: 'Clear',
+      pinMissing: 'No pin yet — paste a Maps link and press Find & fill', clearPin: 'Clear',
+      requiresBooking: 'Needs a booking (hotel, ticket, reservation)',
       stopName: 'Location name', travelHere: 'Getting here from the previous stop',
       travelTime: 'Travel time (e.g. 15 min)', travelMode: 'How you get there',
       liveNote: 'This guide is live. Saving changes sends it back to WTT for review before it goes live again.',
@@ -120,7 +121,8 @@
       noHotels: 'ホテルがまだ追加されていません。', remove: '削除',
       stopTitle: 'スポット名', stopDesc: 'ここでの内容', day: '日', time: '時刻',
       mapsLink: 'Googleマップのリンク', findPin: '検索して入力', finding: '検索中…', pinFound: 'ピンが見つかりました',
-      pinMissing: 'ピン未設定 — リンクを貼って「検索して入力」を押してください', clearPin: 'クリア',
+      pinMissing: 'ピン未設定 — リンクを貼って「検索して入力」を押してください', clearPin: 'クリア',
+      requiresBooking: '予約が必要（ホテル・チケット・予約制）',
       stopName: 'スポット名', travelHere: '前のスポットからの移動',
       travelTime: '移動時間（例：15分）', travelMode: '移動手段',
       liveNote: 'このガイドは公開中です。変更を保存すると、再公開前にWTTの審査に戻ります。',
@@ -500,7 +502,8 @@
         MODES.map(function (m) { return '<option value="' + m + '"' + (s.travelMode === m ? ' selected' : '') + '>' + m + '</option>'; }).join('') +
         '</select></div></div>' +
 
-        '<div class="field"><label>' + esc(t('stopDesc')) + '</label><textarea data-f="desc">' + esc(s.desc || '') + '</textarea></div>' +
+        '<div class="field"><label>' + esc(t('stopDesc')) + '</label><textarea data-f="desc">' + esc(s.desc || '') + '</textarea></div>' +
+        '<div class="field"><label class="check-row"><input type="checkbox" data-f="requiresBooking"' + (s.requiresBooking ? ' checked' : '') + '> ' + esc(t('requiresBooking')) + '</label></div>' +
 
         '<div class="field"><label>' + esc(t('travelHere')) + '</label><input data-f="travelTime" value="' + esc(s.travelTime || '') + '" placeholder="' + esc(t('travelTime')) + '"></div>' +
 
@@ -520,6 +523,7 @@
       Array.prototype.forEach.call(box.querySelectorAll('[data-f]'), function (inp) {
         var f = inp.getAttribute('data-f');
         if (f === 'day') stops[i].day = Math.max(1, Number(inp.value) || 1);
+        else if (f === 'requiresBooking') stops[i].requiresBooking = inp.checked;
         else if (f !== 'googleMapsUrl') stops[i][f] = inp.value;
         else stops[i].googleMapsUrl = inp.value;
       });
@@ -919,7 +923,7 @@
       markDirty();
     });
     view.addEventListener('change', function (e) {
-      if (e.target && e.target.closest && e.target.closest('.stop') && e.target.getAttribute('data-f') === 'title') {
+      if (e.target && e.target.closest && e.target.closest('.stop') && e.target.getAttribute('data-f')) {
         syncStopsFromDOM();
       }
       markDirty();

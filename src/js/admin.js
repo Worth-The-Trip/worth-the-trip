@@ -123,6 +123,65 @@
       const panel = document.getElementById('panel-' + t.dataset.tab);
       if (panel) panel.style.display = (t.dataset.tab === name) ? 'block' : 'none';
     });
+    if (name === 'bookings') renderCoverage();
+  }
+
+  // ---- Booking coverage: who has (and has not) booked each hotel/ticketed step ----
+  let coverageGuideId = '';
+
+  async function renderCoverage() {
+    const el = $('#panel-bookings');
+    if (!el) return;
+    const guides = guidesCache.filter((g) => g.status === 'published');
+    if (!guides.length) { el.innerHTML = '<div class="card"><p class="empty">No published guides yet.</p></div>'; return; }
+    if (!coverageGuideId || !guides.some((g) => g.id === coverageGuideId)) coverageGuideId = guides[0].id;
+    el.innerHTML = '<div class="card"><div class="field"><label>Guide</label><select id="coverage-guide">' +
+      guides.map((g) => '<option value="' + esc(g.id) + '"' + (g.id === coverageGuideId ? ' selected' : '') + '>' +
+        esc(g.title || g.id) + '</option>').join('') +
+      '</select></div><div id="coverage-body"><p class="empty">Loading…</p></div></div>';
+    $('#coverage-guide').addEventListener('change', (e) => {
+      coverageGuideId = e.target.value;
+      loadCoverage();
+    });
+    await loadCoverage();
+  }
+
+  async function loadCoverage() {
+    const body = $('#coverage-body');
+    if (!body) return;
+    try {
+      const d = await api('/api/admin/guides/' + encodeURIComponent(coverageGuideId) + '/booking-coverage');
+      if (!d.steps || !d.steps.length) {
+        body.innerHTML = '<p class="empty">No hotel or ticketed steps in this guide.</p>';
+        return;
+      }
+      let h = '';
+      d.steps.forEach((st) => {
+        const pct = st.owners ? Math.round((100 * st.booked) / st.owners) : 0;
+        const colour = pct >= 80 ? '#2e7d32' : pct >= 50 ? '#ff6d00' : '#c62828';
+        h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:10px">' +
+          '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">' +
+            '<div><strong>' + esc(st.title) + '</strong> <span class="sub">' +
+              (st.kind === 'hotel' ? 'Hotel' : 'Ticketed stop') + '</span></div>' +
+            '<div class="sub">' + st.booked + ' / ' + st.owners + ' booked</div>' +
+          '</div>' +
+          '<div style="height:6px;border-radius:999px;background:var(--muted);margin-top:8px;overflow:hidden">' +
+            '<div style="height:100%;width:' + pct + '%;background:' + colour + '"></div>' +
+          '</div>';
+        if (st.missing.length) {
+          h += '<div style="margin-top:8px"><span class="sub">Not booked (' + st.missing.length + '):</span> ' +
+            st.missing.map((m) => '<span class="pill orange">' + esc(m.name || m.email) + '</span>').join(' ') + '</div>';
+        }
+        if (st.bookedList.length) {
+          h += '<div style="margin-top:6px"><span class="sub">Booked:</span> ' +
+            st.bookedList.map((m) => '<span class="pill green">' + esc(m.name || m.email) + '</span>').join(' ') + '</div>';
+        }
+        h += '</div>';
+      });
+      body.innerHTML = h;
+    } catch (e) {
+      body.innerHTML = '<p class="empty">Could not load coverage: ' + esc(e.message) + '</p>';
+    }
   }
 
   function renderUsers(users) {

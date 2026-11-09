@@ -20,6 +20,7 @@
     unlockedGuides: loadUnlocked(),
     savedGuides: loadSavedGuides(),
     bookings: [],
+    guideBookingStatus: {},
     activeFilter: 'all',
     searchQuery: '',
     diagnosticShown: false,
@@ -1930,6 +1931,7 @@
               <div class="timeline-title-row">
                 <span class="timeline-step-num">${stepNum}</span>
                 <div class="timeline-title">${item._tTitle}</div>
+                ${item.requiresBooking ? bookingStatusHtml('stop-' + i) : ''}
                 <button class="timeline-start-btn"${item.mapPin ? ` data-pin='${JSON.stringify(item.mapPin)}'` : ''} data-tidx="${i}" data-navidx="${navIdx}" aria-label="Start navigation to ${item._tTitle}">
                   ${t('nav.startBtn')}
                 </button>
@@ -1958,6 +1960,7 @@
               <div class="timeline-title-row">
                 <span class="timeline-step-num">${s.num}</span>
                 <div class="timeline-title">${esc(h.name)}</div>
+                ${bookingStatusHtml('hotel-' + s.hotelIndex)}
                 <button class="timeline-start-btn"${s.mapPin ? ` data-pin='${JSON.stringify(s.mapPin)}'` : ''} data-hotelidx="${s.hotelIndex}" data-navidx="${navIdx}" aria-label="Start navigation to ${esc(h.name)}">
                   ${t('nav.startBtn')}
                 </button>
@@ -2009,6 +2012,72 @@
   }
 
   // -------- Modal: open guide --------
+  // A hotel step, or a stop the creator flagged as ticketed, carries a small
+  // badge: amber with an "Add booking" prompt until the traveller has a
+  // matching booking, green once one is detected.
+  function bookingStatusHtml(key) {
+    const st = (state.guideBookingStatus || {})[key];
+    if (st && st.booked) {
+      return '<span class="step-booking-status is-booked" title="' +
+        esc(t('bookStatus.booked') + (st.bookingTitle ? ': ' + st.bookingTitle : '')) + '">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' +
+        '<span class="sbs-label">' + esc(t('bookStatus.booked')) + '</span>' +
+      '</span>';
+    }
+    return '<button type="button" class="step-booking-status is-missing" data-add-booking="' + esc(key) + '"' +
+      ' title="' + esc(t('bookStatus.required')) + '">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
+      '<span class="sbs-label">' + esc(t('bookStatus.add')) + '</span>' +
+    '</button>';
+  }
+
+  // Renders the modal timeline and wires its buttons. Called on open and again
+  // when the booking-coverage fetch lands.
+  function renderModalTimeline(guide, guideId) {
+    const box = els.modalTimelineContent;
+    if (!box) return;
+    box.innerHTML = timelineHtml(guide, guideId);
+
+    box.querySelectorAll('[data-pin]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pin = JSON.parse(btn.dataset.pin);
+        state.map.flyTo({ center: [pin[1], pin[0]], zoom: 16, duration: 1.2 });
+        retargetNavFromButton(guide, btn);
+        toast(t('toast.flyingTo') + ' ' + btn.closest('.timeline-item').querySelector('.timeline-title').textContent);
+      });
+    });
+
+    // Start navigation from a specific timeline step in the modal.
+    box.querySelectorAll('.timeline-start-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (btn.dataset.hotelidx != null) startGuideNav(guideId, null, parseInt(btn.dataset.hotelidx, 10));
+        else startGuideNav(guideId, parseInt(btn.dataset.tidx, 10));
+      });
+    });
+  }
+
+  // Which hotel / ticketed steps the traveller already has a booking for.
+  function loadGuideBookingStatus(guideId) {
+    if (!guideId) return;
+    fetch('/api/guides/' + encodeURIComponent(guideId) + '/booking-status', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        state.guideBookingStatus = (d && d.steps) || {};
+        const g = guideById(guideId);
+        if (!g) return;
+        // Only repaint whatever is still on screen for this guide.
+        if (state.activeGuideId === guideId && els.modalTimeline && els.modalTimeline.style.display !== 'none') {
+          renderModalTimeline(g, guideId);
+        }
+        if (state.nav && state.nav.guideId === guideId && document.body.classList.contains('nav-split')) {
+          renderNavPanel(guideId);
+        }
+      })
+      .catch(() => { /* coverage is a nicety — never block the modal */ });
+  }
+
   function openGuideModal(guideId) {
     console.log('[WTT] openGuideModal called with:', guideId);
     const guide = guideById(guideId);
@@ -2061,26 +2130,8 @@
 
     if (unlocked && guide.timeline) {
       els.modalTimeline.style.display = 'block';
-      els.modalTimelineContent.innerHTML = timelineHtml(guide, guideId);
-
-      els.modalTimelineContent.querySelectorAll('[data-pin]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const pin = JSON.parse(btn.dataset.pin);
-          state.map.flyTo({ center: [pin[1], pin[0]], zoom: 16, duration: 1.2 });
-          retargetNavFromButton(guide, btn);
-          toast(t('toast.flyingTo') + ' ' + btn.closest('.timeline-item').querySelector('.timeline-title').textContent);
-        });
-      });
-
-      // Start navigation from a specific timeline step in the modal.
-      els.modalTimelineContent.querySelectorAll('.timeline-start-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (btn.dataset.hotelidx != null) startGuideNav(guideId, null, parseInt(btn.dataset.hotelidx, 10));
-          else startGuideNav(guideId, parseInt(btn.dataset.tidx, 10));
-        });
-      });
+      renderModalTimeline(guide, guideId);
+      loadGuideBookingStatus(guideId);
     } else {
       els.modalTimeline.style.display = 'none';
     }
@@ -4557,6 +4608,12 @@
 
   // Opening a booking, and the two buttons inside its detail page.
   document.addEventListener('click', (e) => {
+    const addBtn = e.target.closest('[data-add-booking]');
+    if (addBtn) {
+      e.stopPropagation();
+      openImportModal();
+      return;
+    }
     const delBtn = e.target.closest('[data-del-booking]');
     if (delBtn) {
       e.stopPropagation();
