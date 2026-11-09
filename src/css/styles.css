@@ -1895,8 +1895,8 @@ body {
 .nav-panel::-webkit-scrollbar,
 #admin-view .modal::-webkit-scrollbar,
 #assign-guides-modal .modal::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 .modal-sheet::-webkit-scrollbar-track,
