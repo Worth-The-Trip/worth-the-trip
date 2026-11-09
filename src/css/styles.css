@@ -4058,7 +4058,11 @@ a.creator-plat:hover {
   .trips-topbar-actions .btn span { display: none; }
   .trips-topbar-actions .btn { padding: 8px 10px; }
 }
-/* On/off switch — creator studio "needs a booking" toggle */
+/* On/off switch — creator studio "needs a booking" toggle.
+   creator.html carries its own inline stylesheet that styles .field input and
+   .field label directly. Those rules land later in source order, so the switch
+   rules are scoped to .field as well and win on specificity — otherwise the
+   hidden checkbox renders as a full-width bordered box over the label. */
 .switch-row {
   display: flex;
   align-items: center;
@@ -4066,17 +4070,32 @@ a.creator-plat:hover {
   margin: 2px 0 4px;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 400;
   color: var(--text-secondary);
   user-select: none;
 }
-.switch-row input {
+.field .switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 4px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+.switch-row input,
+.field .switch-row input {
   position: absolute;
   opacity: 0;
   width: 1px;
   height: 1px;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
   overflow: hidden;
 }
-.switch {
+.switch,
+.field .switch {
   position: relative;
   flex: none;
   width: 38px;
@@ -4085,7 +4104,8 @@ a.creator-plat:hover {
   background: var(--stone);
   transition: background var(--duration-fast) var(--ease-out);
 }
-.switch::after {
+.switch::after,
+.field .switch::after {
   content: '';
   position: absolute;
   top: 3px;
@@ -4096,7 +4116,11 @@ a.creator-plat:hover {
   background: #fff;
   transition: transform var(--duration-fast) var(--ease-out);
 }
-.switch-row input:checked + .switch { background: var(--vermilion); }
-.switch-row input:checked + .switch::after { transform: translateX(16px); }
-.switch-row input:focus-visible + .switch { outline: 2px solid var(--vermilion); outline-offset: 2px; }
-.switch-text { line-height: 1.35; }
+.switch-row input:checked + .switch,
+.field .switch-row input:checked + .switch { background: var(--vermilion); }
+.switch-row input:checked + .switch::after,
+.field .switch-row input:checked + .switch::after { transform: translateX(16px); }
+.switch-row input:focus-visible + .switch,
+.field .switch-row input:focus-visible + .switch { outline: 2px solid var(--vermilion); outline-offset: 2px; }
+.switch-text,
+.field .switch-text { line-height: 1.35; }
