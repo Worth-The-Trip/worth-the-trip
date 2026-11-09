@@ -1496,8 +1496,8 @@ app.get('/api/users/:id', requireAdmin, (req, res) => {
 
 app.patch('/api/users/:id', requireAdmin, (req, res) => {
   mutate(() => {
-  const u = findUserById(req.params.id);
-  if (!u) return jsonError(res, 404, 'User not found');
+    const u = findUserById(req.params.id);
+    if (!u) return jsonError(res, 404, 'User not found');
   const body = req.body || {};
   if (body.name !== undefined) { if (!body.name.trim()) return jsonError(res, 400, 'Name is required'); u.name = body.name.trim(); }
   if (body.email !== undefined) {
@@ -1531,6 +1531,28 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
   if (i >= 0) users[i] = u;
   writeLines(AUTH_FILE, users);
   res.json({ ok: true, avatar: u.avatar });
+  });
+});
+
+// Removing an account takes its content with it. Purchases stay: they are the
+// Stripe-side record a refund or receipt still needs, and they no longer point
+// at a live login.
+app.delete('/api/users/:id', requireAdmin, (req, res) => {
+  mutate(() => {
+    const u = findUserById(req.params.id);
+    if (!u) return jsonError(res, 404, 'User not found');
+    const id = String(u.id);
+    const d = db();
+    d.prepare('DELETE FROM bookings WHERE user_id = ?').run(id);
+    d.prepare('DELETE FROM guide_comments WHERE user_id = ?').run(id);
+    d.prepare('DELETE FROM guide_comment_votes WHERE user_id = ?').run(id);
+    d.prepare('DELETE FROM guide_ratings WHERE user_id = ?').run(id);
+    writeLines(AUTH_FILE, readUsers().filter(x => String(x.id) !== id));
+    writeLines(SESSIONS_FILE, readSessions().filter(s => String(s.userId) !== id));
+    writeLines(FREE_CLAIMS_FILE, readFreeClaims().filter(c => String(c.userId) !== id));
+    const avatar = path.join(AVATAR_DIR, u.id + path.extname(u.avatar || ''));
+    try { fs.unlinkSync(avatar); } catch (e) { /* never blocked by a missing file */ }
+    res.json({ ok: true });
   });
 });
 
