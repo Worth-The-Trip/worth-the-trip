@@ -74,6 +74,8 @@
 
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.62); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
     .modal { width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+    /* The guide picker shows a four-column table, so it needs more room. */
+    #assign-guides-modal .modal { max-width: 780px; }
     .modal h2 { margin: 0 0 14px; font-size: 19px; }
     .modal .hint { color: var(--muted-foreground); font-size: 13px; font-weight: 400; }
   </style>
