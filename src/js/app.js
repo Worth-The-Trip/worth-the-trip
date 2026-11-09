@@ -4518,6 +4518,9 @@
     const hasCoords = Array.isArray(b.coordinates) && b.coordinates.length === 2;
     $('#booking-detail-navigate').disabled = !hasCoords;
     $('#booking-detail-navhint').textContent = hasCoords ? '' : t('bookingDetail.noCoords');
+    // Static demo bookings are not stored on the account, so there is nothing
+    // to delete.
+    $('#booking-detail-delete').style.display = b.source ? '' : 'none';
     const m = $('#booking-detail-modal');
     m.classList.add('active');
     m.setAttribute('aria-hidden', 'false');
