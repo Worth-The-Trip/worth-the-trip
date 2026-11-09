@@ -3758,6 +3758,97 @@ a.creator-plat:hover {
   align-self: flex-end;
 }
 
+/* ---- Replies, voting, moderation ---- */
+.comment-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.comment-vote {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
+}
+.comment-vote:hover { color: var(--text-primary); }
+.comment-vote .arrow { font-size: 9px; }
+.comment-vote.on {
+  border-color: var(--vermilion);
+  color: var(--vermilion);
+  background: rgba(211, 47, 47, 0.1);
+}
+.comment-down.on {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+.comment-action {
+  padding: 2px 6px;
+  font-size: 11px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.comment-action:hover { color: var(--text-primary); }
+.comment-delete { color: #ef4444; }
+.comment-delete:hover { color: #f87171; }
+
+/* Nested replies: indented with a vermilion rail instead of a card. */
+.comment-children {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  min-width: 0;
+}
+.comment-children.collapsed { display: none; }
+.comment-reply {
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-left: 2px solid var(--vermilion);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+.comment-thread-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 2px 0;
+  font-size: 11px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.comment-thread-toggle:hover { color: var(--text-primary); }
+.comment-thread-toggle .twisty { font-size: 9px; }
+
+.comment-form-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+.comment-form-row .btn-primary,
+.comment-form-row .btn-ghost {
+  padding: 7px 14px;
+  font-size: 12px;
+}
+.comment-reply-form textarea { min-height: 64px; }
+
 /* ============================================================
    IMPORT A BOOKING (paste / forward / calendar / photo)
    ============================================================ */

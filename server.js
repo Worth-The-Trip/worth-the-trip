@@ -89,6 +89,8 @@ if (!ADMIN_PASSWORD) {
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '__STRIPE_NO_KEY__';
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '__STRIPE_WEBHOOK_NO_KEY__';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+// Reply chains nest this deep, then the server refuses to go deeper.
+const COMMENT_MAX_DEPTH = 5;
 
 // ---- Creator guides ----
 const PRICE_MIN = 100;   // ¥ — creator guide price floor
@@ -530,9 +532,19 @@ CREATE TABLE IF NOT EXISTS guide_comments (
   user_id TEXT NOT NULL DEFAULT '',
   user_name TEXT NOT NULL DEFAULT '',
   body TEXT NOT NULL DEFAULT '',
+  parent_id TEXT NOT NULL DEFAULT '',
+  upvotes INTEGER NOT NULL DEFAULT 0,
+  downvotes INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_guide_comments_guide ON guide_comments (guide_id);
+-- One vote per user per comment. Re-tapping a vote retracts it.
+CREATE TABLE IF NOT EXISTS guide_comment_votes (
+  comment_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  value INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (comment_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS bookings (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -557,6 +569,18 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 `;
 
+// Add a column to an existing table if it is missing. Needed because
+// CREATE TABLE IF NOT EXISTS leaves older installs on their original shape.
+function migrateColumn(table, column, definition) {
+  try {
+    const cols = _db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
+    if (cols.indexOf(column) === -1) {
+      console.log(`[WTT] migrate: ${table}.${column}`);
+      _db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
+    }
+  } catch (e) { /* table absent yet — SCHEMA creates it above */ }
+}
+
 function db() {
   if (_db) return _db;
   let DatabaseSync;
@@ -576,12 +600,10 @@ function db() {
   _db.exec(SCHEMA);
   // Older installs predate some columns; add them in place rather than relying
   // on CREATE TABLE IF NOT EXISTS, which never alters an existing table.
-  try {
-    const cols = _db.prepare('PRAGMA table_info(bookings)').all().map(c => c.name);
-    if (cols.indexOf('coordinates') === -1) {
-      _db.prepare("ALTER TABLE bookings ADD COLUMN coordinates TEXT NOT NULL DEFAULT ''").run();
-    }
-  } catch (e) { /* no bookings table yet — SCHEMA created it above */ }
+  migrateColumn('bookings', 'coordinates', "TEXT NOT NULL DEFAULT ''");
+  migrateColumn('guide_comments', 'parent_id', "TEXT NOT NULL DEFAULT ''");
+  migrateColumn('guide_comments', 'upvotes', 'INTEGER NOT NULL DEFAULT 0');
+  migrateColumn('guide_comments', 'downvotes', 'INTEGER NOT NULL DEFAULT 0');
   importLegacy(_db);
   return _db;
 }
@@ -885,8 +907,26 @@ function findGuide(id) { return readGuides().find((g) => g.id === id); }
 function readRatings(guideId) {
   return db().prepare('SELECT guide_id, user_id, stars, created_at, updated_at FROM guide_ratings WHERE guide_id = ?').all(guideId);
 }
-function readComments(guideId) {
-  return db().prepare('SELECT id, guide_id AS guideId, user_id AS userId, user_name AS userName, body, created_at AS createdAt FROM guide_comments WHERE guide_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 200').all(guideId);
+// Comments come back oldest-first (forum order) with the viewer's own vote
+// attached, so the client can render the tree and the vote state in one pass.
+function readComments(guideId, viewerId) {
+  const rows = db().prepare(`SELECT id, guide_id AS guideId, user_id AS userId, user_name AS userName, body,
+      parent_id AS parentId, upvotes, downvotes, created_at AS createdAt
+    FROM guide_comments WHERE guide_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 500`).all(guideId);
+  const mine = {};
+  if (viewerId && rows.length) {
+    const ids = rows.map(r => r.id);
+    const ph = ids.map(() => '?').join(',');
+    db().prepare(`SELECT comment_id, value FROM guide_comment_votes WHERE user_id = ? AND comment_id IN (${ph})`)
+      .all(viewerId, ...ids)
+      .forEach(v => { mine[v.comment_id] = Number(v.value) || 0; });
+  }
+  return rows.map(r => Object.assign({}, r, {
+    parentId: r.parentId || '',
+    upvotes: Number(r.upvotes) || 0,
+    downvotes: Number(r.downvotes) || 0,
+    myVote: mine[r.id] || 0
+  }));
 }
 function ratingStats(guideId) {
   const rows = readRatings(guideId);
@@ -1309,6 +1349,25 @@ function requireUser(req, res, next) {
   next();
 }
 function jsonError(res, status, msg) { res.status(status).json({ error: msg }); }
+// Signed-in user OR signed-in admin. Used where either may act (comment
+// moderation), since the admin session has no user record.
+function requireUserOrAdmin(req, res, next) {
+  const token = readCookie(req);
+  const s = token ? getSession(token) : null;
+  if (!s) return jsonError(res, 401, 'Not logged in');
+  if (s.kind === 'user') {
+    req.user = findUserById(s.userId);
+    if (!req.user) return jsonError(res, 401, 'User no longer exists');
+    if (req.user.banned) return jsonError(res, 403, 'This account has been banned.');
+    req.isAdmin = false;
+  } else if (s.kind === 'admin') {
+    req.user = null;
+    req.isAdmin = true;
+  } else {
+    return jsonError(res, 401, 'Not logged in');
+  }
+  next();
+}
 // Never echo an API key back to the browser — Stripe's own messages include the
 // masked key, and a raw key could appear too.
 function redactKeys(msg) {
@@ -2710,7 +2769,13 @@ app.post('/api/guides/:id/ratings', requireUser, (req, res) => {
 app.get('/api/guides/:id/comments', (req, res) => {
   const g = findGuide(req.params.id);
   if (!g) return jsonError(res, 404, 'Guide not found');
-  res.json({ comments: readComments(g.id) });
+  const s = getSession(readCookie(req));
+  const viewerId = s && s.kind === 'user' ? s.userId : '';
+  res.json({
+    comments: readComments(g.id, viewerId),
+    isAdmin: !!(s && s.kind === 'admin'),
+    myUserId: viewerId
+  });
 });
 
 app.post('/api/guides/:id/comments', requireUser, (req, res) => {
@@ -2718,14 +2783,83 @@ app.post('/api/guides/:id/comments', requireUser, (req, res) => {
   if (!g) return jsonError(res, 404, 'Guide not found');
   const body = clip((req.body || {}).body, 1200).trim();
   if (!body) return jsonError(res, 400, 'Comment cannot be empty');
+  const parentId = clip((req.body || {}).parentId, 40);
+  if (parentId) {
+    // A reply must point at a comment on this guide, and threads stop at
+    // COMMENT_MAX_DEPTH so a runaway chain cannot nest without end.
+    let parent = null, depth = 0, guard = 0;
+    let cur = db().prepare('SELECT id, guide_id, parent_id FROM guide_comments WHERE id = ?').get(parentId);
+    while (cur && guard++ < 50) {
+      if (cur.guide_id !== g.id) return jsonError(res, 400, 'Reply parent not found');
+      depth++;
+      parent = cur;
+      cur = cur.parent_id ? db().prepare('SELECT id, guide_id, parent_id FROM guide_comments WHERE id = ?').get(cur.parent_id) : null;
+    }
+    if (!parent) return jsonError(res, 400, 'Reply parent not found');
+    if (depth >= COMMENT_MAX_DEPTH) return jsonError(res, 400, 'Reply threads are limited to ' + COMMENT_MAX_DEPTH + ' levels');
+  }
   const now = new Date().toISOString();
   const name = clip((req.user && (req.user.name || req.user.email)) || 'Traveller', 80);
   const id = 'c_' + crypto.randomBytes(8).toString('hex');
-  db().prepare('INSERT INTO guide_comments (id, guide_id, user_id, user_name, body, created_at) VALUES (?,?,?,?,?,?)')
-    .run(id, g.id, req.user.id, name, body, now);
+  db().prepare('INSERT INTO guide_comments (id, guide_id, user_id, user_name, body, parent_id, created_at) VALUES (?,?,?,?,?,?,?)')
+    .run(id, g.id, req.user.id, name, body, parentId, now);
   res.status(201).json({
-    comment: { id: id, guideId: g.id, userId: req.user.id, userName: name, body: body, createdAt: now }
+    comment: { id: id, guideId: g.id, userId: req.user.id, userName: name, body: body, parentId: parentId, upvotes: 0, downvotes: 0, myVote: 0, createdAt: now }
   });
+});
+
+// Upvote / downvote. Tapping the same direction again retracts the vote;
+// tapping the other direction switches it. One vote per account per comment.
+app.post('/api/guides/:id/comments/:cid/vote', requireUser, async (req, res) => {
+  const g = findGuide(req.params.id);
+  if (!g) return jsonError(res, 404, 'Guide not found');
+  const c = db().prepare('SELECT id, guide_id FROM guide_comments WHERE id = ?').get(req.params.cid);
+  if (!c || c.guide_id !== g.id) return jsonError(res, 404, 'Comment not found');
+  const v = Number((req.body || {}).value);
+  if (v !== 1 && v !== -1) return jsonError(res, 400, 'Vote must be 1 or -1');
+  const existing = db().prepare('SELECT value FROM guide_comment_votes WHERE comment_id = ? AND user_id = ?').get(c.id, req.user.id);
+  const cur = existing ? Number(existing.value) : 0;
+  const next = (cur === v) ? 0 : v;
+  const counts = await mutate(() => {
+    if (next === 0) {
+      db().prepare('DELETE FROM guide_comment_votes WHERE comment_id = ? AND user_id = ?').run(c.id, req.user.id);
+    } else {
+      db().prepare(`INSERT INTO guide_comment_votes (comment_id, user_id, value) VALUES (?,?,?)
+        ON CONFLICT(comment_id, user_id) DO UPDATE SET value = excluded.value`).run(c.id, req.user.id, next);
+    }
+    const up = db().prepare('SELECT COUNT(*) AS n FROM guide_comment_votes WHERE comment_id = ? AND value = 1').get(c.id).n;
+    const down = db().prepare('SELECT COUNT(*) AS n FROM guide_comment_votes WHERE comment_id = ? AND value = -1').get(c.id).n;
+    db().prepare('UPDATE guide_comments SET upvotes = ?, downvotes = ? WHERE id = ?').run(up, down, c.id);
+    return { up: Number(up) || 0, down: Number(down) || 0 };
+  });
+  res.json({ ok: true, myVote: next, upvotes: counts.up, downvotes: counts.down });
+});
+
+// Admins moderate; authors may remove their own. Deleting a parent takes its
+// whole reply chain with it.
+app.delete('/api/guides/:id/comments/:cid', requireUserOrAdmin, async (req, res) => {
+  const g = findGuide(req.params.id);
+  if (!g) return jsonError(res, 404, 'Guide not found');
+  const c = db().prepare('SELECT id, guide_id, user_id FROM guide_comments WHERE id = ?').get(req.params.cid);
+  if (!c || c.guide_id !== g.id) return jsonError(res, 404, 'Comment not found');
+  if (!req.isAdmin && c.user_id !== (req.user && req.user.id)) {
+    return jsonError(res, 403, 'You can only delete your own comments');
+  }
+  const removed = await mutate(() => {
+    const ids = [c.id];
+    let grew = true;
+    while (grew) {
+      grew = false;
+      const ph = ids.map(() => '?').join(',');
+      db().prepare(`SELECT id FROM guide_comments WHERE parent_id IN (${ph})`).all(...ids)
+        .forEach(k => { if (ids.indexOf(k.id) === -1) { ids.push(k.id); grew = true; } });
+    }
+    const ph = ids.map(() => '?').join(',');
+    db().prepare(`DELETE FROM guide_comment_votes WHERE comment_id IN (${ph})`).run(...ids);
+    db().prepare(`DELETE FROM guide_comments WHERE id IN (${ph})`).run(...ids);
+    return ids.length;
+  });
+  res.json({ ok: true, removed: removed });
 });
 
 // ---- Booking import: pull a structured booking out of a confirmation email ----

@@ -2286,32 +2286,199 @@
     } catch (e) { return ''; }
   }
 
+  let commentsGuide = null;
+  let commentsCtx = { isAdmin: false, myUserId: '' };
+
+  // Flat oldest-first list -> nested tree. Anything whose parent is missing
+  // (deleted, or not in the 500 most recent) is promoted to a top-level item
+  // rather than dropped.
+  function buildCommentTree(list) {
+    const byId = {};
+    list.forEach(c => { byId[c.id] = Object.assign({}, c, { children: [] }); });
+    const roots = [];
+    for (const c of list) {
+      const node = byId[c.id];
+      const pid = c.parentId || '';
+      if (pid && byId[pid]) byId[pid].children.push(node);
+      else roots.push(node);
+    }
+    return roots;
+  }
+
+  function commentNodeHtml(c, depth) {
+    const replies = c.children || [];
+    const wrapId = 'comment-thread-' + c.id;
+    const canDelete = commentsCtx.isAdmin
+      || (!!commentsCtx.myUserId && c.userId === commentsCtx.myUserId);
+    let h = '<div class="comment' + (depth ? ' comment-reply' : '') + '" data-comment-id="' + esc(c.id) + '">';
+    h +=   '<div class="comment-head">';
+    h +=     '<span class="comment-author">' + esc(c.userName || 'Traveller') + '</span>';
+    h +=     '<span class="comment-date">' + esc(formatCommentDate(c.createdAt)) + '</span>';
+    h +=   '</div>';
+    h +=   '<div class="comment-body">' + esc(c.body) + '</div>';
+    h +=   '<div class="comment-actions">';
+    h +=     '<button type="button" class="comment-vote comment-up' + (c.myVote === 1 ? ' on' : '') + '" data-vote="1" data-cid="' + esc(c.id) + '" aria-label="' + esc(t('comments.upvote')) + '"><span class="arrow">▲</span><span class="count">' + (c.upvotes || 0) + '</span></button>';
+    h +=     '<button type="button" class="comment-vote comment-down' + (c.myVote === -1 ? ' on' : '') + '" data-vote="-1" data-cid="' + esc(c.id) + '" aria-label="' + esc(t('comments.downvote')) + '"><span class="arrow">▼</span><span class="count">' + (c.downvotes || 0) + '</span></button>';
+    h +=     '<button type="button" class="comment-action" data-reply="' + esc(c.id) + '">' + esc(t('comments.reply')) + '</button>';
+    if (canDelete) {
+      h +=   '<button type="button" class="comment-action comment-delete" data-del-comment="' + esc(c.id) + '">' + esc(t('comments.delete')) + '</button>';
+    }
+    h +=   '</div>';
+    h +=   '<form class="comment-form comment-reply-form" id="reply-form-' + esc(c.id) + '" data-parent="' + esc(c.id) + '" style="display:none">' +
+             '<textarea maxlength="1200" placeholder="' + esc(t('comments.placeholder')) + '"></textarea>' +
+             '<div class="comment-form-row">' +
+               '<button type="button" class="btn-ghost comment-cancel">' + esc(t('comments.cancel')) + '</button>' +
+               '<button type="submit" class="btn-primary"><span class="btn-label">' + esc(t('comments.postReply')) + '</span></button>' +
+             '</div>' +
+           '</form>';
+    if (replies.length) {
+      h +=   '<button type="button" class="comment-thread-toggle" data-thread="' + wrapId + '">' +
+               '<span class="twisty">▾</span><span class="label">' + replies.length + ' '
+               + (replies.length === 1 ? t('comments.replyOne') : t('comments.replies')) + '</span>' +
+             '</button>';
+    }
+    h +=   '<div class="comment-children" id="' + wrapId + '">';
+    for (const r of replies) h += commentNodeHtml(r, depth + 1);
+    h +=   '</div>';
+    h += '</div>';
+    return h;
+  }
+
+  // Delegated once on the comments container, so re-rendering the list does
+  // not pile up listeners.
+  function wireComments() {
+    const box = els.modalComments;
+    if (!box || box.__wttComments) return;
+    box.__wttComments = true;
+
+    box.addEventListener('submit', async (e) => {
+      const form = e.target.closest && e.target.closest('.comment-form');
+      if (!form || !box.contains(form)) return;
+      e.preventDefault();
+      const ta = form.querySelector('textarea');
+      const body = ((ta && ta.value) || '').trim();
+      if (!body) return;
+      const guide = commentsGuide;
+      if (!guide) return;
+      const parentId = form.getAttribute('data-parent') || '';
+      try {
+        const r = await fetch('/api/guides/' + encodeURIComponent(guide.id) + '/comments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ body: body, parentId: parentId })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'Could not post your comment');
+        showToast(t('comments.posted'), 'success');
+        await renderGuideComments(guide);
+      } catch (err) {
+        showToast(err.message || 'Could not post your comment', true);
+      }
+    });
+
+    box.addEventListener('click', async (e) => {
+      const tgl = e.target.closest('[data-thread]');
+      if (tgl) {
+        const wrap = document.getElementById(tgl.getAttribute('data-thread'));
+        if (!wrap) return;
+        const collapsed = wrap.classList.toggle('collapsed');
+        tgl.querySelector('.twisty').textContent = collapsed ? '▸' : '▾';
+        return;
+      }
+
+      const cancel = e.target.closest('.comment-cancel');
+      if (cancel) {
+        const form = cancel.closest('.comment-reply-form');
+        if (form) form.style.display = 'none';
+        return;
+      }
+
+      const reply = e.target.closest('[data-reply]');
+      if (reply) {
+        const form = document.getElementById('reply-form-' + reply.getAttribute('data-reply'));
+        if (form) {
+          form.style.display = (form.style.display === 'none') ? '' : 'none';
+          if (form.style.display !== 'none') {
+            const ta = form.querySelector('textarea');
+            if (ta) ta.focus();
+          }
+        }
+        return;
+      }
+
+      const vote = e.target.closest('[data-vote]');
+      if (vote) {
+        const cid = vote.getAttribute('data-cid');
+        const guide = commentsGuide;
+        if (!guide || !cid) return;
+        try {
+          const r = await fetch('/api/guides/' + encodeURIComponent(guide.id) + '/comments/' + encodeURIComponent(cid) + '/vote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ value: Number(vote.getAttribute('data-vote')) })
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.error || 'Could not vote');
+          // Update in place: a full re-render would collapse open threads.
+          const node = box.querySelector('.comment[data-comment-id="' + cid + '"]');
+          if (node) {
+            const up = node.querySelector('.comment-up');
+            const down = node.querySelector('.comment-down');
+            if (up) { up.classList.toggle('on', d.myVote === 1); up.querySelector('.count').textContent = d.upvotes; }
+            if (down) { down.classList.toggle('on', d.myVote === -1); down.querySelector('.count').textContent = d.downvotes; }
+          }
+        } catch (err) {
+          showToast(err.message || 'Could not vote', true);
+        }
+        return;
+      }
+
+      const del = e.target.closest('[data-del-comment]');
+      if (del) {
+        const cid = del.getAttribute('data-del-comment');
+        const guide = commentsGuide;
+        if (!guide || !cid) return;
+        if (!window.confirm(t('comments.deleteConfirm'))) return;
+        try {
+          const r = await fetch('/api/guides/' + encodeURIComponent(guide.id) + '/comments/' + encodeURIComponent(cid), {
+            method: 'DELETE',
+            credentials: 'include'
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.error || 'Could not delete');
+          showToast(t('comments.deleted'), 'success');
+          await renderGuideComments(guide);
+        } catch (err) {
+          showToast(err.message || 'Could not delete', true);
+        }
+      }
+    });
+  }
+
   async function renderGuideComments(guide) {
     const label = els.commentsLabel;
     const box = els.modalComments;
     if (!box) return;
+    wireComments();
     if (label) label.style.display = 'block';
     box.style.display = 'block';
     box.innerHTML = '<p class="comments-empty">' + esc(t('comments.loading')) + '</p>';
     try {
       const r = await fetch('/api/guides/' + encodeURIComponent(guide.id) + '/comments?_ts=' + Date.now(), { credentials: 'include' });
       const d = r.ok ? await r.json() : { comments: [] };
-      const list = (d.comments || []).slice().reverse();   // oldest first
+      const list = d.comments || [];
+      commentsGuide = guide;
+      commentsCtx = { isAdmin: !!d.isAdmin, myUserId: d.myUserId || '' };
       const signedIn = !!localStorage.getItem(AUTH_KEY);
+      const tree = buildCommentTree(list);
       let html = '<div class="comments-list">';
-      if (!list.length) html += '<p class="comments-empty">' + esc(t('comments.empty')) + '</p>';
-      for (const c of list) {
-        html += '<div class="comment">' +
-          '<div class="comment-head">' +
-            '<span class="comment-author">' + esc(c.userName || 'Traveller') + '</span>' +
-            '<span class="comment-date">' + esc(formatCommentDate(c.createdAt)) + '</span>' +
-          '</div>' +
-          '<div class="comment-body">' + esc(c.body) + '</div>' +
-        '</div>';
-      }
+      if (!tree.length) html += '<p class="comments-empty">' + esc(t('comments.empty')) + '</p>';
+      for (const node of tree) html += commentNodeHtml(node, 0);
       html += '</div>';
       if (signedIn) {
-        html += '<form class="comment-form" id="comment-form">' +
+        html += '<form class="comment-form" id="comment-form" data-parent="">' +
           '<textarea id="comment-body" maxlength="1200" placeholder="' + esc(t('comments.placeholder')) + '"></textarea>' +
           '<button type="submit" class="btn-primary"><span class="btn-label">' + esc(t('comments.post')) + '</span></button>' +
         '</form>';
@@ -2319,29 +2486,6 @@
         html += '<p class="comments-signin">' + esc(t('comments.signIn')) + '</p>';
       }
       box.innerHTML = html;
-      const form = $('#comment-form');
-      if (form) {
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const ta = $('#comment-body');
-          const body = (ta.value || '').trim();
-          if (!body) return;
-          try {
-            const r = await fetch('/api/guides/' + encodeURIComponent(guide.id) + '/comments', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ body: body })
-            });
-            const d = await r.json().catch(() => ({}));
-            if (!r.ok) throw new Error(d.error || 'Could not post your comment');
-            showToast(t('comments.posted'), 'success');
-            await renderGuideComments(guide);
-          } catch (err) {
-            showToast(err.message || 'Could not post your comment', true);
-          }
-        });
-      }
     } catch (e) {
       box.innerHTML = '<p class="comments-empty">' + esc(t('comments.empty')) + '</p>';
     }
