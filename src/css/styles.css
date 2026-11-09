@@ -1882,6 +1882,10 @@ body {
   height: 220px;
   position: relative;
   overflow: hidden;
+  /* The sheet is a flex column with overflow-y:auto. Without this the hero
+     (whose img is height:100%, so it has no intrinsic min-height) is shrunk
+     to 0 whenever the content is taller than the sheet's max-height. */
+  flex-shrink: 0;
 }
 
 .modal-hero img {
