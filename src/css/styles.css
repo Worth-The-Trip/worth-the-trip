@@ -1047,6 +1047,21 @@ body {
   font-size: 14px;
 }
 
+/* Empty bookings tab: centred prompt with one large call to action. */
+.bookings-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-xxl) 0;
+}
+
+.bookings-empty-cta {
+  padding: 16px 34px;
+  font-size: 16px;
+  border-radius: var(--radius-lg);
+}
+
 /* -------- Trips browse page (full screen) -------- */
 .trips-page {
   position: fixed;

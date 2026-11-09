@@ -4541,9 +4541,13 @@
         html += `<div class="trips-section-title">${t('bookings.past')}</div>` + past.map(bookingCardHtml).join('');
       }
       if (!html) {
-        html = `<div class="page-empty">${t('bookings.empty')}</div>`;
+        html = '<div class="page-empty bookings-empty">' + t('bookings.empty') +
+          '<button type="button" class="btn-primary bookings-empty-cta" id="bookings-empty-import">' +
+          esc(t('import.title')) + '</button></div>';
       }
       $('#bookings-list').innerHTML = html;
+      const emptyBtn = $('#bookings-empty-import');
+      if (emptyBtn) emptyBtn.addEventListener('click', openImportModal);
     });
   }
 
