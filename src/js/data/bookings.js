@@ -23,53 +23,6 @@
 //     }
 // ---------------------------------------------------------------------------
 
-const WTT_BOOKINGS = [
-  {
-    id: 'bk-park-hyatt-tokyo',
-    type: 'hotel',
-    title: 'Park Hyatt Tokyo',
-    location: 'Shinjuku, Tokyo',
-    dateStart: '2026-10-12',
-    dateEnd: '2026-10-15',
-    reference: 'PH-8X2K4Q',
-    image: 'public/Bookings Images/Park Hyatt Tokyo.webp',
-    notes: 'Check-in from 3pm. New York Bar on the 52nd floor.',
-    url: ''
-  },
-  {
-    id: 'bk-teamlab-planets',
-    type: 'event',
-    title: 'teamLab Planets Tickets × 2',
-    location: 'Toyosu, Tokyo',
-    dateStart: '2026-10-13',
-    time: '10:30',
-    reference: 'TL-209471',
-    image: 'public/Bookings Images/team lab planets-web.jpg',
-    notes: 'Arrive 15 min early. Barefoot — wear shorts you can roll up.',
-    url: ''
-  },
-  {
-    id: 'bk-tsukiji-masterclass',
-    type: 'experience',
-    title: 'Tsukiji Sushi Masterclass',
-    location: 'Tsukiji, Tokyo',
-    dateStart: '2026-10-14',
-    time: '08:00',
-    reference: 'TS-5518-WTT',
-    image: 'public/Bookings Images/tsukiji sushi masterclass.jpg',
-    notes: 'Apron provided. Market tour included before the class.',
-    url: ''
-  },
-  {
-    id: 'bk-kyoto-machiya',
-    type: 'hotel',
-    title: 'Gion Machiya Stay',
-    location: 'Gion, Kyoto',
-    dateStart: '2026-04-02',
-    dateEnd: '2026-04-05',
-    reference: 'GM-3301-ZZ',
-    image: 'public/Bookings Images/gion machiya stay.avif',
-    notes: 'Traditional townhouse. Self check-in with key box.',
-    url: ''
-  }
-];
+const WTT_BOOKINGS = [];
+
+// Example bookings were removed on request. Add real ones here when needed.
