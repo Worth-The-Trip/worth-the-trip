@@ -1056,7 +1056,8 @@ body {
   padding: var(--space-xxl) 0;
 }
 
-.bookings-empty-cta {
+/* Higher specificity than .btn-primary so the size override sticks. */
+.bookings-empty .bookings-empty-cta {
   padding: 16px 34px;
   font-size: 16px;
   border-radius: var(--radius-lg);
