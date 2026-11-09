@@ -1879,13 +1879,16 @@ body {
 /* Scrollbars — a rounded near-white pill that floats just inside the edge.
    The native square-ended track and arrow buttons were clipping the sheet's
    curved corners, so the track is made transparent and the thumb is inset by
-   a transparent border (background-clip: padding-box) with fully rounded ends. */
+   a transparent border (background-clip: padding-box) with fully rounded ends.
+   NOTE: scrollbar-width / scrollbar-color are deliberately NOT set here —
+   Chromium turns on its classic scrollbar (with arrow buttons) as soon as
+   either is present, and those buttons cannot be removed from CSS. They are
+   applied for Firefox only, further down. */
 .modal-sheet,
 .nav-panel,
 #admin-view .modal,
 #assign-guides-modal .modal {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: auto;
 }
 
 .modal-sheet::-webkit-scrollbar,
@@ -1934,6 +1937,19 @@ body {
 #assign-guides-modal .modal::-webkit-scrollbar-corner {
   display: none;
   background: transparent;
+}
+
+/* Firefox does not support ::-webkit-scrollbar, so give it the same look via
+   the standard properties. Firefox's thin scrollbar has no arrow buttons, so
+   the curved corners survive there too. */
+@-moz-document url-prefix() {
+  .modal-sheet,
+  .nav-panel,
+  #admin-view .modal,
+  #assign-guides-modal .modal {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
 }
 
 .modal-close {
