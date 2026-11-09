@@ -3117,6 +3117,12 @@
       if (e.key === 'Escape' && els.modalOverlay.classList.contains('active')) {
         closeModal();
       }
+      if (e.key === 'Escape' && $('#booking-detail-modal').classList.contains('active')) {
+        closeBookingDetail();
+      }
+      if (e.key === 'Escape' && $('#import-modal').classList.contains('active')) {
+        closeImportModal();
+      }
       if (e.key === 'Escape' && els.profileModal.classList.contains('active')) {
         closeProfile();
       }
@@ -4565,6 +4571,13 @@
 
   $('#booking-detail-close').addEventListener('click', closeBookingDetail);
   $('#booking-detail-delete').addEventListener('click', deleteBookingDetail);
+  // Tap the dimmed backdrop to dismiss — standard sheet behaviour.
+  $('#booking-detail-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeBookingDetail();
+  });
+  $('#import-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeImportModal();
+  });
   $('#booking-detail-navigate').addEventListener('click', () => {
     const b = bookingById(bookingDetailId);
     closeBookingDetail();
