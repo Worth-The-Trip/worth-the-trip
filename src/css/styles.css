@@ -1903,7 +1903,8 @@ body {
   background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.30) 40%, rgba(0,0,0,0.32) 100%);
 }
 
-/* Title and meta sit on the photo, bottom-left. */
+/* Title and meta sit on the photo, bottom-left. Sits above the locked-guide
+   scrim so the title stays readable while a guide is still locked. */
 .modal-hero-bottom {
   position: absolute;
   left: 0;
@@ -1913,6 +1914,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  z-index: 6;
 }
 
 .modal-hero-bottom .modal-meta {
@@ -1953,6 +1955,7 @@ body {
   position: absolute;
   top: var(--space-md);
   left: var(--space-md);
+  z-index: 6;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
