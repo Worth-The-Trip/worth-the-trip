@@ -1960,7 +1960,7 @@
               <div class="timeline-title-row">
                 <span class="timeline-step-num">${s.num}</span>
                 <div class="timeline-title">${esc(h.name)}</div>
-                ${bookingStatusHtml('hotel-' + s.hotelIndex)}
+                ${h.requiresBooking === false ? '' : bookingStatusHtml('hotel-' + s.hotelIndex)}
                 <button class="timeline-start-btn"${s.mapPin ? ` data-pin='${JSON.stringify(s.mapPin)}'` : ''} data-hotelidx="${s.hotelIndex}" data-navidx="${navIdx}" aria-label="Start navigation to ${esc(h.name)}">
                   ${t('nav.startBtn')}
                 </button>

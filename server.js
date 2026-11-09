@@ -2339,6 +2339,9 @@ app.patch('/api/creator/guides/:id', requireGuideEditor, async (req, res) => {
             Number.isFinite(Number(h.coordinates[0])) && Number.isFinite(Number(h.coordinates[1])))
             ? [Number(h.coordinates[0]), Number(h.coordinates[1])] : null,
           afterIndex: Number.isFinite(Number(h.afterIndex)) ? Math.max(0, Math.floor(Number(h.afterIndex))) : null,
+          // Accommodation is bookable by default; the creator can turn the
+          // requirement off for a "search nearby" style recommendation.
+          requiresBooking: h.requiresBooking !== false,
         };
       });
     }
@@ -2914,6 +2917,7 @@ function bookingMatchesStep(booking, step) {
 function bookableStepsForGuide(guide) {
   const out = [];
   (guide.hotels || []).forEach((h, i) => {
+    if (h && h.requiresBooking === false) return;
     out.push({
       key: 'hotel-' + i,
       kind: 'hotel',

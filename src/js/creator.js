@@ -469,6 +469,15 @@
       ' <button class="btn btn-ghost btn-sm" data-clearpin="' + i + '">' + esc(t('clearPin')) + '</button>';
   }
 
+  // Shared on/off switch used for "requires booking" on stops and hotels.
+  function bookingToggleHtml(prefix, index, on) {
+    return '<label class="switch-row">' +
+      '<input type="checkbox" data-' + prefix + '="requiresBooking" data-idx="' + index + '"' + (on ? ' checked' : '') + '>' +
+      '<span class="switch"></span>' +
+      '<span class="switch-text">' + esc(t('requiresBooking')) + '</span>' +
+      '</label>';
+  }
+
   // ---- stops ----
   // Each stop STARTS from a Google Maps link. Pressing "Find & fill" pulls the
   // place name, the pin, and the distance from the previous stop. Every field
@@ -503,7 +512,7 @@
         '</select></div></div>' +
 
         '<div class="field"><label>' + esc(t('stopDesc')) + '</label><textarea data-f="desc">' + esc(s.desc || '') + '</textarea></div>' +
-        '<div class="field"><label class="check-row"><input type="checkbox" data-f="requiresBooking"' + (s.requiresBooking ? ' checked' : '') + '> ' + esc(t('requiresBooking')) + '</label></div>' +
+        '<div class="field">' + bookingToggleHtml('f', i, s.requiresBooking) + '</div>' +
 
         '<div class="field"><label>' + esc(t('travelHere')) + '</label><input data-f="travelTime" value="' + esc(s.travelTime || '') + '" placeholder="' + esc(t('travelTime')) + '"></div>' +
 
@@ -926,6 +935,9 @@
       if (e.target && e.target.closest && e.target.closest('.stop') && e.target.getAttribute('data-f')) {
         syncStopsFromDOM();
       }
+      if (e.target && e.target.closest && e.target.closest('.hotel-row') && e.target.getAttribute('data-hf')) {
+        syncHotelsFromDOM();
+      }
       markDirty();
     });
 
@@ -1069,6 +1081,7 @@
         '<div class="stop-name">' + esc(h.name || '(' + t('hotelName') + ')') + '</div>' +
         '<button class="btn btn-danger btn-sm" data-rmhotel="' + i + '" title="' + esc(t('remove')) + '">×</button>' +
         '</div>' +
+        '<div class="field">' + bookingToggleHtml('hf', i, h.requiresBooking !== false) + '</div>' +
         '<div class="field"><label>' + esc(t('hotelAfter')) + '</label>' +
         '<select data-hf="afterIndex">' + opts + '</select></div>' +
         '<div class="field"><label>' + esc(t('hotelDirectBooking')) + '</label>' +
@@ -1102,6 +1115,7 @@
       Array.prototype.forEach.call(box.querySelectorAll('[data-hf]'), function (inp) {
         var f = inp.getAttribute('data-hf');
         if (f === 'googleMapsUrl') hotels[i].googleMapsUrl = inp.value.trim();
+        else if (f === 'requiresBooking') hotels[i].requiresBooking = inp.checked;
         else hotels[i][f] = inp.value.trim();
       });
     });
