@@ -2037,14 +2037,20 @@
       els.modalUnlockSub.textContent = t('modal.comingSoon') + ' — ' + formatPrice(guide.price);
     }
 
-    els.modalHero.innerHTML = `
-      <img src="${guide.heroImage}" alt="${gText(guide, 'title')}" loading="lazy" onerror="this.style.display='none'">
-      <div class="modal-hero-overlay"></div>
-      <div class="modal-hero-badge">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-        ${gLocation(guide)}
-      </div>
-    `;
+    // Update the hero in place rather than replacing its markup: the title and
+    // meta line now live inside the hero, and rebuilding it would wipe them.
+    let heroImg = els.modalHero.querySelector('img');
+    if (!heroImg) {
+      heroImg = document.createElement('img');
+      heroImg.loading = 'lazy';
+      heroImg.addEventListener('error', () => { heroImg.style.display = 'none'; });
+      els.modalHero.insertBefore(heroImg, els.modalHero.firstChild);
+    }
+    heroImg.src = guide.heroImage;
+    heroImg.alt = gText(guide, 'title');
+    heroImg.style.display = '';
+    const heroLoc = els.modalHero.querySelector('#modal-location');
+    if (heroLoc) heroLoc.textContent = gLocation(guide);
 
     els.modalIncludes.innerHTML = gText(guide, 'includes').map(item => `
       <div class="includes-list-item">
