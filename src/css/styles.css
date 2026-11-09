@@ -3855,6 +3855,8 @@ a.creator-plat:hover {
 /* The Bookings/Trips/Creators pages are z-index 3000, so the import sheet has
    to sit above them or it opens invisibly behind the page. */
 #import-modal { z-index: 4000; }
+/* Same for the booking detail sheet, which opens from the Bookings page. */
+#booking-detail-modal { z-index: 4000; }
 .import-sheet { max-width: 660px; }
 .import-block {
   padding: 14px 0;
