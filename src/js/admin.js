@@ -254,22 +254,8 @@
     $('#um-phone').value = u.phone || '';
     $('#um-address').value = u.address || '';
     $('#um-password').value = '';
-    $('#um-guide-assign').value = '';
     $('#user-modal-title').textContent = 'Edit ' + (u.name || u.email);
-    await populateGuideDatalist();
     $('#user-modal').classList.add('active');
-  }
-
-  async function populateGuideDatalist() {
-    const dl = $('#guide-options');
-    if (!dl) return;
-    if (!guidesCache || !guidesCache.length) {
-      try {
-        const r = await api('/api/admin/guides');
-        guidesCache = r.guides || [];
-      } catch (e) { guidesCache = []; }
-    }
-    dl.innerHTML = guidesCache.map((g) => '<option value="' + esc(g.title || g.id) + '">').join('');
   }
 
   function closeUserModal() { $('#user-modal').classList.remove('active'); }
@@ -286,25 +272,93 @@
     } catch (e) { toast(e.message); }
   });
 
-  $('#um-assign-guide').addEventListener('click', async () => {
-    const id = $('#um-id').value;
-    if (!id) return;
-    const guideInput = $('#um-guide-assign');
-    const guideTitle = guideInput.value.trim();
-    if (!guideTitle) { toast('Select a guide first'); return; }
-    // Find guide by title from cached list
-    const guide = (guidesCache || []).find((g) => g.title === guideTitle);
-    if (!guide) { toast('Guide not found — try selecting from the dropdown'); return; }
-    if (!confirm('Assign "' + guide.title + '" to this user for free?')) return;
+  // ---- Assign one or more guides from a searchable picker ----
+  let assignUserId = '';
+  let assignGuideRows = [];
+  let assignedGuideIds = new Set();
+
+  async function openAssignGuides(userId, label) {
+    assignUserId = userId;
+    if (!guidesCache || !guidesCache.length) {
+      try {
+        const r = await api('/api/admin/guides');
+        guidesCache = r.guides || [];
+      } catch (e) { guidesCache = []; }
+    }
+    assignGuideRows = guidesCache;
+    assignedGuideIds = new Set();
     try {
-      await api('/api/admin/users/' + id + '/assign-guide', {
+      const r = await api('/api/users/' + userId);
+      assignedGuideIds = new Set(
+        (r.purchases || []).filter((p) => p.guideId).map((p) => p.guideId)
+      );
+    } catch (e) { /* fall through: show everything unticked */ }
+    $('#assign-guides-title').textContent = 'Assign guides — ' + (label || 'user');
+    $('#assign-guides-search').value = '';
+    renderAssignGuideRows();
+    $('#assign-guides-modal').classList.add('active');
+  }
+
+  function renderAssignGuideRows() {
+    const term = ($('#assign-guides-search').value || '').trim().toLowerCase();
+    const rows = assignGuideRows.filter((g) => {
+      if (!term) return true;
+      return [g.title, g.creatorName, g.creatorHandle, g.prefecture, g.city]
+        .filter(Boolean).join(' ').toLowerCase().indexOf(term) !== -1;
+    });
+    const tb = $('#assign-guides-table tbody');
+    if (!rows.length) {
+      tb.innerHTML = '<tr><td colspan="5" class="empty">No guides match that search.</td></tr>';
+      return;
+    }
+    tb.innerHTML = rows.map((g) => {
+      const owned = assignedGuideIds.has(g.id);
+      const created = String(g.createdAt || '').slice(0, 10);
+      return '<tr>' +
+        '<td><input type="checkbox" data-assign-guide="' + esc(g.id) + '"' +
+          (owned ? ' checked disabled' : '') + ' aria-label="Assign ' + esc(g.title || g.id) + '"></td>' +
+        '<td><strong>' + esc(g.title || g.id) + '</strong>' +
+          (owned ? ' <span class="pill green">owned</span>' : '') + '</td>' +
+        '<td>' + esc(g.creatorName || g.creatorHandle || '—') + '</td>' +
+        '<td>' + esc(created) + '</td>' +
+        '<td>' + esc(g.prefecture || g.city || '—') + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  $('#assign-guides-search').addEventListener('input', renderAssignGuideRows);
+
+  $('#assign-guides-cancel').addEventListener('click', () => {
+    $('#assign-guides-modal').classList.remove('active');
+  });
+
+  $('#assign-guides-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) $('#assign-guides-modal').classList.remove('active');
+  });
+
+  $('#assign-guides-save').addEventListener('click', async () => {
+    const ids = Array.from(document.querySelectorAll('[data-assign-guide]:checked'))
+      .map((cb) => cb.getAttribute('data-assign-guide'));
+    if (!ids.length) { toast('Tick at least one guide first'); return; }
+    if (!confirm('Assign ' + ids.length + ' guide(s) to this user for free?')) return;
+    try {
+      const r = await api('/api/admin/users/' + assignUserId + '/assign-guide', {
         method: 'POST',
-        body: JSON.stringify({ guideId: guide.id }),
+        body: JSON.stringify({ guideIds: ids }),
       });
-      toast('Guide assigned');
+      const already = (r.skipped || []).filter((x) => x.reason === 'already owned').length;
+      toast('Assigned ' + (r.assigned || []).length + ' guide(s)' +
+        (already ? ' — ' + already + ' already owned' : ''));
+      $('#assign-guides-modal').classList.remove('active');
       closeUserModal();
       loadAll();
     } catch (e) { toast(e.message); }
+  });
+
+  $('#um-assign-guide').addEventListener('click', () => {
+    const id = $('#um-id').value;
+    if (!id) return;
+    openAssignGuides(id, $('#um-name').value || $('#um-email').value);
   });
 
   $('#user-edit-form').addEventListener('submit', async (e) => {

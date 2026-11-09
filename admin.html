@@ -158,23 +158,41 @@
           <label for="um-password">New password <span class="hint">— leave blank to keep the current one</span></label>
           <input id="um-password" type="password" autocomplete="new-password">
         </div>
-        <div class="field">
-          <label for="um-guide-assign">Assign guide (searchable)</label>
-          <input id="um-guide-assign" list="guide-options" placeholder="Start typing a guide title...">
-          <datalist id="guide-options"></datalist>
-        </div>
         <div class="btn-row">
           <button class="btn btn-primary" type="submit">Save changes</button>
           <button class="btn btn-ghost" type="button" id="um-promote-creator">Promote to Creator</button>
-          <button class="btn btn-ghost" type="button" id="um-assign-guide">Assign Guide</button>
+          <button class="btn btn-ghost" type="button" id="um-assign-guide">Assign guides</button>
           <button class="btn btn-ghost" type="button" id="um-cancel">Cancel</button>
         </div>
       </form>
     </div>
   </div>
 
+  <!-- Assign one or more guides to a user -->
+  <div class="modal-overlay" id="assign-guides-modal">
+    <div class="modal card">
+      <h2 id="assign-guides-title">Assign guides</h2>
+      <p class="sub">Tick as many guides as you like, then assign them in one go. Already-owned guides are shown ticked and cannot be ticked again.</p>
+      <div class="field">
+        <input id="assign-guides-search" class="field-input" placeholder="Search by guide name, creator or prefecture…" autocomplete="off">
+      </div>
+      <div class="table-wrap" style="max-height:52vh;overflow:auto">
+        <table class="table" id="assign-guides-table">
+          <thead>
+            <tr><th style="width:34px"></th><th>Guide</th><th>Creator</th><th>Created</th><th>Prefecture</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="btn-row" style="margin-top:12px;justify-content:flex-end">
+        <button class="btn btn-ghost" id="assign-guides-cancel">Cancel</button>
+        <button class="btn btn-primary" id="assign-guides-save">Assign selected</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
-  <script src="src/js/admin.js?v=7"></script>
+  <script src="src/js/admin.js?v=8"></script>
 </body>
 </html>
