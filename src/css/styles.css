@@ -3280,6 +3280,14 @@ body.nav-immersive .drive-bar {
     right: var(--space-lg);
     bottom: calc(45% + var(--space-sm));
   }
+  /* Immersive drive mode owns the whole screen. Starting navigation leaves
+     nav-split on the body, and its `bottom: 45%` rule above would otherwise
+     win (declared later than the desktop immersive rule) and leave the bottom
+     half of the phone dead while the panel it made room for is hidden. */
+  body.nav-immersive #map-container {
+    right: 0;
+    bottom: 0;
+  }
 }
 
 /* -------- Bookings page -------- */
